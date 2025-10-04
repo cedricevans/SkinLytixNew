@@ -1,10 +1,9 @@
 import { Button } from "@/components/ui/button";
 import { ArrowRight, Sparkles } from "lucide-react";
-import { useState } from "react";
-import WaitlistDialog from "@/components/WaitlistDialog";
+import { useNavigate } from "react-router-dom";
 
 const CTASection = () => {
-  const [waitlistDialogOpen, setWaitlistDialogOpen] = useState(false);
+  const navigate = useNavigate();
 
   return (
     <section id="cta-section" className="py-24 px-6 bg-gradient-hero relative overflow-hidden">
@@ -35,9 +34,9 @@ const CTASection = () => {
             variant="cta" 
             size="lg" 
             className="text-base px-8 py-6 h-auto bg-cta hover:bg-cta/90"
-            onClick={() => setWaitlistDialogOpen(true)}
+            onClick={() => navigate('/auth')}
           >
-            Join the Waitlist
+            Start Your First Analysis
             <ArrowRight className="ml-2 w-5 h-5" />
           </Button>
           <Button
@@ -54,8 +53,6 @@ const CTASection = () => {
         </p>
       </div>
 
-      {/* Waitlist Dialog */}
-      <WaitlistDialog open={waitlistDialogOpen} onOpenChange={setWaitlistDialogOpen} />
     </section>
   );
 };
