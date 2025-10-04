@@ -39,6 +39,7 @@ export default function Routine() {
   const [availableAnalyses, setAvailableAnalyses] = useState<Analysis[]>([]);
   const [loading, setLoading] = useState(false);
   const [optimizing, setOptimizing] = useState(false);
+  const [showCostDialog, setShowCostDialog] = useState(false);
   
   const [showPriceDialog, setShowPriceDialog] = useState(false);
   const [selectedAnalysisId, setSelectedAnalysisId] = useState<string | null>(null);
@@ -286,6 +287,31 @@ export default function Routine() {
     }
   };
 
+  const handleCostAnalysis = async () => {
+    if (!routineId || routineProducts.length === 0) {
+      toast.error("Add products to your routine first");
+      return;
+    }
+
+    try {
+      const { data: optimizations } = await supabase
+        .from("routine_optimizations")
+        .select("id")
+        .eq("routine_id", routineId)
+        .order("created_at", { ascending: false })
+        .limit(1);
+
+      if (optimizations && optimizations.length > 0) {
+        navigate(`/routine/optimization/${optimizations[0].id}`);
+      } else {
+        setShowCostDialog(true);
+      }
+    } catch (error) {
+      console.error("Error checking optimizations:", error);
+      toast.error("Failed to load cost analysis");
+    }
+  };
+
   const totalCost = routineProducts.reduce(
     (sum, p) => sum + (p.product_price || 0),
     0
@@ -328,7 +354,7 @@ export default function Routine() {
                   <Sparkles className="w-4 h-4 mr-2" />
                   {optimizing ? "Optimizing..." : "Optimize Routine"}
                 </Button>
-                <Button variant="outline">
+                <Button variant="outline" onClick={handleCostAnalysis}>
                   <DollarSign className="w-4 h-4 mr-2" />
                   Cost Analysis
                 </Button>
@@ -574,6 +600,32 @@ export default function Routine() {
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
+
+        {/* Cost Analysis Info Dialog */}
+        <Dialog open={showCostDialog} onOpenChange={setShowCostDialog}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Cost Analysis Not Available</DialogTitle>
+            </DialogHeader>
+            <div className="py-4">
+              <p className="text-muted-foreground mb-4">
+                No cost analysis found. Run "Optimize Routine" first to generate detailed cost optimization insights.
+              </p>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setShowCostDialog(false)}>
+                Cancel
+              </Button>
+              <Button onClick={() => {
+                setShowCostDialog(false);
+                handleOptimizeRoutine();
+              }}>
+                <Sparkles className="w-4 h-4 mr-2" />
+                Optimize Now
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
     </div>
   );
