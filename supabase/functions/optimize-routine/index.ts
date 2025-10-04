@@ -28,6 +28,8 @@ serve(async (req) => {
         *,
         user_analyses (
           product_name,
+          brand,
+          category,
           epiq_score,
           ingredients_list,
           recommendations_json
@@ -43,6 +45,8 @@ serve(async (req) => {
     // Prepare product data for AI analysis
     const productsData = routineProducts.map(rp => ({
       name: rp.user_analyses.product_name,
+      brand: rp.user_analyses.brand,
+      category: rp.user_analyses.category,
       ingredients: rp.user_analyses.ingredients_list,
       price: rp.product_price,
       frequency: rp.usage_frequency,
@@ -53,7 +57,14 @@ serve(async (req) => {
     const aiPrompt = `You are a skincare routine optimization expert. Analyze this skincare routine and provide detailed insights:
 
 PRODUCTS IN ROUTINE:
-${JSON.stringify(productsData, null, 2)}
+${productsData.map((p, i) => `
+${i + 1}. ${p.name}${p.brand ? ` by ${p.brand}` : ''}
+   Category: ${p.category || 'unknown'}
+   Price: $${p.price || 'unknown'}
+   Used: ${p.frequency}
+   EpiQ Score: ${p.epiqScore}/100
+   Full Ingredients: ${p.ingredients}
+`).join('\n')}
 
 Provide a comprehensive analysis covering:
 

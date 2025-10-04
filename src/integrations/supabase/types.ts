@@ -314,6 +314,8 @@ export type Database = {
       user_analyses: {
         Row: {
           analyzed_at: string | null
+          brand: string | null
+          category: string | null
           epiq_score: number | null
           id: string
           ingredients_list: string
@@ -324,6 +326,8 @@ export type Database = {
         }
         Insert: {
           analyzed_at?: string | null
+          brand?: string | null
+          category?: string | null
           epiq_score?: number | null
           id?: string
           ingredients_list: string
@@ -334,6 +338,8 @@ export type Database = {
         }
         Update: {
           analyzed_at?: string | null
+          brand?: string | null
+          category?: string | null
           epiq_score?: number | null
           id?: string
           ingredients_list?: string

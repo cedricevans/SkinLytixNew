@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 import { Plus, Sparkles, DollarSign, AlertTriangle } from "lucide-react";
@@ -21,6 +22,8 @@ interface RoutineProduct {
   product_price: number | null;
   user_analyses: {
     product_name: string;
+    brand?: string;
+    category?: string;
     epiq_score: number;
   };
 }
@@ -78,6 +81,8 @@ export default function Routine() {
           *,
           user_analyses (
             product_name,
+            brand,
+            category,
             epiq_score
           )
         `)
@@ -215,12 +220,31 @@ export default function Routine() {
               {routineProducts.map((rp) => (
                 <Card key={rp.id} className="p-4">
                   <div className="flex items-center justify-between">
-                    <div>
+                    <div className="flex-1">
                       <h3 className="font-semibold">{rp.user_analyses.product_name}</h3>
-                      <p className="text-sm text-muted-foreground">
-                        EpiQ Score: {rp.user_analyses.epiq_score} • {rp.usage_frequency} • $
-                        {rp.product_price || 0}
-                      </p>
+                      {rp.user_analyses.brand && (
+                        <p className="text-sm text-muted-foreground">
+                          {rp.user_analyses.brand}
+                        </p>
+                      )}
+                      <div className="flex items-center gap-2 mt-1">
+                        {rp.user_analyses.category && (
+                          <Badge variant="outline" className="text-xs">
+                            {rp.user_analyses.category}
+                          </Badge>
+                        )}
+                        <span className="text-sm text-muted-foreground">
+                          EpiQ: {rp.user_analyses.epiq_score}
+                        </span>
+                        <span className="text-sm text-muted-foreground">•</span>
+                        <span className="text-sm text-muted-foreground">
+                          {rp.usage_frequency}
+                        </span>
+                        <span className="text-sm text-muted-foreground">•</span>
+                        <span className="text-sm text-muted-foreground">
+                          ${rp.product_price || 0}
+                        </span>
+                      </div>
                     </div>
                   </div>
                 </Card>

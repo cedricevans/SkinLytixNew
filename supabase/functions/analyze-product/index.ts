@@ -12,7 +12,7 @@ serve(async (req) => {
   }
 
   try {
-    const { product_name, barcode, ingredients_list, user_id } = await req.json();
+    const { product_name, barcode, brand, category, ingredients_list, user_id } = await req.json();
     
     if (!product_name || !ingredients_list || !user_id) {
       return new Response(
@@ -35,6 +35,24 @@ serve(async (req) => {
       .maybeSingle();
 
     console.log('User profile:', profile);
+
+    // Helper: Detect product category from OBF tags
+    const detectCategoryFromTags = (tags: string[]): string | null => {
+      const tagString = tags.join(' ').toLowerCase();
+      if (tagString.includes('cleanser')) return 'cleanser';
+      if (tagString.includes('serum')) return 'serum';
+      if (tagString.includes('moisturizer') || tagString.includes('cream')) return 'moisturizer';
+      if (tagString.includes('sunscreen') || tagString.includes('spf')) return 'sunscreen';
+      if (tagString.includes('toner')) return 'toner';
+      if (tagString.includes('treatment')) return 'treatment';
+      if (tagString.includes('mask')) return 'mask';
+      if (tagString.includes('eye')) return 'eye-cream';
+      return null;
+    };
+
+    // Extract brand/category from Open Beauty Facts if not provided
+    let extractedBrand = brand;
+    let extractedCategory = category;
 
     // Check product_cache if barcode provided
     let cachedProductData = null;
@@ -68,6 +86,18 @@ serve(async (req) => {
         if (obfData.product) {
           cachedProductData = obfData;
         }
+      }
+    }
+
+    // Extract brand/category from cached data if not manually provided
+    if (cachedProductData?.product) {
+      if (!extractedBrand && cachedProductData.product.brands) {
+        extractedBrand = cachedProductData.product.brands.split(',')[0].trim();
+      }
+      
+      if (!extractedCategory && cachedProductData.product.categories_tags) {
+        const obfCategories = cachedProductData.product.categories_tags;
+        extractedCategory = detectCategoryFromTags(obfCategories);
       }
     }
 
@@ -326,12 +356,7 @@ serve(async (req) => {
     const detectCategory = (cachedData: any): string => {
       if (!cachedData?.product) return 'unknown';
       const categories = cachedData.product.categories_tags || [];
-      if (categories.some((c: string) => c.includes('cleanser'))) return 'cleanser';
-      if (categories.some((c: string) => c.includes('serum'))) return 'serum';
-      if (categories.some((c: string) => c.includes('moisturizer') || c.includes('cream'))) return 'moisturizer';
-      if (categories.some((c: string) => c.includes('sunscreen') || c.includes('spf'))) return 'sunscreen';
-      if (categories.some((c: string) => c.includes('treatment'))) return 'treatment';
-      return 'unknown';
+      return detectCategoryFromTags(categories) || 'unknown';
     };
 
     // Helper: Get application technique
@@ -429,6 +454,10 @@ serve(async (req) => {
           : `Not ideal for your skin profile. Consider alternatives with safer formulations.`,
       routine_suggestions: routineSuggestions,
       personalized: !!profile,
+      product_metadata: {
+        brand: extractedBrand,
+        category: extractedCategory
+      }
     };
 
     // Check if product exists in database
@@ -450,6 +479,8 @@ serve(async (req) => {
         user_id,
         product_id: productId,
         product_name,
+        brand: extractedBrand,
+        category: extractedCategory,
         ingredients_list,
         epiq_score: epiqScore,
         recommendations_json: recommendations

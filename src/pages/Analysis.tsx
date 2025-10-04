@@ -11,6 +11,8 @@ import PostAnalysisFeedback from "@/components/PostAnalysisFeedback";
 interface AnalysisData {
   id: string;
   product_name: string;
+  brand?: string;
+  category?: string;
   product_id: string | null;
   barcode: string | null;
   ingredients_list: string;
@@ -22,6 +24,10 @@ interface AnalysisData {
     summary: string;
     routine_suggestions: string[];
     personalized?: boolean;
+    product_metadata?: {
+      brand?: string;
+      category?: string;
+    };
   };
   analyzed_at: string;
 }
@@ -97,6 +103,8 @@ const Analysis = () => {
       const { data, error } = await supabase.functions.invoke('save-product', {
         body: {
           product_name: analysis.product_name,
+          brand: analysis.brand || analysis.recommendations_json?.product_metadata?.brand,
+          category: analysis.category || analysis.recommendations_json?.product_metadata?.category,
           barcode: analysis.barcode,
           ingredients: ingredientsArray,
           analysis_id: analysis.id,
@@ -245,6 +253,18 @@ const Analysis = () => {
 
         <div className="mb-8">
           <h1 className="text-4xl font-bold mb-2">{analysis.product_name}</h1>
+          <div className="flex flex-wrap gap-2 mb-2">
+            {(analysis.brand || analysis.recommendations_json?.product_metadata?.brand) && (
+              <Badge variant="secondary">
+                {analysis.brand || analysis.recommendations_json?.product_metadata?.brand}
+              </Badge>
+            )}
+            {(analysis.category || analysis.recommendations_json?.product_metadata?.category) && (
+              <Badge variant="outline">
+                {analysis.category || analysis.recommendations_json?.product_metadata?.category}
+              </Badge>
+            )}
+          </div>
           <p className="text-muted-foreground">
             Analyzed on {new Date(analysis.analyzed_at).toLocaleDateString()}
           </p>

@@ -18,6 +18,8 @@ const Upload = () => {
   const [productImage, setProductImage] = useState<string | null>(null);
   const [productName, setProductName] = useState("");
   const [barcode, setBarcode] = useState("");
+  const [brand, setBrand] = useState("");
+  const [category, setCategory] = useState("");
   const [ingredientsList, setIngredientsList] = useState("");
   const [isProcessingOCR, setIsProcessingOCR] = useState(false);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
@@ -42,10 +44,47 @@ const Upload = () => {
           }
         });
         
-        setIngredientsList(result.data.text);
+        const fullText = result.data.text;
+        const lines = fullText.split('\n').map(l => l.trim()).filter(l => l);
+        
+        // Extract brand (usually at top)
+        if (lines.length > 0 && !brand) {
+          const potentialBrand = lines[0];
+          if (potentialBrand.length < 30) {
+            setBrand(potentialBrand);
+          }
+        }
+        
+        // Detect category from text
+        const textLower = fullText.toLowerCase();
+        const categoryKeywords: Record<string, string[]> = {
+          'cleanser': ['cleanser', 'cleansing', 'wash'],
+          'serum': ['serum'],
+          'moisturizer': ['moisturizer', 'cream', 'lotion'],
+          'toner': ['toner'],
+          'sunscreen': ['sunscreen', 'spf', 'sun protection'],
+          'mask': ['mask'],
+          'treatment': ['treatment', 'spot']
+        };
+        
+        for (const [cat, keywords] of Object.entries(categoryKeywords)) {
+          if (keywords.some(kw => textLower.includes(kw))) {
+            setCategory(cat);
+            break;
+          }
+        }
+        
+        // Extract ingredients
+        const ingredientsMatch = fullText.match(/ingredients?[:\s]+(.+?)(?:\n\n|$)/is);
+        if (ingredientsMatch) {
+          setIngredientsList(ingredientsMatch[1].trim());
+        } else {
+          setIngredientsList(fullText);
+        }
+        
         toast({
           title: "OCR Complete",
-          description: "Ingredients extracted! Please review and edit as needed.",
+          description: "Product info extracted! Please review and edit.",
         });
       } catch (error) {
         console.error('OCR error:', error);
@@ -97,6 +136,8 @@ const Upload = () => {
         body: {
           product_name: productName,
           barcode: barcode || null,
+          brand: brand || null,
+          category: category || null,
           ingredients_list: ingredientsList,
           user_id: user.id
         }
@@ -202,6 +243,26 @@ const Upload = () => {
                 value={barcode}
                 onChange={(e) => setBarcode(e.target.value)}
                 placeholder="e.g., 012345678901"
+              />
+            </div>
+
+            <div>
+              <Label htmlFor="brand">Brand (Optional)</Label>
+              <Input
+                id="brand"
+                value={brand}
+                onChange={(e) => setBrand(e.target.value)}
+                placeholder="e.g., CeraVe, The Ordinary"
+              />
+            </div>
+
+            <div>
+              <Label htmlFor="category">Category (Optional)</Label>
+              <Input
+                id="category"
+                value={category}
+                onChange={(e) => setCategory(e.target.value)}
+                placeholder="e.g., serum, moisturizer, cleanser"
               />
             </div>
 
