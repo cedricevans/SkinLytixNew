@@ -123,6 +123,16 @@ export default {
             opacity: "0.7",
           },
         },
+        "slide-in-from-right": {
+          from: {
+            transform: "translateX(100%)",
+            opacity: "0",
+          },
+          to: {
+            transform: "translateX(0)",
+            opacity: "1",
+          },
+        },
       },
       animation: {
         "accordion-down": "accordion-down 0.2s ease-out",
@@ -130,6 +140,7 @@ export default {
         "fade-in-up": "fade-in-up 0.6s ease-out",
         "float": "float 3s ease-in-out infinite",
         "pulse-glow": "pulse-glow 2s ease-in-out infinite",
+        "slide-in-from-right": "slide-in-from-right 0.3s ease-out",
       },
     },
   },

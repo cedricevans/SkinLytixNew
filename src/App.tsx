@@ -9,6 +9,7 @@ import Analysis from "./pages/Analysis";
 import Auth from "./pages/Auth";
 import Onboarding from "./pages/Onboarding";
 import NotFound from "./pages/NotFound";
+import FeedbackWidget from "@/components/FeedbackWidget";
 
 const queryClient = new QueryClient();
 
@@ -27,6 +28,7 @@ const App = () => (
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>
+        <FeedbackWidget />
       </BrowserRouter>
     </TooltipProvider>
   </QueryClientProvider>

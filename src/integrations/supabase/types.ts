@@ -14,6 +14,42 @@ export type Database = {
   }
   public: {
     Tables: {
+      feedback: {
+        Row: {
+          context_id: string | null
+          context_type: string | null
+          created_at: string
+          feedback_type: string
+          id: string
+          message: string
+          page_url: string | null
+          rating: number | null
+          user_id: string | null
+        }
+        Insert: {
+          context_id?: string | null
+          context_type?: string | null
+          created_at?: string
+          feedback_type: string
+          id?: string
+          message: string
+          page_url?: string | null
+          rating?: number | null
+          user_id?: string | null
+        }
+        Update: {
+          context_id?: string | null
+          context_type?: string | null
+          created_at?: string
+          feedback_type?: string
+          id?: string
+          message?: string
+          page_url?: string | null
+          rating?: number | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       ingredient_cache: {
         Row: {
           cached_at: string | null

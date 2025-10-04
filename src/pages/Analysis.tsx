@@ -6,6 +6,7 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { AlertCircle, CheckCircle2, Sparkles, Home, ScanLine, Database, Users } from "lucide-react";
+import PostAnalysisFeedback from "@/components/PostAnalysisFeedback";
 
 interface AnalysisData {
   id: string;
@@ -322,6 +323,9 @@ const Analysis = () => {
             ))}
           </ul>
         </Card>
+
+        {/* Post-Analysis Feedback */}
+        <PostAnalysisFeedback analysisId={analysis.id} />
       </div>
     </main>
   );
