@@ -1,12 +1,13 @@
 import { Button } from "@/components/ui/button";
 import { ArrowRight, Sparkles } from "lucide-react";
-import { useNavigate } from "react-router-dom";
+import { useState } from "react";
+import WaitlistDialog from "@/components/WaitlistDialog";
 
 const CTASection = () => {
-  const navigate = useNavigate();
+  const [waitlistDialogOpen, setWaitlistDialogOpen] = useState(false);
 
   return (
-    <section className="py-24 px-6 bg-gradient-hero relative overflow-hidden">
+    <section id="cta-section" className="py-24 px-6 bg-gradient-hero relative overflow-hidden">
       {/* Background Pattern */}
       <div className="absolute inset-0 opacity-10">
         <div className="absolute top-10 left-10 w-40 h-40 bg-cta rounded-full blur-3xl animate-pulse-glow" />
@@ -34,9 +35,9 @@ const CTASection = () => {
             variant="cta" 
             size="lg" 
             className="text-base px-8 py-6 h-auto bg-cta hover:bg-cta/90"
-            onClick={() => navigate('/auth')}
+            onClick={() => setWaitlistDialogOpen(true)}
           >
-            Start Your First Analysis
+            Join the Waitlist
             <ArrowRight className="ml-2 w-5 h-5" />
           </Button>
           <Button
@@ -52,6 +53,9 @@ const CTASection = () => {
           No credit card required • Free API access • Help shape the future of skincare intelligence
         </p>
       </div>
+
+      {/* Waitlist Dialog */}
+      <WaitlistDialog open={waitlistDialogOpen} onOpenChange={setWaitlistDialogOpen} />
     </section>
   );
 };

@@ -1,10 +1,11 @@
 import { Button } from "@/components/ui/button";
 import { Sparkles, ArrowRight } from "lucide-react";
-import { useNavigate } from "react-router-dom";
+import { useState } from "react";
 import heroBackground from "@/assets/hero-background.jpg";
+import WaitlistDialog from "@/components/WaitlistDialog";
 
 const Hero = () => {
-  const navigate = useNavigate();
+  const [waitlistDialogOpen, setWaitlistDialogOpen] = useState(false);
 
   return (
     <section className="relative min-h-[90vh] flex items-center justify-center overflow-hidden">
@@ -21,12 +22,17 @@ const Hero = () => {
       {/* Content */}
       <div className="relative z-10 max-w-6xl mx-auto px-6 py-20 text-center">
         {/* Trust Badge */}
-        <div className="inline-flex items-center gap-2 px-4 py-2 bg-success/20 rounded-full mb-8 animate-fade-in-up border border-success/30">
+        <button 
+          onClick={() => {
+            document.getElementById('cta-section')?.scrollIntoView({ behavior: 'smooth' });
+          }}
+          className="inline-flex items-center gap-2 px-4 py-2 bg-success/20 rounded-full mb-8 animate-fade-in-up border border-success/30 hover:bg-success/30 transition-colors cursor-pointer"
+        >
           <Sparkles className="w-4 h-4 text-success-foreground" />
           <span className="text-sm font-subheading font-medium text-success-foreground">
             Beta Access Coming Soon
           </span>
-        </div>
+        </button>
 
         {/* Main Headline */}
         <h1 className="text-5xl md:text-7xl font-heading font-bold mb-6 leading-tight animate-fade-in-up" style={{ animationDelay: "0.1s" }}>
@@ -49,9 +55,9 @@ const Hero = () => {
             variant="cta" 
             size="lg" 
             className="text-base px-8 py-6 h-auto"
-            onClick={() => navigate('/auth')}
+            onClick={() => setWaitlistDialogOpen(true)}
           >
-            Analyze Your Products Free
+            Join our Community
             <ArrowRight className="ml-2 w-5 h-5" />
           </Button>
           <Button 
@@ -75,6 +81,9 @@ const Hero = () => {
       {/* Floating Elements */}
       <div className="absolute top-20 left-10 w-24 h-24 bg-accent/10 rounded-full blur-3xl animate-float" />
       <div className="absolute bottom-20 right-10 w-32 h-32 bg-cta/10 rounded-full blur-3xl animate-float" style={{ animationDelay: "1s" }} />
+
+      {/* Waitlist Dialog */}
+      <WaitlistDialog open={waitlistDialogOpen} onOpenChange={setWaitlistDialogOpen} />
     </section>
   );
 };
