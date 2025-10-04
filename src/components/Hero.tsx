@@ -24,7 +24,7 @@ const Hero = () => {
         <div className="inline-flex items-center gap-2 px-4 py-2 bg-success/20 rounded-full mb-8 animate-fade-in-up border border-success/30">
           <Sparkles className="w-4 h-4 text-success-foreground" />
           <span className="text-sm font-subheading font-medium text-success-foreground">
-            Evidence-Based Skincare Intelligence
+            Beta Access Coming Soon
           </span>
         </div>
 
@@ -54,7 +54,14 @@ const Hero = () => {
             Analyze Your Products Free
             <ArrowRight className="ml-2 w-5 h-5" />
           </Button>
-          <Button variant="outline" size="lg" className="text-base px-8 py-6 h-auto border-primary/30 hover:border-primary">
+          <Button 
+            variant="outline" 
+            size="lg" 
+            className="text-base px-8 py-6 h-auto border-primary/30 hover:border-primary"
+            onClick={() => {
+              document.getElementById('how-it-works')?.scrollIntoView({ behavior: 'smooth' });
+            }}
+          >
             See How It Works
           </Button>
         </div>

@@ -85,7 +85,7 @@ const FeedbackWidget = () => {
           />
           
           {/* Panel */}
-          <div className="relative bg-background border-l border-border w-full sm:w-[400px] h-[80vh] sm:h-auto sm:max-h-[600px] shadow-2xl animate-slide-in-from-right flex flex-col">
+          <div className="relative bg-card border-l border-border w-full sm:w-[400px] h-[80vh] sm:h-auto sm:max-h-[600px] shadow-2xl animate-slide-in-from-right flex flex-col">
             {/* Header */}
             <div className="flex items-center justify-between p-6 border-b border-border">
               <div className="flex items-center gap-2">
@@ -107,10 +107,10 @@ const FeedbackWidget = () => {
               <div className="space-y-2">
                 <Label htmlFor="feedback-type">Feedback Type</Label>
                 <Select value={feedbackType} onValueChange={setFeedbackType}>
-                  <SelectTrigger id="feedback-type" className="bg-background">
+                  <SelectTrigger id="feedback-type" className="bg-card">
                     <SelectValue placeholder="Select a type..." />
                   </SelectTrigger>
-                  <SelectContent className="bg-background z-[60]">
+                  <SelectContent className="bg-card z-[60]">
                     <SelectItem value="bug_report">Bug Report</SelectItem>
                     <SelectItem value="feature_request">Feature Request</SelectItem>
                     <SelectItem value="general_feedback">General Feedback</SelectItem>

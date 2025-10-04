@@ -17,7 +17,7 @@ const CTASection = () => {
         <div className="inline-flex items-center gap-2 px-4 py-2 bg-primary-foreground/20 rounded-full mb-6 animate-fade-in-up">
           <Sparkles className="w-4 h-4 text-primary-foreground" />
           <span className="text-sm font-subheading font-medium text-primary-foreground">
-            Beta Access Now Open
+            Beta Access Coming Soon
           </span>
         </div>
 
@@ -40,11 +40,11 @@ const CTASection = () => {
             <ArrowRight className="ml-2 w-5 h-5" />
           </Button>
           <Button
-            variant="outline"
+            variant="default"
             size="lg"
-            className="text-base px-8 py-6 h-auto border-primary-foreground/30 hover:border-primary-foreground hover:bg-primary-foreground/10 text-primary-foreground"
+            className="text-base px-8 py-6 h-auto bg-primary hover:bg-primary/90 text-primary-foreground"
           >
-            Learn More About Beta
+            Learn More About SkinLytix
           </Button>
         </div>
 
