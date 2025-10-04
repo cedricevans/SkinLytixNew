@@ -8,7 +8,8 @@ import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
-import { Plus, Sparkles, DollarSign, AlertTriangle } from "lucide-react";
+import { Plus, Sparkles, DollarSign, AlertTriangle, Pencil, Trash2 } from "lucide-react";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 
 interface Analysis {
   id: string;
@@ -43,6 +44,17 @@ export default function Routine() {
   const [selectedAnalysisId, setSelectedAnalysisId] = useState<string | null>(null);
   const [productPrice, setProductPrice] = useState("");
   const [usageFrequency, setUsageFrequency] = useState("Both");
+  const [editingProductId, setEditingProductId] = useState<string | null>(null);
+  
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [productToDelete, setProductToDelete] = useState<string | null>(null);
+  
+  const [showManualEntryDialog, setShowManualEntryDialog] = useState(false);
+  const [manualProductName, setManualProductName] = useState("");
+  const [manualBrand, setManualBrand] = useState("");
+  const [manualCategory, setManualCategory] = useState("");
+  const [manualPrice, setManualPrice] = useState("");
+  const [manualFrequency, setManualFrequency] = useState("Both");
 
   useEffect(() => {
     loadRoutineAndAnalyses();
@@ -117,7 +129,42 @@ export default function Routine() {
     setSelectedAnalysisId(analysisId);
     setProductPrice("");
     setUsageFrequency("Both");
+    setEditingProductId(null);
     setShowPriceDialog(true);
+  };
+
+  const handleEditProduct = (routineProduct: RoutineProduct) => {
+    setEditingProductId(routineProduct.id);
+    setSelectedAnalysisId(routineProduct.analysis_id);
+    setProductPrice(routineProduct.product_price?.toString() || "");
+    setUsageFrequency(routineProduct.usage_frequency);
+    setShowPriceDialog(true);
+  };
+
+  const confirmDeleteProduct = (productId: string) => {
+    setProductToDelete(productId);
+    setShowDeleteDialog(true);
+  };
+
+  const handleDeleteProduct = async () => {
+    if (!productToDelete) return;
+
+    try {
+      const { error } = await supabase
+        .from("routine_products")
+        .delete()
+        .eq("id", productToDelete);
+
+      if (error) throw error;
+
+      toast.success("Product removed from routine");
+      setShowDeleteDialog(false);
+      setProductToDelete(null);
+      loadRoutineAndAnalyses();
+    } catch (error) {
+      console.error("Error deleting product:", error);
+      toast.error("Failed to remove product");
+    }
   };
 
   const handleAddProduct = async () => {
@@ -126,22 +173,91 @@ export default function Routine() {
     const price = parseFloat(productPrice) || 0;
 
     try {
-      const { error } = await supabase
+      if (editingProductId) {
+        // Update existing product
+        const { error } = await supabase
+          .from("routine_products")
+          .update({
+            usage_frequency: usageFrequency,
+            product_price: price,
+          })
+          .eq("id", editingProductId);
+
+        if (error) throw error;
+        toast.success("Product updated");
+      } else {
+        // Insert new product
+        const { error } = await supabase
+          .from("routine_products")
+          .insert({
+            routine_id: routineId,
+            analysis_id: selectedAnalysisId,
+            usage_frequency: usageFrequency,
+            product_price: price,
+          });
+
+        if (error) throw error;
+        toast.success("Product added to routine");
+      }
+
+      setShowPriceDialog(false);
+      setEditingProductId(null);
+      loadRoutineAndAnalyses();
+    } catch (error) {
+      console.error("Error saving product:", error);
+      toast.error("Failed to save product");
+    }
+  };
+
+  const handleAddManualProduct = async () => {
+    if (!routineId || !manualProductName) {
+      toast.error("Product name is required");
+      return;
+    }
+
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      // First, create a user analysis entry
+      const { data: analysis, error: analysisError } = await supabase
+        .from("user_analyses")
+        .insert({
+          user_id: user.id,
+          product_name: manualProductName,
+          brand: manualBrand || null,
+          category: manualCategory || null,
+          epiq_score: null,
+          ingredients_list: "Manually added - no ingredient analysis",
+        })
+        .select()
+        .single();
+
+      if (analysisError) throw analysisError;
+
+      // Then add to routine
+      const price = parseFloat(manualPrice) || 0;
+      const { error: routineError } = await supabase
         .from("routine_products")
         .insert({
           routine_id: routineId,
-          analysis_id: selectedAnalysisId,
-          usage_frequency: usageFrequency,
+          analysis_id: analysis.id,
+          usage_frequency: manualFrequency,
           product_price: price,
         });
 
-      if (error) throw error;
+      if (routineError) throw routineError;
 
       toast.success("Product added to routine");
-      setShowPriceDialog(false);
+      setShowManualEntryDialog(false);
+      setManualProductName("");
+      setManualBrand("");
+      setManualCategory("");
+      setManualPrice("");
+      setManualFrequency("Both");
       loadRoutineAndAnalyses();
     } catch (error) {
-      console.error("Error adding product:", error);
+      console.error("Error adding manual product:", error);
       toast.error("Failed to add product");
     }
   };
@@ -236,7 +352,7 @@ export default function Routine() {
             <div className="grid gap-4">
               {routineProducts.map((rp) => (
                 <Card key={rp.id} className="p-4">
-                  <div className="flex items-center justify-between">
+                  <div className="flex items-center justify-between gap-4">
                     <div className="flex-1">
                       <h3 className="font-semibold">{rp.user_analyses.product_name}</h3>
                       {rp.user_analyses.brand && (
@@ -250,10 +366,14 @@ export default function Routine() {
                             {rp.user_analyses.category}
                           </Badge>
                         )}
-                        <span className="text-sm text-muted-foreground">
-                          EpiQ: {rp.user_analyses.epiq_score}
-                        </span>
-                        <span className="text-sm text-muted-foreground">•</span>
+                        {rp.user_analyses.epiq_score !== null && (
+                          <>
+                            <span className="text-sm text-muted-foreground">
+                              EpiQ: {rp.user_analyses.epiq_score}
+                            </span>
+                            <span className="text-sm text-muted-foreground">•</span>
+                          </>
+                        )}
                         <span className="text-sm text-muted-foreground">
                           {rp.usage_frequency}
                         </span>
@@ -262,6 +382,24 @@ export default function Routine() {
                           ${rp.product_price || 0}
                         </span>
                       </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => handleEditProduct(rp)}
+                        className="h-8 w-8 text-primary hover:text-primary hover:bg-primary/10"
+                      >
+                        <Pencil className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => confirmDeleteProduct(rp.id)}
+                        className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
                     </div>
                   </div>
                 </Card>
@@ -272,7 +410,13 @@ export default function Routine() {
 
         {/* Available Products to Add */}
         <div>
-          <h2 className="text-2xl font-bold mb-4">Add Products</h2>
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-2xl font-bold">Add Products</h2>
+            <Button onClick={() => setShowManualEntryDialog(true)} variant="default">
+              <Plus className="w-4 h-4 mr-2" />
+              Add New Product
+            </Button>
+          </div>
           <div className="grid gap-4">
             {availableAnalyses
               .filter(
@@ -304,7 +448,7 @@ export default function Routine() {
         <Dialog open={showPriceDialog} onOpenChange={setShowPriceDialog}>
           <DialogContent>
             <DialogHeader>
-              <DialogTitle>Add Product to Routine</DialogTitle>
+              <DialogTitle>{editingProductId ? "Edit Product" : "Add Product to Routine"}</DialogTitle>
             </DialogHeader>
             <div className="space-y-4 py-4">
               <div>
@@ -337,11 +481,99 @@ export default function Routine() {
                 Cancel
               </Button>
               <Button onClick={handleAddProduct}>
-                Add Product
+                {editingProductId ? "Update Product" : "Add Product"}
               </Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>
+
+        {/* Manual Product Entry Dialog */}
+        <Dialog open={showManualEntryDialog} onOpenChange={setShowManualEntryDialog}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Add New Product Manually</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+              <div>
+                <Label htmlFor="manual-name">Product Name *</Label>
+                <Input
+                  id="manual-name"
+                  placeholder="Enter product name"
+                  value={manualProductName}
+                  onChange={(e) => setManualProductName(e.target.value)}
+                />
+              </div>
+              <div>
+                <Label htmlFor="manual-brand">Brand</Label>
+                <Input
+                  id="manual-brand"
+                  placeholder="Enter brand (optional)"
+                  value={manualBrand}
+                  onChange={(e) => setManualBrand(e.target.value)}
+                />
+              </div>
+              <div>
+                <Label htmlFor="manual-category">Category</Label>
+                <Input
+                  id="manual-category"
+                  placeholder="e.g., Moisturizer, Serum (optional)"
+                  value={manualCategory}
+                  onChange={(e) => setManualCategory(e.target.value)}
+                />
+              </div>
+              <div>
+                <Label htmlFor="manual-price">Product Price ($)</Label>
+                <Input
+                  id="manual-price"
+                  type="number"
+                  step="0.01"
+                  placeholder="0.00"
+                  value={manualPrice}
+                  onChange={(e) => setManualPrice(e.target.value)}
+                />
+              </div>
+              <div>
+                <Label htmlFor="manual-frequency">Usage Frequency</Label>
+                <select
+                  id="manual-frequency"
+                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                  value={manualFrequency}
+                  onChange={(e) => setManualFrequency(e.target.value)}
+                >
+                  <option value="AM">Morning (AM)</option>
+                  <option value="PM">Evening (PM)</option>
+                  <option value="Both">Both AM & PM</option>
+                </select>
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setShowManualEntryDialog(false)}>
+                Cancel
+              </Button>
+              <Button onClick={handleAddManualProduct}>
+                Add to Routine
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Delete Confirmation Dialog */}
+        <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Remove Product from Routine?</AlertDialogTitle>
+              <AlertDialogDescription>
+                This will remove the product from your routine. You can always add it back later.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogAction onClick={handleDeleteProduct} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+                Remove
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </div>
     </div>
   );
