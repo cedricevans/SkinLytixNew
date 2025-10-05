@@ -22,12 +22,9 @@ const Hero = () => {
       {/* Header Bar */}
       <header className="relative z-20 w-full bg-primary shadow-soft">
         <div className="max-w-6xl mx-auto px-6 py-4">
-          <div className="flex items-center gap-2">
-            <Hexagon className="w-6 h-6 text-primary-foreground" />
-            <h2 className="text-xl md:text-2xl font-heading font-bold text-primary-foreground">
-              SkinLytix
-            </h2>
-          </div>
+          <h2 className="text-xl md:text-2xl font-heading font-bold text-primary-foreground">
+            SkinLytix
+          </h2>
         </div>
       </header>
 
