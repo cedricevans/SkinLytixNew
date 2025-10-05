@@ -2,13 +2,14 @@ import { Button } from "@/components/ui/button";
 import { Sparkles, ArrowRight } from "lucide-react";
 import { useState } from "react";
 import heroBackground from "@/assets/hero-background.jpg";
+import skinlytixLogo from "@/assets/skinlytix-logo.png";
 import WaitlistDialog from "@/components/WaitlistDialog";
 
 const Hero = () => {
   const [waitlistDialogOpen, setWaitlistDialogOpen] = useState(false);
 
   return (
-    <section className="relative min-h-[90vh] flex items-center justify-center overflow-hidden">
+    <section className="relative min-h-[90vh] flex flex-col overflow-hidden">
       {/* Background Image with Overlay */}
       <div className="absolute inset-0 z-0">
         <img
@@ -19,8 +20,20 @@ const Hero = () => {
         <div className="absolute inset-0 bg-gradient-to-br from-background via-background/95 to-accent/10" />
       </div>
 
+      {/* Header with Logo */}
+      <header className="relative z-20 w-full px-6 py-6">
+        <div className="max-w-6xl mx-auto">
+          <img 
+            src={skinlytixLogo} 
+            alt="SkinLytix Logo" 
+            className="h-12 md:h-16 w-auto"
+          />
+        </div>
+      </header>
+
       {/* Content */}
-      <div className="relative z-10 max-w-6xl mx-auto px-6 py-20 text-center">
+      <div className="relative z-10 flex-1 flex items-center justify-center">
+      <div className="max-w-6xl mx-auto px-6 py-20 text-center">
         {/* Trust Badge */}
         <button 
           onClick={() => {
@@ -76,6 +89,7 @@ const Hero = () => {
         <p className="mt-12 text-sm font-body text-muted-foreground animate-fade-in-up" style={{ animationDelay: "0.4s" }}>
           Trusted by beauty enthusiasts who refuse to waste money on trial and error
         </p>
+        </div>
       </div>
 
       {/* Floating Elements */}
