@@ -8,7 +8,7 @@ const Hero = () => {
   const [waitlistDialogOpen, setWaitlistDialogOpen] = useState(false);
 
   return (
-    <section className="relative min-h-[90vh] flex flex-col overflow-hidden">
+    <section className="relative min-h-[85vh] md:min-h-[90vh] flex flex-col overflow-hidden">
       {/* Background Image with Overlay */}
       <div className="absolute inset-0 z-0">
         <img
@@ -21,7 +21,7 @@ const Hero = () => {
 
       {/* Header Bar */}
       <header className="relative z-20 w-full bg-primary shadow-soft">
-        <div className="max-w-6xl mx-auto px-6 py-4">
+        <div className="max-w-6xl mx-auto px-4 md:px-6 py-3 md:py-4">
           <h2 className="text-xl md:text-2xl font-heading font-bold text-primary-foreground">
             SkinLytix
           </h2>
@@ -30,7 +30,7 @@ const Hero = () => {
 
       {/* Content */}
       <div className="relative z-10 flex-1 flex items-center justify-center">
-      <div className="max-w-6xl mx-auto px-6 py-20 text-center">
+      <div className="max-w-6xl mx-auto px-4 md:px-6 py-12 md:py-20 text-center">
         {/* Trust Badge */}
         <button 
           onClick={() => {
@@ -45,7 +45,7 @@ const Hero = () => {
         </button>
 
         {/* Main Headline */}
-        <h1 className="text-5xl md:text-7xl font-heading font-bold mb-6 leading-tight animate-fade-in-up" style={{ animationDelay: "0.1s" }}>
+        <h1 className="text-4xl md:text-7xl font-heading font-bold mb-4 md:mb-6 leading-tight animate-fade-in-up" style={{ animationDelay: "0.1s" }}>
           Stop Guessing.
           <br />
           <span className="bg-gradient-hero bg-clip-text text-transparent">
@@ -54,17 +54,17 @@ const Hero = () => {
         </h1>
 
         {/* Subheadline */}
-        <p className="text-xl md:text-2xl font-subheading text-muted-foreground max-w-3xl mx-auto mb-12 animate-fade-in-up" style={{ animationDelay: "0.2s" }}>
+        <p className="text-lg md:text-2xl font-subheading text-muted-foreground max-w-3xl mx-auto mb-8 md:mb-12 animate-fade-in-up" style={{ animationDelay: "0.2s" }}>
           70% of shoppers find ingredient lists confusing. SkinLytix decodes them instantly, 
           optimizes your routine, and helps you stop wasting money on products that don't work together.
         </p>
 
         {/* CTA Buttons */}
-        <div className="flex flex-col sm:flex-row gap-4 justify-center items-center animate-fade-in-up" style={{ animationDelay: "0.3s" }}>
+        <div className="flex flex-col sm:flex-row gap-3 md:gap-4 justify-center items-center animate-fade-in-up" style={{ animationDelay: "0.3s" }}>
           <Button 
             variant="cta" 
             size="lg" 
-            className="text-base px-8 py-6 h-auto"
+            className="text-base px-8 py-5 md:py-6 h-auto w-full sm:w-auto"
             onClick={() => setWaitlistDialogOpen(true)}
           >
             Join our Community
@@ -73,7 +73,7 @@ const Hero = () => {
           <Button 
             variant="outline" 
             size="lg" 
-            className="text-base px-8 py-6 h-auto border-primary/30 hover:border-primary"
+            className="text-base px-8 py-5 md:py-6 h-auto w-full sm:w-auto border-primary/30 hover:border-primary"
             onClick={() => {
               document.getElementById('how-it-works')?.scrollIntoView({ behavior: 'smooth' });
             }}

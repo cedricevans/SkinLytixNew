@@ -29,14 +29,14 @@ const steps = [
 
 const HowItWorks = () => {
   return (
-    <section id="how-it-works" className="py-24 px-6 bg-background">
+    <section id="how-it-works" className="py-12 md:py-24 px-4 md:px-6 bg-background">
       <div className="max-w-6xl mx-auto">
         {/* Section Header */}
-        <div className="text-center mb-16">
-          <h2 className="text-4xl md:text-5xl font-heading font-bold mb-4">
+        <div className="text-center mb-10 md:mb-16">
+          <h2 className="text-3xl md:text-5xl font-heading font-bold mb-3 md:mb-4">
             How SkinLytix Works
           </h2>
-          <p className="text-lg font-subheading text-muted-foreground max-w-2xl mx-auto">
+          <p className="text-base md:text-lg font-subheading text-muted-foreground max-w-2xl mx-auto">
             From confusion to clarity in under 60 seconds
           </p>
         </div>
@@ -47,7 +47,7 @@ const HowItWorks = () => {
           <div className="hidden md:block absolute top-12 left-0 right-0 h-1 bg-gradient-to-r from-accent via-primary to-cta opacity-20" />
 
           {/* Steps Grid */}
-          <div className="grid md:grid-cols-4 gap-8 relative">
+          <div className="grid md:grid-cols-4 gap-8 md:gap-8 relative">
             {steps.map((step, index) => {
               const Icon = step.icon;
               return (
@@ -57,12 +57,12 @@ const HowItWorks = () => {
                   style={{ animationDelay: `${index * 0.15}s` }}
                 >
                   {/* Number Badge */}
-                  <div className="flex justify-center mb-6">
+                  <div className="flex justify-center mb-4 md:mb-6">
                     <div className="relative">
-                      <div className="w-24 h-24 rounded-full bg-gradient-hero flex items-center justify-center shadow-medium">
-                        <Icon className="w-10 h-10 text-primary-foreground" />
+                      <div className="w-20 h-20 md:w-24 md:h-24 rounded-full bg-gradient-hero flex items-center justify-center shadow-medium">
+                        <Icon className="w-8 h-8 md:w-10 md:h-10 text-primary-foreground" />
                       </div>
-                      <div className="absolute -top-2 -right-2 w-8 h-8 bg-cta rounded-full flex items-center justify-center text-cta-foreground font-cta font-bold text-sm shadow-soft">
+                      <div className="absolute -top-2 -right-2 w-7 h-7 md:w-8 md:h-8 bg-cta rounded-full flex items-center justify-center text-cta-foreground font-cta font-bold text-xs md:text-sm shadow-soft">
                         {index + 1}
                       </div>
                     </div>
@@ -70,7 +70,7 @@ const HowItWorks = () => {
 
                   {/* Content */}
                   <div className="text-center">
-                    <h3 className="text-xl font-heading font-bold mb-2">
+                    <h3 className="text-lg md:text-xl font-heading font-bold mb-2">
                       {step.title}
                     </h3>
                     <p className="text-muted-foreground font-body text-sm mb-3 leading-relaxed">
@@ -87,9 +87,9 @@ const HowItWorks = () => {
         </div>
 
         {/* Beta Notice */}
-        <div className="mt-16 max-w-3xl mx-auto">
-          <div className="bg-warning/20 border border-warning/30 rounded-xl p-6 text-center">
-            <p className="font-subheading text-warning-foreground">
+        <div className="mt-10 md:mt-16 max-w-3xl mx-auto">
+          <div className="bg-warning/20 border border-warning/30 rounded-xl p-4 md:p-6 text-center">
+            <p className="text-sm md:text-base font-subheading text-warning-foreground">
               <span className="font-bold">Beta Transparency:</span> First-time product entry takes 20-40 seconds. 
               Once in our database, analysis drops to 5-7 seconds. You're not just using SkinLytix—you're building it with us.
             </p>

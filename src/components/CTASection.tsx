@@ -6,7 +6,7 @@ const CTASection = () => {
   const navigate = useNavigate();
 
   return (
-    <section id="cta-section" className="py-24 px-6 bg-gradient-hero relative overflow-hidden">
+    <section id="cta-section" className="py-12 md:py-24 px-4 md:px-6 bg-gradient-hero relative overflow-hidden">
       {/* Background Pattern */}
       <div className="absolute inset-0 opacity-10">
         <div className="absolute top-10 left-10 w-40 h-40 bg-cta rounded-full blur-3xl animate-pulse-glow" />
@@ -21,19 +21,19 @@ const CTASection = () => {
           </span>
         </div>
 
-        <h2 className="text-4xl md:text-5xl font-heading font-bold text-primary-foreground mb-6 animate-fade-in-up" style={{ animationDelay: "0.1s" }}>
+        <h2 className="text-3xl md:text-5xl font-heading font-bold text-primary-foreground mb-4 md:mb-6 animate-fade-in-up" style={{ animationDelay: "0.1s" }}>
           Ready to Stop Wasting Money on Skincare?
         </h2>
 
-        <p className="text-xl font-subheading text-primary-foreground/90 mb-10 animate-fade-in-up" style={{ animationDelay: "0.2s" }}>
+        <p className="text-lg md:text-xl font-subheading text-primary-foreground/90 mb-8 md:mb-10 animate-fade-in-up" style={{ animationDelay: "0.2s" }}>
           Join beauty enthusiasts who analyze before they buy. Free during beta—help us build the tool you've always needed.
         </p>
 
-        <div className="flex flex-col sm:flex-row gap-4 justify-center items-center animate-fade-in-up" style={{ animationDelay: "0.3s" }}>
+        <div className="flex flex-col sm:flex-row gap-3 md:gap-4 justify-center items-center animate-fade-in-up" style={{ animationDelay: "0.3s" }}>
           <Button 
             variant="cta" 
             size="lg" 
-            className="text-base px-8 py-6 h-auto bg-cta hover:bg-cta/90"
+            className="text-base px-8 py-5 md:py-6 h-auto w-full sm:w-auto bg-cta hover:bg-cta/90"
             onClick={() => navigate('/auth')}
           >
             Start Your First Analysis
@@ -42,7 +42,7 @@ const CTASection = () => {
           <Button
             variant="default"
             size="lg"
-            className="text-base px-8 py-6 h-auto bg-primary hover:bg-primary/90 text-primary-foreground"
+            className="text-base px-8 py-5 md:py-6 h-auto w-full sm:w-auto bg-primary hover:bg-primary/90 text-primary-foreground"
             onClick={() => window.open('https://www.skinlytix.com', '_blank')}
           >
             Learn More About SkinLytix

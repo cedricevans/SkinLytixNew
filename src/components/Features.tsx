@@ -29,30 +29,30 @@ const features = [
 
 const Features = () => {
   return (
-    <section className="py-24 px-6 bg-gradient-card">
+    <section className="py-12 md:py-24 px-4 md:px-6 bg-gradient-card">
       <div className="max-w-6xl mx-auto">
         {/* Section Header */}
-        <div className="text-center mb-16">
-          <h2 className="text-4xl md:text-5xl font-heading font-bold mb-4">
+        <div className="text-center mb-10 md:mb-16">
+          <h2 className="text-3xl md:text-5xl font-heading font-bold mb-3 md:mb-4">
             Three Modules. Zero Guesswork.
           </h2>
-          <p className="text-lg font-subheading text-muted-foreground max-w-2xl mx-auto">
+          <p className="text-base md:text-lg font-subheading text-muted-foreground max-w-2xl mx-auto">
             Built on real consumer pain points from 998 beauty shoppers just like you
           </p>
         </div>
 
         {/* Feature Cards */}
-        <div className="grid md:grid-cols-3 gap-8">
+        <div className="grid md:grid-cols-3 gap-6 md:gap-8">
           {features.map((feature, index) => (
             <Card
               key={feature.title}
               className="border-border/50 shadow-soft hover:shadow-medium transition-all duration-300 hover:-translate-y-2 bg-card/80 backdrop-blur-sm animate-fade-in-up"
               style={{ animationDelay: `${index * 0.1}s` }}
             >
-              <CardContent className="p-8">
+              <CardContent className="p-5 md:p-8">
                 {/* Icon */}
-                <div className="mb-6 flex justify-center">
-                  <div className="w-20 h-20 rounded-2xl bg-accent/10 flex items-center justify-center p-4">
+                <div className="mb-4 md:mb-6 flex justify-center">
+                  <div className="w-16 h-16 md:w-20 md:h-20 rounded-2xl bg-accent/10 flex items-center justify-center p-3 md:p-4">
                     <img
                       src={feature.icon}
                       alt={`${feature.title} icon`}
@@ -62,12 +62,12 @@ const Features = () => {
                 </div>
 
                 {/* Title */}
-                <h3 className="text-2xl font-heading font-bold mb-3 text-center">
+                <h3 className="text-xl md:text-2xl font-heading font-bold mb-2 md:mb-3 text-center">
                   {feature.title}
                 </h3>
 
                 {/* Description */}
-                <p className="text-muted-foreground font-body mb-6 text-center leading-relaxed">
+                <p className="text-sm md:text-base text-muted-foreground font-body mb-4 md:mb-6 text-center leading-relaxed">
                   {feature.description}
                 </p>
 
