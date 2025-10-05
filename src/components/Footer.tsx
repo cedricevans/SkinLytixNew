@@ -14,27 +14,6 @@ const Footer = () => {
             </p>
           </div>
 
-          {/* Product */}
-          <div>
-            <h4 className="font-heading font-bold mb-3 text-sm uppercase tracking-wide">Product</h4>
-            <ul className="space-y-2 text-sm font-body text-primary-foreground/80">
-              <li><a href="#" className="hover:text-primary-foreground transition-colors">Ingredient Intelligence</a></li>
-              <li><a href="#" className="hover:text-primary-foreground transition-colors">Routine Optimizer</a></li>
-              <li><a href="#" className="hover:text-primary-foreground transition-colors">Cost Analysis</a></li>
-              <li><a href="#" className="hover:text-primary-foreground transition-colors">Beta Program</a></li>
-            </ul>
-          </div>
-
-          {/* Resources */}
-          <div>
-            <h4 className="font-heading font-bold mb-3 text-sm uppercase tracking-wide">Resources</h4>
-            <ul className="space-y-2 text-sm font-body text-primary-foreground/80">
-              <li><a href="#" className="hover:text-primary-foreground transition-colors">Research Data</a></li>
-              <li><a href="#" className="hover:text-primary-foreground transition-colors">API Documentation</a></li>
-              <li><a href="#" className="hover:text-primary-foreground transition-colors">Community Guidelines</a></li>
-              <li><a href="#" className="hover:text-primary-foreground transition-colors">Privacy Policy</a></li>
-            </ul>
-          </div>
         </div>
 
         {/* Bottom Bar */}
