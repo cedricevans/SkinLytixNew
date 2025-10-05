@@ -1,8 +1,7 @@
 import { Button } from "@/components/ui/button";
-import { Sparkles, ArrowRight } from "lucide-react";
+import { Sparkles, ArrowRight, Hexagon } from "lucide-react";
 import { useState } from "react";
 import heroBackground from "@/assets/hero-background.jpg";
-import skinlytixLogo from "@/assets/skinlytix-logo.png";
 import WaitlistDialog from "@/components/WaitlistDialog";
 
 const Hero = () => {
@@ -20,14 +19,15 @@ const Hero = () => {
         <div className="absolute inset-0 bg-gradient-to-br from-background via-background/95 to-accent/10" />
       </div>
 
-      {/* Header with Logo */}
-      <header className="relative z-20 w-full px-6 py-6">
-        <div className="max-w-6xl mx-auto">
-          <img 
-            src={skinlytixLogo} 
-            alt="SkinLytix Logo" 
-            className="h-12 md:h-16 w-auto"
-          />
+      {/* Header Bar */}
+      <header className="relative z-20 w-full bg-primary shadow-soft">
+        <div className="max-w-6xl mx-auto px-6 py-4">
+          <div className="flex items-center gap-2">
+            <Hexagon className="w-6 h-6 text-primary-foreground" />
+            <h2 className="text-xl md:text-2xl font-heading font-bold text-primary-foreground">
+              SkinLytix
+            </h2>
+          </div>
         </div>
       </header>
 
