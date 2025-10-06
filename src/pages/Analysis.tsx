@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { AlertCircle, CheckCircle2, Sparkles, Home, ScanLine, Database, Users, Plus, Info } from "lucide-react";
 import PostAnalysisFeedback from "@/components/PostAnalysisFeedback";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from "@/components/ui/tooltip";
 
 interface AnalysisData {
   id: string;
@@ -246,7 +246,8 @@ const Analysis = () => {
   };
 
   return (
-    <main className="min-h-screen bg-gradient-to-b from-background to-muted py-12 px-4">
+    <TooltipProvider>
+      <main className="min-h-screen bg-gradient-to-b from-background to-muted py-12 px-4">
       <div className="container max-w-4xl mx-auto">
         <div className="flex items-center justify-between mb-8">
           <Button variant="ghost" onClick={() => navigate('/')}>
@@ -490,6 +491,7 @@ const Analysis = () => {
         <PostAnalysisFeedback analysisId={analysis.id} />
       </div>
     </main>
+    </TooltipProvider>
   );
 };
 

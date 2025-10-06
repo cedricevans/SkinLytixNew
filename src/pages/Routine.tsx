@@ -10,7 +10,7 @@ import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { Plus, Sparkles, DollarSign, AlertTriangle, Pencil, Trash2, Info } from "lucide-react";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from "@/components/ui/tooltip";
 
 interface Analysis {
   id: string;
@@ -327,7 +327,8 @@ export default function Routine() {
   }
 
   return (
-    <div className="min-h-screen bg-background">
+    <TooltipProvider>
+      <div className="min-h-screen bg-background">
       <div className="container mx-auto px-4 py-8 max-w-6xl">
         <div className="mb-8">
           <h1 className="text-4xl font-bold mb-2">{routineName}</h1>
@@ -679,5 +680,6 @@ export default function Routine() {
         </Dialog>
       </div>
     </div>
+    </TooltipProvider>
   );
 }

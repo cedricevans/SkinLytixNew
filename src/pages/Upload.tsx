@@ -9,7 +9,7 @@ import { Card } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import Tesseract from "tesseract.js";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from "@/components/ui/tooltip";
 
 const Upload = () => {
   const navigate = useNavigate();
@@ -166,7 +166,8 @@ const Upload = () => {
   };
 
   return (
-    <main className="min-h-screen bg-gradient-to-b from-background to-muted py-12 px-4">
+    <TooltipProvider>
+      <main className="min-h-screen bg-gradient-to-b from-background to-muted py-12 px-4">
       <div className="container max-w-3xl mx-auto">
         <h1 className="text-4xl font-bold text-center mb-8">Upload Product</h1>
         
@@ -322,6 +323,7 @@ const Upload = () => {
         </Card>
       </div>
     </main>
+    </TooltipProvider>
   );
 };
 

@@ -6,7 +6,7 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { ArrowLeft, AlertTriangle, TrendingDown, DollarSign, CheckCircle, Info } from "lucide-react";
 import { toast } from "sonner";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from "@/components/ui/tooltip";
 
 interface OptimizationData {
   redundancies: Array<{
@@ -88,7 +88,8 @@ export default function RoutineOptimization() {
   }
 
   return (
-    <div className="min-h-screen bg-background">
+    <TooltipProvider>
+      <div className="min-h-screen bg-background">
       <div className="container mx-auto px-4 py-8 max-w-4xl">
         <Button
           variant="ghost"
@@ -332,5 +333,6 @@ export default function RoutineOptimization() {
         )}
       </div>
     </div>
+    </TooltipProvider>
   );
 }
