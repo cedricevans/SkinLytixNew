@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { ThumbsUp, ThumbsDown } from "lucide-react";
+import { useState, useEffect } from "react";
+import { Star } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
@@ -20,13 +20,13 @@ const PostAnalysisFeedback = ({ analysisId }: PostAnalysisFeedbackProps) => {
   const handleRating = async (value: number) => {
     setRating(value);
     
-    // Show follow-up for negative ratings
+    // Show follow-up for ratings 1-3 (negative/neutral)
     if (value <= 3) {
       setShowFollowUp(true);
       return;
     }
 
-    // Submit immediately for positive ratings
+    // Submit immediately for positive ratings (4-5)
     await submitFeedback(value, "");
   };
 
@@ -86,26 +86,29 @@ const PostAnalysisFeedback = ({ analysisId }: PostAnalysisFeedbackProps) => {
       <h3 className="text-lg font-semibold mb-4">Was this analysis helpful?</h3>
       
       {!showFollowUp ? (
-        <div className="flex items-center gap-4">
-          <button
-            onClick={() => handleRating(5)}
-            disabled={isSubmitting || rating !== null}
-            className="flex items-center gap-2 px-4 py-2 rounded-lg border border-border bg-background hover:bg-accent hover:border-accent-foreground transition-colors disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2"
-            aria-label="Positive feedback"
-          >
-            <ThumbsUp className="w-5 h-5" />
-            <span className="text-sm font-medium">Yes, helpful</span>
-          </button>
-          
-          <button
-            onClick={() => handleRating(2)}
-            disabled={isSubmitting || rating !== null}
-            className="flex items-center gap-2 px-4 py-2 rounded-lg border border-border bg-background hover:bg-accent hover:border-accent-foreground transition-colors disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2"
-            aria-label="Negative feedback"
-          >
-            <ThumbsDown className="w-5 h-5" />
-            <span className="text-sm font-medium">Could be better</span>
-          </button>
+        <div className="space-y-2">
+          <p className="text-sm text-muted-foreground text-center">
+            Rate your experience (1 = Poor, 5 = Excellent)
+          </p>
+          <div className="flex items-center justify-center gap-2">
+            {[1, 2, 3, 4, 5].map((starValue) => (
+              <button
+                key={starValue}
+                onClick={() => handleRating(starValue)}
+                disabled={isSubmitting || rating !== null}
+                className="transition-all hover:scale-110 disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 rounded"
+                aria-label={`Rate ${starValue} stars`}
+              >
+                <Star
+                  className={`w-8 h-8 transition-colors ${
+                    rating !== null && starValue <= rating
+                      ? "fill-yellow-400 text-yellow-400"
+                      : "text-muted-foreground hover:text-yellow-400"
+                  }`}
+                />
+              </button>
+            ))}
+          </div>
         </div>
       ) : (
         <div className="space-y-4">
