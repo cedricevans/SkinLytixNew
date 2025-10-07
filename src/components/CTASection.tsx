@@ -20,7 +20,7 @@ const CTASection = () => {
         <div className="inline-flex items-center gap-2 px-4 py-2 bg-primary-foreground/20 rounded-full mb-6 animate-fade-in-up">
           <Sparkles className="w-4 h-4 text-primary-foreground" />
           <span className="text-sm font-subheading font-medium text-primary-foreground">
-            Beta Access Coming Soon
+            Beta Access is Live
           </span>
         </div>
 
