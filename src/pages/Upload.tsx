@@ -1,6 +1,6 @@
 import { useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
-import { Camera, Upload as UploadIcon, Loader2, Info } from "lucide-react";
+import { Camera, Upload as UploadIcon, Loader2, Info, Home, User } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
@@ -169,6 +169,26 @@ const Upload = () => {
     <TooltipProvider>
       <main className="min-h-screen bg-gradient-to-b from-background to-muted py-12 px-4">
       <div className="container max-w-3xl mx-auto">
+        {/* Navigation Header */}
+        <div className="flex justify-between items-center mb-8">
+          <Button
+            variant="outline"
+            onClick={() => navigate('/')}
+            className="gap-2"
+          >
+            <Home className="w-4 h-4" />
+            Home
+          </Button>
+          <Button
+            variant="outline"
+            onClick={() => navigate('/profile')}
+            className="gap-2"
+          >
+            <User className="w-4 h-4" />
+            Profile
+          </Button>
+        </div>
+        
         <h1 className="text-4xl font-bold text-center mb-8">Upload Product</h1>
         
         <Card className="p-6 space-y-6">

@@ -5,7 +5,7 @@ import { Card } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { Droplets, Wind, Flame, Shield, Sparkles, Home, ArrowLeft, User } from "lucide-react";
+import { Droplets, Wind, Flame, Shield, Sparkles, Home, ArrowLeft, User, TrendingUp, Calendar, DollarSign, Edit2 } from "lucide-react";
 
 const skinTypes = [
   { value: "oily", label: "Oily", icon: Droplets, description: "Shiny, prone to breakouts" },
@@ -26,6 +26,15 @@ const skinConcerns = [
   { value: "dark_circles", label: "Dark Circles" },
 ];
 
+interface ProfileStats {
+  totalAnalyses: number;
+  latestRoutine: {
+    name: string;
+    lastUsed: string;
+  } | null;
+  totalSavings: number;
+}
+
 const Profile = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -34,9 +43,16 @@ const Profile = () => {
   const [selectedConcerns, setSelectedConcerns] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+  const [stats, setStats] = useState<ProfileStats>({
+    totalAnalyses: 0,
+    latestRoutine: null,
+    totalSavings: 0
+  });
+  const [isLoadingStats, setIsLoadingStats] = useState(true);
 
   useEffect(() => {
     fetchProfile();
+    fetchStats();
   }, []);
 
   const fetchProfile = async () => {
@@ -68,6 +84,71 @@ const Profile = () => {
       });
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const fetchStats = async () => {
+    setIsLoadingStats(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      // Get total analyses count
+      const { count: analysesCount } = await supabase
+        .from('user_analyses')
+        .select('*', { count: 'exact', head: true })
+        .eq('user_id', user.id);
+
+      // Get most recent routine
+      const { data: routineData } = await supabase
+        .from('routines')
+        .select('routine_name, updated_at')
+        .eq('user_id', user.id)
+        .order('updated_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      // Get total savings from routine optimizations
+      const { data: routinesData } = await supabase
+        .from('routines')
+        .select('id')
+        .eq('user_id', user.id);
+
+      const routineIds = routinesData?.map(r => r.id) || [];
+      
+      let totalSavings = 0;
+      if (routineIds.length > 0) {
+        const { data: optimizationsData } = await supabase
+          .from('routine_optimizations')
+          .select('optimization_data')
+          .in('routine_id', routineIds);
+
+        if (optimizationsData) {
+          optimizationsData.forEach((opt: any) => {
+            const costOpts = opt.optimization_data?.costOptimizations;
+            if (Array.isArray(costOpts)) {
+              costOpts.forEach((costOpt: any) => {
+                if (costOpt.potentialSavings) {
+                  totalSavings += parseFloat(costOpt.potentialSavings);
+                }
+              });
+            }
+          });
+        }
+      }
+
+      setStats({
+        totalAnalyses: analysesCount || 0,
+        latestRoutine: routineData ? {
+          name: routineData.routine_name,
+          lastUsed: new Date(routineData.updated_at).toLocaleDateString()
+        } : null,
+        totalSavings
+      });
+    } catch (error) {
+      console.error('Error fetching stats:', error);
+    } finally {
+      setIsLoadingStats(false);
     }
   };
 
@@ -148,6 +229,62 @@ const Profile = () => {
           </div>
         </div>
 
+        {/* Stats Section */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+          <Card className="p-6">
+            <div className="flex items-center gap-4">
+              <div className="p-3 bg-primary/10 rounded-lg">
+                <TrendingUp className="w-6 h-6 text-primary" />
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground">Products Analyzed</p>
+                {isLoadingStats ? (
+                  <p className="text-2xl font-bold">-</p>
+                ) : (
+                  <p className="text-2xl font-bold">{stats.totalAnalyses}</p>
+                )}
+              </div>
+            </div>
+          </Card>
+
+          <Card className="p-6">
+            <div className="flex items-center gap-4">
+              <div className="p-3 bg-primary/10 rounded-lg">
+                <Calendar className="w-6 h-6 text-primary" />
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground">Latest Routine</p>
+                {isLoadingStats ? (
+                  <p className="text-sm font-semibold">-</p>
+                ) : stats.latestRoutine ? (
+                  <>
+                    <p className="text-sm font-semibold truncate">{stats.latestRoutine.name}</p>
+                    <p className="text-xs text-muted-foreground">{stats.latestRoutine.lastUsed}</p>
+                  </>
+                ) : (
+                  <p className="text-sm text-muted-foreground">No routines yet</p>
+                )}
+              </div>
+            </div>
+          </Card>
+
+          <Card className="p-6">
+            <div className="flex items-center gap-4">
+              <div className="p-3 bg-primary/10 rounded-lg">
+                <DollarSign className="w-6 h-6 text-primary" />
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground">Total Savings</p>
+                {isLoadingStats ? (
+                  <p className="text-2xl font-bold">-</p>
+                ) : (
+                  <p className="text-2xl font-bold">${stats.totalSavings.toFixed(2)}</p>
+                )}
+              </div>
+            </div>
+          </Card>
+        </div>
+
         <Card className="p-8">
           <div className="flex items-center justify-between mb-8">
             <div className="flex items-center gap-3">
@@ -163,6 +300,7 @@ const Profile = () => {
             </div>
             {!isEditing && (
               <Button onClick={() => setIsEditing(true)}>
+                <Edit2 className="w-4 h-4 mr-2" />
                 Edit Profile
               </Button>
             )}
