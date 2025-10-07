@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
-import { Plus, Sparkles, DollarSign, AlertTriangle, Pencil, Trash2, Info } from "lucide-react";
+import { Plus, Sparkles, DollarSign, AlertTriangle, Pencil, Trash2, Info, Home, ArrowLeft } from "lucide-react";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from "@/components/ui/tooltip";
 
@@ -330,6 +330,24 @@ export default function Routine() {
     <TooltipProvider>
       <div className="min-h-screen bg-background">
       <div className="container mx-auto px-4 py-8 max-w-6xl">
+        {/* Navigation Header */}
+        <div className="flex items-center justify-between mb-8">
+          <div className="flex gap-2">
+            <Button variant="ghost" onClick={() => navigate('/')}>
+              <Home className="w-4 h-4 mr-2" />
+              Home
+            </Button>
+            <Button variant="ghost" onClick={() => navigate(-1)}>
+              <ArrowLeft className="w-4 h-4 mr-2" />
+              Back
+            </Button>
+          </div>
+          <Button variant="default" onClick={() => navigate('/upload')}>
+            <Plus className="w-4 h-4 mr-2" />
+            Scan Product
+          </Button>
+        </div>
+
         <div className="mb-8">
           <h1 className="text-4xl font-bold mb-2">{routineName}</h1>
           <p className="text-muted-foreground">
