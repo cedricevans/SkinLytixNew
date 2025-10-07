@@ -72,7 +72,7 @@ const Onboarding = () => {
         description: "Your personalized EpiQ scores are ready.",
       });
 
-      navigate("/upload");
+      navigate("/walkthrough");
     } catch (error: any) {
       toast({
         title: "Failed to save profile",

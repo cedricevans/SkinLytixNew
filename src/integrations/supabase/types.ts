@@ -188,6 +188,7 @@ export type Database = {
           created_at: string | null
           display_name: string | null
           email: string | null
+          has_seen_walkthrough: boolean | null
           id: string
           is_profile_complete: boolean | null
           skin_concerns: Json | null
@@ -198,6 +199,7 @@ export type Database = {
           created_at?: string | null
           display_name?: string | null
           email?: string | null
+          has_seen_walkthrough?: boolean | null
           id: string
           is_profile_complete?: boolean | null
           skin_concerns?: Json | null
@@ -208,6 +210,7 @@ export type Database = {
           created_at?: string | null
           display_name?: string | null
           email?: string | null
+          has_seen_walkthrough?: boolean | null
           id?: string
           is_profile_complete?: boolean | null
           skin_concerns?: Json | null

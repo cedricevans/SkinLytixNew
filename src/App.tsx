@@ -8,6 +8,7 @@ import Upload from "./pages/Upload";
 import Analysis from "./pages/Analysis";
 import Auth from "./pages/Auth";
 import Onboarding from "./pages/Onboarding";
+import Walkthrough from "./pages/Walkthrough";
 import Profile from "./pages/Profile";
 import Routine from "./pages/Routine";
 import RoutineOptimization from "./pages/RoutineOptimization";
@@ -28,6 +29,7 @@ const App = () => (
           <Route path="/analysis/:id" element={<Analysis />} />
           <Route path="/auth" element={<Auth />} />
           <Route path="/onboarding" element={<Onboarding />} />
+          <Route path="/walkthrough" element={<Walkthrough />} />
           <Route path="/profile" element={<Profile />} />
           <Route path="/routine" element={<Routine />} />
           <Route path="/routine/optimization/:id" element={<RoutineOptimization />} />

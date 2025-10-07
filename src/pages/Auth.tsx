@@ -68,10 +68,10 @@ const Auth = () => {
 
       if (error) throw error;
 
-      // Check if profile is complete
+      // Check if profile is complete and if user has seen walkthrough
       const { data: profile } = await supabase
         .from('profiles')
-        .select('is_profile_complete')
+        .select('is_profile_complete, has_seen_walkthrough')
         .eq('id', (await supabase.auth.getUser()).data.user?.id!)
         .single();
 
@@ -80,7 +80,14 @@ const Auth = () => {
         description: "Successfully signed in.",
       });
       
-      navigate(profile?.is_profile_complete ? '/upload' : '/onboarding');
+      // Route based on profile status
+      if (!profile?.is_profile_complete) {
+        navigate('/onboarding');
+      } else if (!profile?.has_seen_walkthrough) {
+        navigate('/walkthrough');
+      } else {
+        navigate('/upload');
+      }
     } catch (error: any) {
       toast({
         title: "Sign In Failed",
