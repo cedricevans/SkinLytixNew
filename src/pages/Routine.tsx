@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
-import { Plus, Sparkles, DollarSign, AlertTriangle, Pencil, Trash2, Info, Home, ArrowLeft } from "lucide-react";
+import { Plus, Sparkles, DollarSign, AlertTriangle, Pencil, Trash2, Info, Home, ArrowLeft, User } from "lucide-react";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from "@/components/ui/tooltip";
 
@@ -340,6 +340,10 @@ export default function Routine() {
             <Button variant="ghost" onClick={() => navigate(-1)}>
               <ArrowLeft className="w-4 h-4 mr-2" />
               Back
+            </Button>
+            <Button variant="ghost" onClick={() => navigate('/profile')}>
+              <User className="w-4 h-4 mr-2" />
+              Profile
             </Button>
           </div>
           <Button variant="default" onClick={() => navigate('/upload')}>
