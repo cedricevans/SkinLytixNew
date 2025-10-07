@@ -39,7 +39,7 @@ const Hero = () => {
         >
           <Sparkles className="w-4 h-4 text-success-foreground" />
           <span className="text-sm font-subheading font-medium text-success-foreground">
-            Beta Access Coming Soon
+            Beta Access is Live
           </span>
         </button>
 
