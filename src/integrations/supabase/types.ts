@@ -219,6 +219,27 @@ export type Database = {
         }
         Relationships: []
       }
+      rate_limit_log: {
+        Row: {
+          created_at: string | null
+          endpoint: string
+          id: string
+          identifier: string
+        }
+        Insert: {
+          created_at?: string | null
+          endpoint: string
+          id?: string
+          identifier: string
+        }
+        Update: {
+          created_at?: string | null
+          endpoint?: string
+          id?: string
+          identifier?: string
+        }
+        Relationships: []
+      }
       routine_optimizations: {
         Row: {
           created_at: string
@@ -403,10 +424,28 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      rate_limit_abuse_alerts: {
+        Row: {
+          endpoint: string | null
+          first_request: string | null
+          ip_address: string | null
+          last_request: string | null
+          requests_last_5min: number | null
+          total_requests: number | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
-      [_ in never]: never
+      check_rate_limit: {
+        Args: {
+          _endpoint: string
+          _identifier: string
+          _max_requests: number
+          _window_minutes: number
+        }
+        Returns: Json
+      }
     }
     Enums: {
       skin_type_enum: "oily" | "dry" | "combination" | "sensitive" | "normal"
