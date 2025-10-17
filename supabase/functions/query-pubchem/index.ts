@@ -6,7 +6,15 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-// Rate limiting: 1-2 requests per second
+// Rate limiting configuration
+const RATE_LIMITS = {
+  requestsPerMinute: 20,    // Max 20 requests per minute per IP
+  maxIngredientsPerRequest: 50,  // Max 50 ingredients per request
+  maxIngredientNameLength: 200,  // Max 200 chars per ingredient name
+  maxPayloadSize: 50000  // 50KB max payload
+};
+
+// Rate limiting: 1-2 requests per second for PubChem API
 const RATE_LIMIT_DELAY = 1500; // 1.5 seconds between requests
 
 serve(async (req) => {
@@ -15,18 +23,108 @@ serve(async (req) => {
   }
 
   try {
+    // Step 1: Check payload size
+    const contentLength = req.headers.get('content-length');
+    if (contentLength && parseInt(contentLength) > RATE_LIMITS.maxPayloadSize) {
+      return new Response(
+        JSON.stringify({ 
+          error: 'Request payload too large',
+          max_size_bytes: RATE_LIMITS.maxPayloadSize 
+        }),
+        { status: 413, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Step 2: Extract IP address for rate limiting
+    const clientIp = req.headers.get('x-forwarded-for')?.split(',')[0].trim() 
+      || req.headers.get('x-real-ip') 
+      || 'unknown';
+    
+    // Initialize Supabase client early for rate limit check
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+    const supabase = createClient(supabaseUrl, supabaseKey);
+
+    // Step 3: Check rate limit
+    const { data: rateLimitCheck, error: rateLimitError } = await supabase
+      .rpc('check_rate_limit', {
+        _endpoint: 'query-pubchem',
+        _identifier: clientIp,
+        _max_requests: RATE_LIMITS.requestsPerMinute,
+        _window_minutes: 1
+      });
+    
+    if (rateLimitError) {
+      console.error('Rate limit check failed:', rateLimitError);
+      // Fail open - allow request if rate limit check fails
+    } else if (rateLimitCheck && !rateLimitCheck.allowed) {
+      console.error('RATE_LIMIT_EXCEEDED', {
+        endpoint: 'query-pubchem',
+        ip: clientIp,
+        current_count: rateLimitCheck.current_count,
+        max_allowed: rateLimitCheck.max_requests,
+        timestamp: new Date().toISOString()
+      });
+      
+      return new Response(
+        JSON.stringify({ 
+          error: 'Rate limit exceeded. Please try again later.',
+          retry_after_seconds: rateLimitCheck.retry_after_seconds,
+          current_count: rateLimitCheck.current_count,
+          max_requests: rateLimitCheck.max_requests
+        }),
+        { 
+          status: 429, 
+          headers: { 
+            ...corsHeaders, 
+            'Content-Type': 'application/json',
+            'Retry-After': rateLimitCheck.retry_after_seconds.toString()
+          } 
+        }
+      );
+    }
+
+    // Step 4: Parse and validate request body
     const { ingredients } = await req.json();
     
+    // Validation checks
     if (!Array.isArray(ingredients) || ingredients.length === 0) {
       return new Response(
         JSON.stringify({ error: 'Ingredients array is required' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
-
-    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-    const supabase = createClient(supabaseUrl, supabaseKey);
+    
+    if (ingredients.length > RATE_LIMITS.maxIngredientsPerRequest) {
+      return new Response(
+        JSON.stringify({ 
+          error: `Too many ingredients. Maximum ${RATE_LIMITS.maxIngredientsPerRequest} per request.`,
+          provided: ingredients.length,
+          max_allowed: RATE_LIMITS.maxIngredientsPerRequest
+        }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+    
+    // Validate each ingredient name
+    for (const ingredient of ingredients) {
+      if (typeof ingredient !== 'string') {
+        return new Response(
+          JSON.stringify({ error: 'All ingredients must be strings' }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+      
+      if (ingredient.length > RATE_LIMITS.maxIngredientNameLength) {
+        return new Response(
+          JSON.stringify({ 
+            error: `Ingredient name too long. Maximum ${RATE_LIMITS.maxIngredientNameLength} characters.`,
+            ingredient: ingredient.substring(0, 50) + '...'
+          }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+    }
 
     const results = [];
 
