@@ -97,9 +97,9 @@ const Navigation = () => {
         </button>
       ))}
       <Button
-        variant="outline"
+        variant="ghost"
         size="sm"
-        className="border-primary-foreground/30 text-primary-foreground hover:bg-primary-foreground/10"
+        className="bg-white/20 text-white border border-white/50 hover:bg-white/30 transition-all"
         onClick={handleSignIn}
       >
         Sign In

@@ -66,7 +66,7 @@ const Upload = () => {
   const [isProcessingOCR, setIsProcessingOCR] = useState(false);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [ocrProgress, setOcrProgress] = useState(0);
-  const [useAIExtraction, setUseAIExtraction] = useState(false);
+  const [useAIExtraction, setUseAIExtraction] = useState(true);
 
   const handleImageUpload = async (file: File) => {
     const reader = new FileReader();
@@ -286,7 +286,7 @@ const Upload = () => {
               <Label>Product Photo</Label>
               <div className="flex items-center gap-2">
                 <Label htmlFor="ai-extraction" className="text-sm font-normal cursor-pointer">
-                  AI Extraction
+                  AI Extraction (Recommended)
                 </Label>
                 <Tooltip>
                   <TooltipTrigger asChild>
@@ -300,7 +300,7 @@ const Upload = () => {
                     </div>
                   </TooltipTrigger>
                   <TooltipContent className="max-w-xs">
-                    <p>AI-powered extraction provides 99% accuracy, understands context, and handles multiple languages. Standard OCR is fast and free.</p>
+                    <p><strong>AI Extraction (Default):</strong> 99% accuracy, understands context, handles all languages. <strong>Standard OCR:</strong> Free alternative but may produce errors with special characters.</p>
                   </TooltipContent>
                 </Tooltip>
               </div>
