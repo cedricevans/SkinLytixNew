@@ -234,6 +234,9 @@ const Analysis = () => {
 
   if (!analysis) return null;
 
+  const productMetadata = analysis.recommendations_json?.product_metadata as any;
+  const productType = productMetadata?.product_type || 'face';
+
   const getScoreColor = (score: number) => {
     if (score >= 70) return "text-green-600 dark:text-green-400";
     if (score >= 50) return "text-yellow-600 dark:text-yellow-400";
@@ -274,6 +277,12 @@ const Analysis = () => {
         <div className="mb-8">
           <h1 className="text-4xl font-bold mb-2">{analysis.product_name}</h1>
           <div className="flex flex-wrap gap-2 mb-2">
+            <Badge variant="secondary" className="text-base">
+              {productType === 'face' && '👤 Face'}
+              {productType === 'body' && '🧴 Body'}
+              {productType === 'hair' && '💆 Hair'}
+              {productType === 'other' && '🔍 Personal Care'}
+            </Badge>
             {(analysis.brand || analysis.recommendations_json?.product_metadata?.brand) && (
               <Badge variant="secondary">
                 {analysis.brand || analysis.recommendations_json?.product_metadata?.brand}

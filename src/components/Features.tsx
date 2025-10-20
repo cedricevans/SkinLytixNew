@@ -7,14 +7,14 @@ const features = [
   {
     icon: ingredientIcon,
     title: "Ingredient Intelligence",
-    description: "Decode confusing ingredient lists instantly. Understand what each ingredient does, its molecular properties, and potential interactions.",
+    description: "Decode confusing ingredient lists instantly for any personal care product - face, body, or hair. Understand what each ingredient does and potential interactions.",
     stat: "70% find ingredients confusing",
     benefit: "Get clarity in seconds"
   },
   {
     icon: routineIcon,
     title: "Routine Optimizer",
-    description: "Stop products from fighting each other. Our EpiQ score analyzes interactions and tells you exactly how to layer your skincare.",
+    description: "Stop products from fighting each other. Our EpiQ score analyzes interactions across your entire routine - from facial serums to body lotions to hair treatments.",
     stat: "69% don't know how products work together",
     benefit: "Maximize effectiveness"
   },

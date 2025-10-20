@@ -67,6 +67,7 @@ const Upload = () => {
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [ocrProgress, setOcrProgress] = useState(0);
   const [useAIExtraction, setUseAIExtraction] = useState(true);
+  const [productType, setProductType] = useState<'face' | 'body' | 'hair' | 'auto'>('auto');
 
   const handleImageUpload = async (file: File) => {
     const reader = new FileReader();
@@ -160,7 +161,10 @@ const Upload = () => {
     
     try {
       const { data, error } = await supabase.functions.invoke('extract-ingredients', {
-        body: { image: imageDataUrl }
+        body: { 
+          image: imageDataUrl,
+          productType: productType === 'auto' ? null : productType
+        }
       });
 
       if (error) throw error;
@@ -280,6 +284,48 @@ const Upload = () => {
         <h1 className="text-4xl font-bold text-center mb-8">Upload Product</h1>
         
         <Card className="p-6 space-y-6">
+          {/* Product Type Selector */}
+          <div className="space-y-2">
+            <Label>Product Type</Label>
+            <div className="flex gap-2">
+              <Button
+                type="button"
+                variant={productType === 'auto' ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => setProductType('auto')}
+              >
+                Auto-Detect
+              </Button>
+              <Button
+                type="button"
+                variant={productType === 'face' ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => setProductType('face')}
+              >
+                👤 Face
+              </Button>
+              <Button
+                type="button"
+                variant={productType === 'body' ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => setProductType('body')}
+              >
+                🧴 Body
+              </Button>
+              <Button
+                type="button"
+                variant={productType === 'hair' ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => setProductType('hair')}
+              >
+                💆 Hair
+              </Button>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Helps optimize ingredient analysis for your product type
+            </p>
+          </div>
+
           {/* Image Upload */}
           <div className="space-y-4">
             <div className="flex items-center justify-between mb-2">

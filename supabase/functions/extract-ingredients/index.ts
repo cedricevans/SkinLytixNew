@@ -11,7 +11,7 @@ serve(async (req) => {
   }
 
   try {
-    const { image } = await req.json();
+    const { image, productType } = await req.json();
     const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
     
     if (!LOVABLE_API_KEY) {
@@ -31,10 +31,12 @@ serve(async (req) => {
           content: [
             {
               type: 'text',
-              text: `Extract the following information from this skincare/cosmetic product image:
-1. Ingredients list (comma-separated, clean format with no special characters)
+              text: `${getProductTypeContext(productType)}
+
+Extract the following information from this personal care product image:
+1. Ingredients list (comma-separated, clean format)
 2. Brand name (if visible)
-3. Product category (cleanser, serum, moisturizer, toner, sunscreen, mask, or treatment)
+3. Product category (${getCategoryExamples(productType)})
 4. Product name (if visible)
 
 Return ONLY valid JSON in this exact format:
@@ -104,3 +106,25 @@ Important:
     );
   }
 });
+
+function getProductTypeContext(productType: string | null): string {
+  if (productType === 'body') {
+    return 'This is a BODY CARE product (body wash, lotion, deodorant, hand cream, etc.).';
+  } else if (productType === 'hair') {
+    return 'This is a HAIR CARE product (shampoo, conditioner, scalp treatment, hair mask, etc.).';
+  } else if (productType === 'face') {
+    return 'This is a FACIAL SKINCARE product (cleanser, serum, moisturizer, sunscreen, etc.).';
+  }
+  return 'This is a PERSONAL CARE product (could be facial skincare, body care, or hair care).';
+}
+
+function getCategoryExamples(productType: string | null): string {
+  if (productType === 'body') {
+    return 'body-wash, body-lotion, hand-cream, foot-cream, deodorant, body-scrub, body-sunscreen, or shaving';
+  } else if (productType === 'hair') {
+    return 'shampoo, conditioner, hair-mask, scalp-treatment, or hair-oil';
+  } else if (productType === 'face') {
+    return 'cleanser, serum, moisturizer, toner, sunscreen, mask, or eye-cream';
+  }
+  return 'cleanser, serum, moisturizer, body-wash, shampoo, conditioner, etc.';
+}

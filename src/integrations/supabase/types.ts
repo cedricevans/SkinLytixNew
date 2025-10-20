@@ -185,34 +185,43 @@ export type Database = {
       }
       profiles: {
         Row: {
+          body_concerns: Json | null
           created_at: string | null
           display_name: string | null
           email: string | null
           has_seen_walkthrough: boolean | null
           id: string
           is_profile_complete: boolean | null
+          product_preferences: Json | null
+          scalp_type: string | null
           skin_concerns: Json | null
           skin_type: Database["public"]["Enums"]["skin_type_enum"] | null
           updated_at: string | null
         }
         Insert: {
+          body_concerns?: Json | null
           created_at?: string | null
           display_name?: string | null
           email?: string | null
           has_seen_walkthrough?: boolean | null
           id: string
           is_profile_complete?: boolean | null
+          product_preferences?: Json | null
+          scalp_type?: string | null
           skin_concerns?: Json | null
           skin_type?: Database["public"]["Enums"]["skin_type_enum"] | null
           updated_at?: string | null
         }
         Update: {
+          body_concerns?: Json | null
           created_at?: string | null
           display_name?: string | null
           email?: string | null
           has_seen_walkthrough?: boolean | null
           id?: string
           is_profile_complete?: boolean | null
+          product_preferences?: Json | null
+          scalp_type?: string | null
           skin_concerns?: Json | null
           skin_type?: Database["public"]["Enums"]["skin_type_enum"] | null
           updated_at?: string | null
@@ -316,6 +325,7 @@ export type Database = {
           created_at: string
           id: string
           routine_name: string
+          routine_type: string | null
           updated_at: string
           user_id: string
         }
@@ -323,6 +333,7 @@ export type Database = {
           created_at?: string
           id?: string
           routine_name: string
+          routine_type?: string | null
           updated_at?: string
           user_id: string
         }
@@ -330,6 +341,7 @@ export type Database = {
           created_at?: string
           id?: string
           routine_name?: string
+          routine_type?: string | null
           updated_at?: string
           user_id?: string
         }

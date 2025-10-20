@@ -355,7 +355,7 @@ export default function Routine() {
         <div className="mb-8">
           <h1 className="text-4xl font-bold mb-2">{routineName}</h1>
           <p className="text-muted-foreground">
-            Build and optimize your skincare routine
+            Build and optimize your personal care routine (face, body, & hair)
           </p>
         </div>
 
