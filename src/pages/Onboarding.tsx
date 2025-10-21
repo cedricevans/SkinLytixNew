@@ -5,9 +5,9 @@ import { Card } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { Droplets, Wind, Flame, Shield, Sparkles } from "lucide-react";
+import { Droplets, Wind, Flame, Shield, Sparkles, User, Shirt, Scissors } from "lucide-react";
 
-const skinTypes = [
+const faceSkinTypes = [
   { value: "oily", label: "Oily", icon: Droplets, description: "Shiny, prone to breakouts" },
   { value: "dry", label: "Dry", icon: Wind, description: "Tight, flaky, rough texture" },
   { value: "combination", label: "Combination", icon: Flame, description: "Oily T-zone, dry cheeks" },
@@ -15,7 +15,22 @@ const skinTypes = [
   { value: "normal", label: "Normal", icon: Sparkles, description: "Balanced, healthy glow" },
 ];
 
-const skinConcerns = [
+const bodySkinTypes = [
+  { value: "normal", label: "Normal", description: "Generally smooth and balanced" },
+  { value: "dry", label: "Dry", description: "Rough patches, especially elbows/knees" },
+  { value: "sensitive", label: "Sensitive", description: "Easily irritated or reactive" },
+  { value: "oily", label: "Oily", description: "Prone to body acne" },
+];
+
+const scalpTypes = [
+  { value: "normal", label: "Normal", description: "Balanced, no major issues" },
+  { value: "oily", label: "Oily", description: "Gets greasy quickly" },
+  { value: "dry", label: "Dry", description: "Flaky, tight feeling" },
+  { value: "sensitive", label: "Sensitive", description: "Easily irritated" },
+  { value: "dandruff-prone", label: "Dandruff-Prone", description: "Frequent flakes" },
+];
+
+const faceConcerns = [
   { value: "acne", label: "Acne & Breakouts" },
   { value: "aging", label: "Fine Lines & Aging" },
   { value: "hyperpigmentation", label: "Dark Spots & Hyperpigmentation" },
@@ -26,41 +41,98 @@ const skinConcerns = [
   { value: "dark_circles", label: "Dark Circles" },
 ];
 
+const bodyConcerns = [
+  { value: "body-acne", label: "Body Acne (back/chest)" },
+  { value: "eczema", label: "Eczema / Dermatitis" },
+  { value: "keratosis-pilaris", label: "Keratosis Pilaris (bumpy skin)" },
+  { value: "dry-hands-feet", label: "Dry Hands/Feet" },
+  { value: "body-odor", label: "Body Odor Sensitivity" },
+  { value: "ingrown-hairs", label: "Ingrown Hairs / Razor Burn" },
+];
+
+const hairConcerns = [
+  { value: "dandruff", label: "Dandruff" },
+  { value: "oily-scalp", label: "Oily Scalp" },
+  { value: "dry-scalp", label: "Dry/Itchy Scalp" },
+  { value: "hair-thinning", label: "Hair Thinning" },
+  { value: "scalp-sensitivity", label: "Scalp Sensitivity" },
+];
+
 const Onboarding = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
-  const [step, setStep] = useState(1);
-  const [skinType, setSkinType] = useState<"oily" | "dry" | "combination" | "sensitive" | "normal" | "">("");
-  const [selectedConcerns, setSelectedConcerns] = useState<string[]>([]);
+  const [step, setStep] = useState(0);
+  
+  // Step 0: Product preferences
+  const [productPreferences, setProductPreferences] = useState({ face: true, body: false, hair: false });
+  
+  // Step 1: Skin types
+  const [faceSkinType, setFaceSkinType] = useState<"oily" | "dry" | "combination" | "sensitive" | "normal" | "">("");
+  const [bodySkinType, setBodySkinType] = useState<string>("");
+  const [scalpType, setScalpType] = useState<string>("");
+  
+  // Step 2: Concerns
+  const [selectedFaceConcerns, setSelectedFaceConcerns] = useState<string[]>([]);
+  const [selectedBodyConcerns, setSelectedBodyConcerns] = useState<string[]>([]);
+  const [selectedHairConcerns, setSelectedHairConcerns] = useState<string[]>([]);
+  
   const [isLoading, setIsLoading] = useState(false);
 
-  const handleConcernToggle = (concern: string) => {
-    setSelectedConcerns((prev) =>
-      prev.includes(concern)
-        ? prev.filter((c) => c !== concern)
-        : [...prev, concern]
+  const handleProductPrefToggle = (type: 'face' | 'body' | 'hair') => {
+    setProductPreferences(prev => ({ ...prev, [type]: !prev[type] }));
+  };
+
+  const handleFaceConcernToggle = (concern: string) => {
+    setSelectedFaceConcerns((prev) =>
+      prev.includes(concern) ? prev.filter((c) => c !== concern) : [...prev, concern]
     );
   };
 
-  const handleComplete = async () => {
-    if (!skinType) {
-      toast({
-        title: "Please select your skin type",
-        variant: "destructive",
-      });
-      return;
-    }
+  const handleBodyConcernToggle = (concern: string) => {
+    setSelectedBodyConcerns((prev) =>
+      prev.includes(concern) ? prev.filter((c) => c !== concern) : [...prev, concern]
+    );
+  };
 
+  const handleHairConcernToggle = (concern: string) => {
+    setSelectedHairConcerns((prev) =>
+      prev.includes(concern) ? prev.filter((c) => c !== concern) : [...prev, concern]
+    );
+  };
+
+  const getTotalSteps = () => {
+    return 3; // Always 3 steps
+  };
+
+  const canProceedFromStep = (currentStep: number) => {
+    if (currentStep === 0) {
+      return productPreferences.face || productPreferences.body || productPreferences.hair;
+    }
+    if (currentStep === 1) {
+      if (productPreferences.face && !faceSkinType) return false;
+      if (productPreferences.body && !bodySkinType) return false;
+      if (productPreferences.hair && !scalpType) return false;
+      return true;
+    }
+    return true;
+  };
+
+  const handleComplete = async () => {
     setIsLoading(true);
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Not authenticated");
 
+      const allConcerns = [...selectedFaceConcerns, ...selectedBodyConcerns, ...selectedHairConcerns];
+
       const { error } = await supabase
         .from("profiles")
         .update({
-          skin_type: skinType,
-          skin_concerns: selectedConcerns,
+          skin_type: faceSkinType || null,
+          skin_concerns: selectedFaceConcerns,
+          body_concerns: selectedBodyConcerns,
+          scalp_type: scalpType || null,
+          product_preferences: productPreferences,
           is_profile_complete: true,
         })
         .eq("id", user.id);
@@ -90,48 +162,82 @@ const Onboarding = () => {
         <div className="mb-8">
           <div className="flex justify-between items-center mb-4">
             <h1 className="text-3xl font-bold">Complete Your Profile</h1>
-            <span className="text-sm text-muted-foreground">Step {step} of 2</span>
+            <span className="text-sm text-muted-foreground">Step {step + 1} of {getTotalSteps()}</span>
           </div>
           <p className="text-muted-foreground">
-            Help us personalize your EpiQ scores based on your unique skin needs
+            Help us personalize your EpiQ scores based on your unique needs
           </p>
         </div>
 
-        {step === 1 && (
+        {/* Step 0: Product Type Selection */}
+        {step === 0 && (
           <div className="space-y-6">
-            <h2 className="text-xl font-semibold">What's your skin type?</h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {skinTypes.map((type) => {
-                const Icon = type.icon;
-                return (
-                  <button
-                    key={type.value}
-                    onClick={() => setSkinType(type.value as "oily" | "dry" | "combination" | "sensitive" | "normal")}
-                    className={`p-6 border-2 rounded-lg transition-all hover:border-primary ${
-                      skinType === type.value
-                        ? "border-primary bg-primary/5"
-                        : "border-border"
-                    }`}
-                  >
-                    <div className="flex flex-col items-center text-center space-y-3">
-                      <div className="w-16 h-16 rounded-full bg-accent/20 flex items-center justify-center">
-                        <Icon className="w-8 h-8 text-accent" />
-                      </div>
-                      <div>
-                        <h3 className="font-semibold">{type.label}</h3>
-                        <p className="text-sm text-muted-foreground mt-1">
-                          {type.description}
-                        </p>
-                      </div>
-                    </div>
-                  </button>
-                );
-              })}
+            <h2 className="text-xl font-semibold">What products do you want to analyze?</h2>
+            <p className="text-sm text-muted-foreground">Select all that apply</p>
+            
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <button
+                onClick={() => handleProductPrefToggle('face')}
+                className={`p-6 border-2 rounded-lg transition-all hover:border-primary ${
+                  productPreferences.face ? "border-primary bg-primary/5" : "border-border"
+                }`}
+              >
+                <div className="flex flex-col items-center text-center space-y-3">
+                  <div className="w-16 h-16 rounded-full bg-accent/20 flex items-center justify-center">
+                    <User className="w-8 h-8 text-accent" />
+                  </div>
+                  <div>
+                    <h3 className="font-semibold">Face Care</h3>
+                    <p className="text-sm text-muted-foreground mt-1">
+                      Cleansers, serums, moisturizers
+                    </p>
+                  </div>
+                </div>
+              </button>
+
+              <button
+                onClick={() => handleProductPrefToggle('body')}
+                className={`p-6 border-2 rounded-lg transition-all hover:border-primary ${
+                  productPreferences.body ? "border-primary bg-primary/5" : "border-border"
+                }`}
+              >
+                <div className="flex flex-col items-center text-center space-y-3">
+                  <div className="w-16 h-16 rounded-full bg-accent/20 flex items-center justify-center">
+                    <Shirt className="w-8 h-8 text-accent" />
+                  </div>
+                  <div>
+                    <h3 className="font-semibold">Body Care</h3>
+                    <p className="text-sm text-muted-foreground mt-1">
+                      Lotions, washes, deodorants
+                    </p>
+                  </div>
+                </div>
+              </button>
+
+              <button
+                onClick={() => handleProductPrefToggle('hair')}
+                className={`p-6 border-2 rounded-lg transition-all hover:border-primary ${
+                  productPreferences.hair ? "border-primary bg-primary/5" : "border-border"
+                }`}
+              >
+                <div className="flex flex-col items-center text-center space-y-3">
+                  <div className="w-16 h-16 rounded-full bg-accent/20 flex items-center justify-center">
+                    <Scissors className="w-8 h-8 text-accent" />
+                  </div>
+                  <div>
+                    <h3 className="font-semibold">Hair Care</h3>
+                    <p className="text-sm text-muted-foreground mt-1">
+                      Shampoos, conditioners, treatments
+                    </p>
+                  </div>
+                </div>
+              </button>
             </div>
+
             <div className="flex justify-end pt-4">
               <Button
-                onClick={() => setStep(2)}
-                disabled={!skinType}
+                onClick={() => setStep(1)}
+                disabled={!canProceedFromStep(0)}
                 size="lg"
               >
                 Continue
@@ -140,49 +246,185 @@ const Onboarding = () => {
           </div>
         )}
 
-        {step === 2 && (
-          <div className="space-y-6">
-            <div>
-              <h2 className="text-xl font-semibold mb-2">
-                What are your main skin concerns?
-              </h2>
-              <p className="text-sm text-muted-foreground">
-                Select all that apply (optional but recommended)
-              </p>
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {skinConcerns.map((concern) => (
-                <div
-                  key={concern.value}
-                  className="flex items-center space-x-3 p-4 border rounded-lg hover:bg-accent/5 transition-colors"
-                >
-                  <Checkbox
-                    id={concern.value}
-                    checked={selectedConcerns.includes(concern.value)}
-                    onCheckedChange={() => handleConcernToggle(concern.value)}
-                  />
-                  <label
-                    htmlFor={concern.value}
-                    className="text-sm font-medium cursor-pointer flex-1"
-                  >
-                    {concern.label}
-                  </label>
+        {/* Step 1: Skin/Scalp Types */}
+        {step === 1 && (
+          <div className="space-y-8">
+            {productPreferences.face && (
+              <div className="space-y-4">
+                <h2 className="text-xl font-semibold">What's your facial skin type?</h2>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {faceSkinTypes.map((type) => {
+                    const Icon = type.icon;
+                    return (
+                      <button
+                        key={type.value}
+                        onClick={() => setFaceSkinType(type.value as typeof faceSkinType)}
+                        className={`p-6 border-2 rounded-lg transition-all hover:border-primary ${
+                          faceSkinType === type.value ? "border-primary bg-primary/5" : "border-border"
+                        }`}
+                      >
+                        <div className="flex flex-col items-center text-center space-y-3">
+                          <div className="w-12 h-12 rounded-full bg-accent/20 flex items-center justify-center">
+                            <Icon className="w-6 h-6 text-accent" />
+                          </div>
+                          <div>
+                            <h3 className="font-semibold">{type.label}</h3>
+                            <p className="text-xs text-muted-foreground mt-1">{type.description}</p>
+                          </div>
+                        </div>
+                      </button>
+                    );
+                  })}
                 </div>
-              ))}
-            </div>
+              </div>
+            )}
+
+            {productPreferences.body && (
+              <div className="space-y-4">
+                <h2 className="text-xl font-semibold">What's your body skin type?</h2>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  {bodySkinTypes.map((type) => (
+                    <button
+                      key={type.value}
+                      onClick={() => setBodySkinType(type.value)}
+                      className={`p-4 border-2 rounded-lg transition-all hover:border-primary text-left ${
+                        bodySkinType === type.value ? "border-primary bg-primary/5" : "border-border"
+                      }`}
+                    >
+                      <h3 className="font-semibold">{type.label}</h3>
+                      <p className="text-sm text-muted-foreground mt-1">{type.description}</p>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {productPreferences.hair && (
+              <div className="space-y-4">
+                <h2 className="text-xl font-semibold">What's your scalp type?</h2>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  {scalpTypes.map((type) => (
+                    <button
+                      key={type.value}
+                      onClick={() => setScalpType(type.value)}
+                      className={`p-4 border-2 rounded-lg transition-all hover:border-primary text-left ${
+                        scalpType === type.value ? "border-primary bg-primary/5" : "border-border"
+                      }`}
+                    >
+                      <h3 className="font-semibold">{type.label}</h3>
+                      <p className="text-sm text-muted-foreground mt-1">{type.description}</p>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
             <div className="flex justify-between pt-4">
-              <Button
-                onClick={() => setStep(1)}
-                variant="outline"
-                size="lg"
-              >
+              <Button onClick={() => setStep(0)} variant="outline" size="lg">
                 Back
               </Button>
               <Button
-                onClick={handleComplete}
-                disabled={isLoading}
+                onClick={() => setStep(2)}
+                disabled={!canProceedFromStep(1)}
                 size="lg"
               >
+                Continue
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {/* Step 2: Concerns */}
+        {step === 2 && (
+          <div className="space-y-8">
+            <div>
+              <h2 className="text-xl font-semibold mb-2">What are your main concerns?</h2>
+              <p className="text-sm text-muted-foreground">Select all that apply (optional but recommended)</p>
+            </div>
+
+            {productPreferences.face && (
+              <div className="space-y-3">
+                <h3 className="font-semibold text-lg">Face Concerns</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  {faceConcerns.map((concern) => (
+                    <div
+                      key={concern.value}
+                      className="flex items-center space-x-3 p-3 border rounded-lg hover:bg-accent/5 transition-colors"
+                    >
+                      <Checkbox
+                        id={`face-${concern.value}`}
+                        checked={selectedFaceConcerns.includes(concern.value)}
+                        onCheckedChange={() => handleFaceConcernToggle(concern.value)}
+                      />
+                      <label
+                        htmlFor={`face-${concern.value}`}
+                        className="text-sm font-medium cursor-pointer flex-1"
+                      >
+                        {concern.label}
+                      </label>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {productPreferences.body && (
+              <div className="space-y-3">
+                <h3 className="font-semibold text-lg">Body Concerns</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  {bodyConcerns.map((concern) => (
+                    <div
+                      key={concern.value}
+                      className="flex items-center space-x-3 p-3 border rounded-lg hover:bg-accent/5 transition-colors"
+                    >
+                      <Checkbox
+                        id={`body-${concern.value}`}
+                        checked={selectedBodyConcerns.includes(concern.value)}
+                        onCheckedChange={() => handleBodyConcernToggle(concern.value)}
+                      />
+                      <label
+                        htmlFor={`body-${concern.value}`}
+                        className="text-sm font-medium cursor-pointer flex-1"
+                      >
+                        {concern.label}
+                      </label>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {productPreferences.hair && (
+              <div className="space-y-3">
+                <h3 className="font-semibold text-lg">Hair/Scalp Concerns</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  {hairConcerns.map((concern) => (
+                    <div
+                      key={concern.value}
+                      className="flex items-center space-x-3 p-3 border rounded-lg hover:bg-accent/5 transition-colors"
+                    >
+                      <Checkbox
+                        id={`hair-${concern.value}`}
+                        checked={selectedHairConcerns.includes(concern.value)}
+                        onCheckedChange={() => handleHairConcernToggle(concern.value)}
+                      />
+                      <label
+                        htmlFor={`hair-${concern.value}`}
+                        className="text-sm font-medium cursor-pointer flex-1"
+                      >
+                        {concern.label}
+                      </label>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            <div className="flex justify-between pt-4">
+              <Button onClick={() => setStep(1)} variant="outline" size="lg">
+                Back
+              </Button>
+              <Button onClick={handleComplete} disabled={isLoading} size="lg">
                 {isLoading ? "Saving..." : "Complete Profile"}
               </Button>
             </div>
