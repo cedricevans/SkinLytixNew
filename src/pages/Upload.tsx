@@ -281,8 +281,8 @@ const Upload = () => {
 
   return (
     <TooltipProvider>
-      <main className="min-h-screen bg-gradient-to-b from-background to-muted py-12 px-4">
-      <div className="container max-w-3xl mx-auto">
+      <main className="min-h-screen bg-gradient-to-b from-background to-muted py-12 px-4 overflow-x-hidden">
+      <div className="container max-w-3xl mx-auto w-full">
         {/* Navigation Header */}
         <div className="flex justify-between items-center mb-8">
           <Button
@@ -309,12 +309,13 @@ const Upload = () => {
           {/* Product Type Selector */}
           <div className="space-y-2">
             <Label>Product Type</Label>
-            <div className="flex gap-2">
+            <div className="flex flex-wrap gap-2">
               <Button
                 type="button"
                 variant={productType === 'auto' ? 'default' : 'outline'}
                 size="sm"
                 onClick={() => setProductType('auto')}
+                className="touch-target w-full sm:w-auto"
               >
                 Auto-Detect
               </Button>
@@ -323,6 +324,7 @@ const Upload = () => {
                 variant={productType === 'face' ? 'default' : 'outline'}
                 size="sm"
                 onClick={() => setProductType('face')}
+                className="touch-target w-full sm:w-auto"
               >
                 👤 Face
               </Button>
@@ -331,6 +333,7 @@ const Upload = () => {
                 variant={productType === 'body' ? 'default' : 'outline'}
                 size="sm"
                 onClick={() => setProductType('body')}
+                className="touch-target w-full sm:w-auto"
               >
                 🧴 Body
               </Button>
@@ -339,6 +342,7 @@ const Upload = () => {
                 variant={productType === 'hair' ? 'default' : 'outline'}
                 size="sm"
                 onClick={() => setProductType('hair')}
+                className="touch-target w-full sm:w-auto"
               >
                 💆 Hair
               </Button>
@@ -373,11 +377,11 @@ const Upload = () => {
                 </Tooltip>
               </div>
             </div>
-            <div className="flex gap-4">
+            <div className="flex flex-col sm:flex-row gap-4">
               <Button
                 variant="outline"
                 onClick={() => fileInputRef.current?.click()}
-                className="flex-1"
+                className="flex-1 w-full touch-target"
               >
                 <UploadIcon className="w-4 h-4 mr-2" />
                 Upload Photo
@@ -391,7 +395,7 @@ const Upload = () => {
                     description: "Camera feature coming soon. Please upload from gallery.",
                   });
                 }}
-                className="flex-1"
+                className="flex-1 w-full touch-target"
               >
                 <Camera className="w-4 h-4 mr-2" />
                 Take Photo

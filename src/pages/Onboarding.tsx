@@ -5,8 +5,9 @@ import { Card } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { Droplets, Wind, Flame, Shield, Sparkles, User, Shirt, Scissors } from "lucide-react";
+import { Droplets, Wind, Flame, Shield, Sparkles, User, Shirt, Scissors, HelpCircle } from "lucide-react";
 import { useTracking, trackEvent } from "@/hooks/useTracking";
+import { SkinTypeQuiz } from "@/components/SkinTypeQuiz";
 
 const faceSkinTypes = [
   { value: "oily", label: "Oily", icon: Droplets, description: "Shiny, prone to breakouts" },
@@ -79,6 +80,8 @@ const Onboarding = () => {
   const [selectedHairConcerns, setSelectedHairConcerns] = useState<string[]>([]);
   
   const [isLoading, setIsLoading] = useState(false);
+  const [showSkinTypeQuiz, setShowSkinTypeQuiz] = useState(false);
+  const [quizType, setQuizType] = useState<"face" | "body" | "scalp">("face");
 
   const handleProductPrefToggle = (type: 'face' | 'body' | 'hair') => {
     setProductPreferences(prev => ({ ...prev, [type]: !prev[type] }));
@@ -296,6 +299,25 @@ const Onboarding = () => {
                       </button>
                     );
                   })}
+                  
+                  {/* Not Sure Option */}
+                  <button
+                    onClick={() => {
+                      setQuizType("face");
+                      setShowSkinTypeQuiz(true);
+                    }}
+                    className="p-6 border-2 border-dashed rounded-lg transition-all hover:border-primary hover:bg-primary/5"
+                  >
+                    <div className="flex flex-col items-center text-center space-y-3">
+                      <div className="w-12 h-12 rounded-full bg-muted flex items-center justify-center">
+                        <HelpCircle className="w-6 h-6 text-muted-foreground" />
+                      </div>
+                      <div>
+                        <h3 className="font-semibold">Not Sure?</h3>
+                        <p className="text-xs text-muted-foreground mt-1">Take our 5-question quiz</p>
+                      </div>
+                    </div>
+                  </button>
                 </div>
               </div>
             )}
@@ -340,8 +362,8 @@ const Onboarding = () => {
               </div>
             )}
 
-            <div className="flex justify-between pt-4">
-              <Button onClick={() => setStep(0)} variant="outline" size="lg">
+            <div className="flex flex-col sm:flex-row justify-between gap-3 pt-4">
+              <Button onClick={() => setStep(0)} variant="outline" size="lg" className="w-full sm:w-auto">
                 Back
               </Button>
               <Button
@@ -355,10 +377,26 @@ const Onboarding = () => {
                 }}
                 disabled={!canProceedFromStep(1)}
                 size="lg"
+                className="w-full sm:w-auto"
               >
                 Continue
               </Button>
             </div>
+
+            {/* Skin Type Quiz Dialog */}
+            <SkinTypeQuiz
+              open={showSkinTypeQuiz}
+              onClose={() => setShowSkinTypeQuiz(false)}
+              onComplete={(skinType) => {
+                setFaceSkinType(skinType);
+                setShowSkinTypeQuiz(false);
+                toast({
+                  title: "Skin Type Selected!",
+                  description: `Your skin type has been set to ${skinType}.`,
+                });
+              }}
+              quizType={quizType}
+            />
           </div>
         )}
 
@@ -448,11 +486,11 @@ const Onboarding = () => {
               </div>
             )}
 
-            <div className="flex justify-between pt-4">
-              <Button onClick={() => setStep(1)} variant="outline" size="lg">
+            <div className="flex flex-col sm:flex-row justify-between gap-3 pt-4">
+              <Button onClick={() => setStep(1)} variant="outline" size="lg" className="w-full sm:w-auto">
                 Back
               </Button>
-              <Button onClick={handleComplete} disabled={isLoading} size="lg">
+              <Button onClick={handleComplete} disabled={isLoading} size="lg" className="w-full sm:w-auto">
                 {isLoading ? "Saving..." : "Complete Profile"}
               </Button>
             </div>
