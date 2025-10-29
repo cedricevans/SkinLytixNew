@@ -445,7 +445,7 @@ serve(async (req) => {
         timing: 'PM preferred',
         concerns: ['body-acne', 'dandruff', 'oily-scalp'],
         conflicts: [],
-        tips: ['May cause sensitivity - patch test first', 'Dilute if using pure oil', 'Effective against bacteria and fungi'],
+        tips: ['May cause sensitivity - patch test first', 'Dilute if using pure oil (1-2 drops in shampoo)'],
         sunSensitivity: false,
         category: 'active'
       },
@@ -453,7 +453,7 @@ serve(async (req) => {
         timing: 'AM & PM',
         concerns: ['hair-thinning'],
         conflicts: [],
-        tips: ['Strengthens hair follicles', 'Results take 3-6 months', 'Safe for daily use'],
+        tips: ['Strengthens hair follicles over time', 'Safe for daily use in shampoos and conditioners'],
         sunSensitivity: false,
         category: 'active'
       },
@@ -469,7 +469,7 @@ serve(async (req) => {
         timing: 'AM & PM',
         concerns: ['dry-scalp', 'hair-thinning'],
         conflicts: [],
-        tips: ['Also called Pro-Vitamin B5', 'Deeply moisturizing', 'Great for damaged hair'],
+        tips: ['Deeply moisturizing for hair and scalp', 'Great for damaged or color-treated hair'],
         sunSensitivity: false,
         category: 'hydrator'
       },
@@ -477,7 +477,7 @@ serve(async (req) => {
         timing: 'As needed',
         concerns: ['cleansing'],
         conflicts: [],
-        tips: ['Effective cleansers but can strip natural oils', 'Consider sulfate-free if you have dry/sensitive scalp', 'SLS more harsh than SLES'],
+        tips: ['Consider sulfate-free if you have dry/sensitive scalp', 'Use less frequently if experiencing dryness'],
         sunSensitivity: false,
         category: 'surfactant'
       },
@@ -788,10 +788,29 @@ serve(async (req) => {
     // STEP 4: Add profile-specific tips (skin type, body concerns, scalp type)
     routineSuggestions.push(...getProductTypeTips(profile, detectedActives, productType));
 
-    // STEP 5: Add active-specific tips if space permits
+    // STEP 5: Add active-specific tips if space permits (ONLY actionable routine advice)
     for (const active of detectedActives.slice(0, 2)) {
       if (active.info.tips && routineSuggestions.length < 8) {
-        routineSuggestions.push(...active.info.tips.slice(0, 1));
+        // Filter out non-actionable tips (ingredient facts, descriptions)
+        const actionableTips = active.info.tips.filter((tip: string) => {
+          const lowerTip = tip.toLowerCase();
+          // Exclude tips that are purely informational
+          if (lowerTip.includes('also called') || lowerTip.includes('also known') || lowerTip.includes('aka')) {
+            console.log(`Filtered out informational tip for ${active.name}: "${tip}"`);
+            return false;
+          }
+          // Exclude tips that are just descriptions without action
+          if (lowerTip.match(/^(is a|are a|effective at|effective against|powerful)/)) {
+            console.log(`Filtered out descriptive tip for ${active.name}: "${tip}"`);
+            return false;
+          }
+          return true;
+        });
+        
+        if (actionableTips.length > 0) {
+          console.log(`Adding actionable tip for ${active.name}: "${actionableTips[0]}"`);
+          routineSuggestions.push(...actionableTips.slice(0, 1));
+        }
       }
     }
 
