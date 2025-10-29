@@ -141,16 +141,25 @@ serve(async (req) => {
                         hairProducts.length > 0 && faceProducts.length === 0 && bodyProducts.length === 0 ? 'hair' :
                         'mixed';
 
+    // Add default values if profile fields are missing
+    const skinType = userProfile?.skin_type || 'not specified';
+    const skinConcerns = Array.isArray(userProfile?.skin_concerns) && userProfile.skin_concerns.length > 0 
+      ? userProfile.skin_concerns 
+      : ['none specified'];
+    const bodyConcerns = Array.isArray(userProfile?.body_concerns) && userProfile.body_concerns.length > 0 
+      ? userProfile.body_concerns 
+      : ['none specified'];
+    const scalpType = userProfile?.scalp_type || 'not specified';
+
     // Build context-aware AI prompt based on product types
     let aiPrompt = '';
     
     if (routineType === 'face' || (routineType === 'mixed' && faceProducts.length > 0)) {
-      const skinConcerns = userProfile?.skin_concerns || [];
       aiPrompt += `You are a skincare routine optimization expert. Analyze this ${routineType === 'mixed' ? 'FACIAL' : ''} routine and provide detailed insights:
 
 USER FACIAL SKIN PROFILE:
-- Skin Type: ${userProfile?.skin_type || 'unknown'}
-- Facial Concerns: ${Array.isArray(skinConcerns) ? skinConcerns.join(', ') : 'none specified'}
+- Skin Type: ${skinType}
+- Facial Concerns: ${skinConcerns.join(', ')}
 
 ${routineType === 'mixed' ? 'FACIAL ' : ''}PRODUCTS IN ROUTINE:
 ${faceProducts.map((p, i) => `
@@ -166,11 +175,10 @@ ${i + 1}. ${p.name}${p.brand ? ` by ${p.brand}` : ''}
     }
 
     if (routineType === 'body' || (routineType === 'mixed' && bodyProducts.length > 0)) {
-      const bodyConcerns = userProfile?.body_concerns || [];
       aiPrompt += `${routineType === 'mixed' ? '\n\n---\n\n' : ''}You are a body care product optimization expert. Analyze this ${routineType === 'mixed' ? 'BODY CARE' : ''} routine:
 
 USER BODY PROFILE:
-- Body Concerns: ${Array.isArray(bodyConcerns) ? bodyConcerns.join(', ') : 'none specified'}
+- Body Concerns: ${bodyConcerns.join(', ')}
 
 ${routineType === 'mixed' ? 'BODY CARE ' : ''}PRODUCTS IN ROUTINE:
 ${bodyProducts.map((p, i) => `
@@ -191,7 +199,7 @@ Focus on body-specific concerns: fragrance content, skin irritation potential, m
       aiPrompt += `${routineType === 'mixed' ? '\n\n---\n\n' : ''}You are a hair care product optimization expert. Analyze this ${routineType === 'mixed' ? 'HAIR/SCALP CARE' : ''} routine:
 
 USER SCALP/HAIR PROFILE:
-- Scalp Type: ${userProfile?.scalp_type || 'unknown'}
+- Scalp Type: ${scalpType}
 
 ${routineType === 'mixed' ? 'HAIR CARE ' : ''}PRODUCTS IN ROUTINE:
 ${hairProducts.map((p, i) => `
@@ -222,6 +230,30 @@ ${unknownProducts.length > 0 ? `
 ${unknownProducts.map(p => `- ${p.name}`).join('\n')}
 Please note these in the "outOfScope" section.
 ` : ''}
+
+**CRITICAL: Your summary MUST be personalized based on the user's profile:**
+${routineType === 'face' || (routineType === 'mixed' && faceProducts.length > 0) ? `
+- Reference their ${skinType} skin type
+- Address their specific facial concerns: ${skinConcerns.join(', ')}
+` : ''}
+${routineType === 'body' || (routineType === 'mixed' && bodyProducts.length > 0) ? `
+- Address their body concerns: ${bodyConcerns.join(', ')}
+` : ''}
+${routineType === 'hair' || (routineType === 'mixed' && hairProducts.length > 0) ? `
+- Reference their ${scalpType} scalp type
+` : ''}
+
+The summary should:
+- Start by acknowledging their specific skin/body/hair profile
+- Explain what the score means FOR THEIR SPECIFIC NEEDS
+- Mention 1-2 key insights relevant to their concerns
+- Be encouraging and actionable (2-3 sentences max)
+
+Example for oily skin with acne concerns:
+"For your oily, acne-prone skin, this routine shows good ingredient balance but has room for improvement. Your products contain effective acne-fighting actives, but we've identified some cost savings and a potential ingredient conflict that could be irritating your skin."
+
+Example for dry skin with aging concerns:
+"Your dry skin routine lacks sufficient moisturizing layers for anti-aging benefits. We've identified hydrating alternatives that address fine lines while saving you $25/month."
 
 Format your response as a structured JSON:
 {
