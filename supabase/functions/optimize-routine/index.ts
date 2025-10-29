@@ -65,27 +65,53 @@ serve(async (req) => {
       const category = product.category?.toLowerCase() || '';
       const name = product.product_name?.toLowerCase() || '';
       
-      // Face categories
-      if (category.includes('face') || category.includes('serum') || category.includes('moisturizer') || 
-          category.includes('cleanser') || category.includes('sunscreen') || category.includes('toner') ||
-          category.includes('eye') || category.includes('mask') ||
-          name.includes('face') || name.includes('serum') || name.includes('moisturizer')) {
-        return 'face';
+      // Priority 1: Hair - Check first for hair-specific products (most distinct)
+      if (category.includes('shampoo') || category.includes('conditioner') || 
+          category.includes('hair') || category.includes('scalp') ||
+          name.includes('shampoo') || name.includes('conditioner')) {
+        return 'hair';
       }
       
-      // Body categories
-      if (category.includes('body') || category.includes('deodorant') || category.includes('lotion') ||
-          category.includes('hand') || category.includes('foot') || category.includes('scrub') ||
-          name.includes('body') || name.includes('deodorant') || name.includes('hand cream') || 
-          name.includes('body lotion')) {
+      // Priority 2: Body - Check for body-specific indicators with explicit keywords
+      if (category.includes('body') || category.includes('deodorant') || 
+          category.includes('hand') || category.includes('foot') || 
+          category.includes('scrub') || 
+          name.includes('body wash') || name.includes('body lotion') || 
+          name.includes('body cream') || name.includes('deodorant') || 
+          name.includes('hand cream')) {
         return 'body';
       }
       
-      // Hair categories
-      if (category.includes('hair') || category.includes('shampoo') || category.includes('conditioner') ||
-          category.includes('scalp') || name.includes('shampoo') || name.includes('conditioner') ||
-          name.includes('hair')) {
-        return 'hair';
+      // Priority 3: Face - Check face-specific with stricter matching
+      if (category.includes('face') || category.includes('serum') || 
+          category.includes('cleanser') || category.includes('sunscreen') || 
+          category.includes('toner') || category.includes('eye') || 
+          category.includes('mask') ||
+          name.includes('face wash') || name.includes('face cream') || 
+          name.includes('face serum') || name.includes('facial')) {
+        return 'face';
+      }
+      
+      // Priority 4: Ambiguous terms - check with context
+      // "lotion" alone could be face or body - check name for additional context
+      if (category.includes('lotion')) {
+        if (name.includes('face') || name.includes('facial')) {
+          return 'face';
+        }
+        // Default lotion to body since most lotions are for body
+        return 'body';
+      }
+      
+      // "moisturizer" or "cream" alone could be face or body
+      if (category.includes('moisturizer') || category.includes('cream')) {
+        if (name.includes('body')) {
+          return 'body';
+        }
+        if (name.includes('hand')) {
+          return 'body';
+        }
+        // Default moisturizer/cream to face (more common)
+        return 'face';
       }
       
       return 'unknown';
