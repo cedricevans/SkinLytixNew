@@ -9,8 +9,5 @@ verify_jwt = false
 [functions.analyze-product]
 verify_jwt = true
 
-[functions.save-product]
-verify_jwt = true
-
 [functions.optimize-routine]
 verify_jwt = true

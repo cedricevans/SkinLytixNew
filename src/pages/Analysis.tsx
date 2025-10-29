@@ -5,7 +5,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { AlertCircle, CheckCircle2, Sparkles, Home, ScanLine, Database, Users, Plus, Info, HelpCircle } from "lucide-react";
+import { AlertCircle, CheckCircle2, Sparkles, Home, ScanLine, Plus, Info, HelpCircle, AlertTriangle } from "lucide-react";
 import PostAnalysisFeedback from "@/components/PostAnalysisFeedback";
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from "@/components/ui/tooltip";
 import { useTracking, trackEvent } from "@/hooks/useTracking";
@@ -15,12 +15,18 @@ interface AnalysisData {
   product_name: string;
   brand?: string;
   category?: string;
-  product_id: string | null;
-  barcode: string | null;
   ingredients_list: string;
   epiq_score: number;
   recommendations_json: {
     safe_ingredients: string[];
+    problematic_ingredients?: Array<{
+      name: string;
+      reason: string;
+    }>;
+    beneficial_ingredients?: Array<{
+      name: string;
+      benefit: string;
+    }>;
     concern_ingredients: string[];
     warnings?: string[];
     summary: string;
@@ -50,8 +56,6 @@ const Analysis = () => {
   useTracking('analysis');
   const [analysis, setAnalysis] = useState<AnalysisData | null>(null);
   const [loading, setLoading] = useState(true);
-  const [isSaving, setIsSaving] = useState(false);
-  const [savedToDb, setSavedToDb] = useState(false);
   const [addingToRoutine, setAddingToRoutine] = useState(false);
 
   const fetchAnalysis = async () => {
@@ -83,7 +87,6 @@ const Analysis = () => {
       }
 
       setAnalysis(data as any);
-      setSavedToDb(!!data.product_id);
     } catch (error) {
       console.error('Unexpected error:', error);
     } finally {
@@ -91,81 +94,6 @@ const Analysis = () => {
     }
   };
 
-  const handleSaveToDatabase = async () => {
-    if (!analysis || savedToDb) return;
-
-    setIsSaving(true);
-    try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
-        toast({
-          title: "Not authenticated",
-          description: "Please sign in to save products.",
-          variant: "destructive",
-        });
-        return;
-      }
-
-      // Try to get enriched ingredient data with PubChem CIDs
-      let ingredientsArray;
-      if (analysis.recommendations_json?.ingredient_data) {
-        // Use enriched data with PubChem CIDs
-        ingredientsArray = analysis.recommendations_json.ingredient_data.map((ing: any) => ({
-          name: ing.name,
-          pubchem_cid: ing.pubchem_cid || null
-        }));
-      } else {
-        // Fallback to string parsing (backward compatibility)
-        ingredientsArray = analysis.ingredients_list
-          .split(/[,\n]/)
-          .map((i: string) => i.trim())
-          .filter((i: string) => i.length > 0)
-          .map((name: string) => ({ name, pubchem_cid: null }));
-      }
-
-      const { data, error } = await supabase.functions.invoke('save-product', {
-        body: {
-          product_name: analysis.product_name,
-          brand: analysis.brand || analysis.recommendations_json?.product_metadata?.brand,
-          category: analysis.category || analysis.recommendations_json?.product_metadata?.category,
-          barcode: analysis.barcode,
-          ingredients: ingredientsArray,
-          analysis_id: analysis.id,
-        },
-      });
-
-      if (error) throw error;
-
-      const result = data as { success: boolean; product_id: string; verification_count: number; is_new: boolean };
-
-      toast({
-        title: result.is_new ? "✅ Added to Community Database!" : "✅ Product Verified!",
-        description: result.is_new 
-          ? `You're contributor #${result.verification_count}`
-          : `Verified by ${result.verification_count} users`,
-      });
-
-      setSavedToDb(true);
-      
-      trackEvent({
-        eventName: 'product_saved_to_database',
-        eventCategory: 'analysis',
-        eventProperties: {
-          isNew: result.is_new,
-          verificationCount: result.verification_count
-        }
-      });
-    } catch (error: any) {
-      console.error('Error saving product:', error);
-      toast({
-        title: "Failed to save product",
-        description: error.message,
-        variant: "destructive",
-      });
-    } finally {
-      setIsSaving(false);
-    }
-  };
 
   const handleAddToRoutine = async () => {
     setAddingToRoutine(true);
@@ -347,60 +275,6 @@ const Analysis = () => {
           </p>
         </Card>
 
-        {!savedToDb && (
-          <Card className="p-6 mb-8 bg-accent/5 border-accent">
-            <div className="flex items-start justify-between">
-              <div className="flex items-start gap-4">
-                <div className="w-12 h-12 rounded-full bg-accent/20 flex items-center justify-center flex-shrink-0">
-                  <Database className="w-6 h-6 text-accent" />
-                </div>
-                <div className="flex-1">
-                  <div className="flex items-center gap-2 mb-1">
-                    <h3 className="text-lg font-semibold">Help the Community! 🌟</h3>
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <Info className="w-4 h-4 text-muted-foreground cursor-help" />
-                      </TooltipTrigger>
-                      <TooltipContent className="max-w-xs">
-                        <p>By adding this product to our community database, you help other users discover it faster. Products verified by multiple users get a trust badge!</p>
-                      </TooltipContent>
-                    </Tooltip>
-                  </div>
-                  <p className="text-sm text-muted-foreground mb-3">
-                    Be the first to add <strong>{analysis.product_name}</strong> to our database. 
-                    Your contribution helps others discover safer products.
-                  </p>
-                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                    <Users className="w-4 h-4" />
-                    <span>Join our community of beauty transparency advocates</span>
-                  </div>
-                </div>
-              </div>
-              <Button 
-                onClick={handleSaveToDatabase}
-                disabled={isSaving}
-                size="lg"
-                className="ml-4"
-              >
-                {isSaving ? "Saving..." : "Add to Database"}
-              </Button>
-            </div>
-          </Card>
-        )}
-
-        {savedToDb && (
-          <Card className="p-6 mb-8 bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800">
-            <div className="flex items-center gap-3">
-              <CheckCircle2 className="w-6 h-6 text-green-600 dark:text-green-400" />
-              <div>
-                <h3 className="font-semibold text-green-900 dark:text-green-100">Saved to Community Database</h3>
-                <p className="text-sm text-green-700 dark:text-green-300">
-                  This product is now discoverable by other users. Thank you for contributing!
-                </p>
-              </div>
-            </div>
-          </Card>
-        )}
 
         {analysis.recommendations_json.personalized && (
           <Card className="p-6 mb-8 bg-primary/5 border-primary/20">
@@ -422,6 +296,51 @@ const Analysis = () => {
                   This analysis is customized based on your skin type and concerns
                 </p>
               </div>
+            </div>
+          </Card>
+        )}
+
+        {analysis.recommendations_json.problematic_ingredients && 
+         analysis.recommendations_json.problematic_ingredients.length > 0 && (
+          <Card className="p-6 mb-8 border-destructive/50 bg-destructive/5">
+            <div className="flex items-center gap-3 mb-4">
+              <AlertTriangle className="w-8 h-8 text-destructive" />
+              <div className="flex-1">
+                <div className="flex items-center gap-2">
+                  <h2 className="text-2xl font-bold text-destructive">Ingredients to Avoid</h2>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Info className="w-4 h-4 text-muted-foreground cursor-help" />
+                    </TooltipTrigger>
+                    <TooltipContent className="max-w-sm">
+                      <p className="font-semibold mb-1">Based on your skin profile</p>
+                      <p>These ingredients are recognized in scientific databases but may not be suitable for your specific skin type or concerns.</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </div>
+                <p className="text-sm text-muted-foreground">
+                  These ingredients may conflict with your {analysis.recommendations_json.product_metadata?.product_type || 'skin'} profile
+                </p>
+              </div>
+            </div>
+            <div className="space-y-3">
+              {analysis.recommendations_json.problematic_ingredients.map((item, index) => (
+                <div key={index} className="p-4 bg-background rounded-lg border border-destructive/30">
+                  <div className="flex items-start gap-3">
+                    <AlertTriangle className="w-5 h-5 text-destructive mt-0.5 flex-shrink-0" />
+                    <div className="flex-1">
+                      <p className="font-semibold text-destructive">{item.name}</p>
+                      <p className="text-sm text-muted-foreground mt-1">{item.reason}</p>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+            <div className="mt-4 p-3 bg-destructive/10 rounded-lg border border-destructive/30">
+              <p className="text-sm">
+                <strong>⚠️ Consider avoiding this product</strong> if you have sensitive skin or active concerns. 
+                These ingredients are known to potentially aggravate your specific condition.
+              </p>
             </div>
           </Card>
         )}
@@ -456,20 +375,43 @@ const Analysis = () => {
                     <Info className="w-4 h-4 text-muted-foreground cursor-help" />
                   </TooltipTrigger>
                   <TooltipContent className="max-w-xs">
-                    <p>These ingredients are well-documented in scientific databases like PubChem and Open Beauty Facts. They're recognized as safe and effective for most skin types.</p>
+                    <p>These ingredients are well-documented in scientific databases and are suitable for your skin profile. 
+                    Ingredients with a ✨ star specifically target your concerns.</p>
                   </TooltipContent>
                 </Tooltip>
               </div>
-              <p className="text-sm text-muted-foreground">These ingredients are recognized and documented</p>
+              <p className="text-sm text-muted-foreground">
+                {analysis.recommendations_json.beneficial_ingredients?.length > 0 
+                  ? `${analysis.recommendations_json.beneficial_ingredients.length} beneficial for your profile`
+                  : 'Recognized and suitable for your skin'
+                }
+              </p>
             </div>
           </div>
           <div className="flex flex-wrap gap-2">
             {analysis.recommendations_json.safe_ingredients.length > 0 ? (
-              analysis.recommendations_json.safe_ingredients.map((ingredient, index) => (
-                <Badge key={index} variant="secondary" className="bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-100">
-                  {ingredient}
-                </Badge>
-              ))
+              <>
+                {analysis.recommendations_json.beneficial_ingredients?.map((item, index) => (
+                  <Tooltip key={`beneficial-${index}`}>
+                    <TooltipTrigger asChild>
+                      <Badge variant="secondary" className="bg-emerald-100 text-emerald-900 dark:bg-emerald-900 dark:text-emerald-100 border border-emerald-300 dark:border-emerald-700">
+                        ✨ {item.name}
+                      </Badge>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p className="text-xs">{item.benefit}</p>
+                    </TooltipContent>
+                  </Tooltip>
+                ))}
+                {analysis.recommendations_json.safe_ingredients
+                  .filter(ing => !analysis.recommendations_json.beneficial_ingredients?.some(b => b.name === ing))
+                  .map((ingredient, index) => (
+                    <Badge key={`safe-${index}`} variant="secondary" className="bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-100">
+                      {ingredient}
+                    </Badge>
+                  ))
+                }
+              </>
             ) : (
               <p className="text-muted-foreground">No safe ingredients identified</p>
             )}

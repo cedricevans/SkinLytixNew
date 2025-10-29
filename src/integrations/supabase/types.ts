@@ -98,91 +98,6 @@ export type Database = {
         }
         Relationships: []
       }
-      product_ingredients: {
-        Row: {
-          created_at: string | null
-          id: string
-          ingredient_name: string
-          ingredient_order: number
-          product_id: string
-          pubchem_cid: string | null
-        }
-        Insert: {
-          created_at?: string | null
-          id?: string
-          ingredient_name: string
-          ingredient_order: number
-          product_id: string
-          pubchem_cid?: string | null
-        }
-        Update: {
-          created_at?: string | null
-          id?: string
-          ingredient_name?: string
-          ingredient_order?: number
-          product_id?: string
-          pubchem_cid?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "product_ingredients_product_id_fkey"
-            columns: ["product_id"]
-            isOneToOne: false
-            referencedRelation: "products"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      products: {
-        Row: {
-          barcode: string | null
-          brand: string | null
-          category: string | null
-          contributed_by_user_id: string | null
-          date_added: string | null
-          id: string
-          image_url: string | null
-          last_verified_date: string | null
-          product_name: string
-          updated_at: string | null
-          verification_count: number | null
-        }
-        Insert: {
-          barcode?: string | null
-          brand?: string | null
-          category?: string | null
-          contributed_by_user_id?: string | null
-          date_added?: string | null
-          id?: string
-          image_url?: string | null
-          last_verified_date?: string | null
-          product_name: string
-          updated_at?: string | null
-          verification_count?: number | null
-        }
-        Update: {
-          barcode?: string | null
-          brand?: string | null
-          category?: string | null
-          contributed_by_user_id?: string | null
-          date_added?: string | null
-          id?: string
-          image_url?: string | null
-          last_verified_date?: string | null
-          product_name?: string
-          updated_at?: string | null
-          verification_count?: number | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "products_contributed_by_user_id_fkey"
-            columns: ["contributed_by_user_id"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       profiles: {
         Row: {
           body_concerns: Json | null
@@ -355,7 +270,6 @@ export type Database = {
           epiq_score: number | null
           id: string
           ingredients_list: string
-          product_id: string | null
           product_name: string
           recommendations_json: Json | null
           user_id: string
@@ -367,7 +281,6 @@ export type Database = {
           epiq_score?: number | null
           id?: string
           ingredients_list: string
-          product_id?: string | null
           product_name: string
           recommendations_json?: Json | null
           user_id: string
@@ -379,19 +292,11 @@ export type Database = {
           epiq_score?: number | null
           id?: string
           ingredients_list?: string
-          product_id?: string | null
           product_name?: string
           recommendations_json?: Json | null
           user_id?: string
         }
         Relationships: [
-          {
-            foreignKeyName: "user_analyses_product_id_fkey"
-            columns: ["product_id"]
-            isOneToOne: false
-            referencedRelation: "products"
-            referencedColumns: ["id"]
-          },
           {
             foreignKeyName: "user_analyses_user_id_fkey"
             columns: ["user_id"]

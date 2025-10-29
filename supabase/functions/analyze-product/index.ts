@@ -255,96 +255,128 @@ serve(async (req) => {
       return SAFE_COMMON_INGREDIENTS.some(safe => lower.includes(safe));
     };
 
-    // Analyze ingredients
-    const concerns = [];
-    const safe = [];
-    const warnings = [];
+    // Analyze ingredients with new categorization
+    const safe = [];              // Ingredients that are verified AND not problematic
+    const problematic = [];       // Ingredients that ARE in PubChem but bad for user
+    const concerns = [];          // Ingredients NOT in PubChem (unverified)
+    const warnings = [];          // Personalized warning messages
+    const beneficial = [];        // Ingredients that target user's specific concerns
 
     for (const result of ingredientResults) {
       const ingredientLower = result.name.toLowerCase();
       
       if (result.data) {
-        safe.push(result.name);
+        // Ingredient IS in PubChem - now check if it's problematic for THIS user
+        let isProblematic = false;
         
-        // Check beneficial for user's profile based on product type
         if (profile) {
           const allConcerns = [...(profile.skin_concerns || []), ...(profile.body_concerns || [])];
           
-          // Face-specific checks
+          // Check if problematic for skin type
           if (productType === 'face' && profile.skin_type) {
-            const beneficial = beneficialIngredients[profile.skin_type] || [];
-            if (beneficial.some(b => ingredientLower.includes(b))) {
-              safe.push(`${result.name} (beneficial for ${profile.skin_type} skin)`);
+            const problematicList = problematicIngredients[profile.skin_type] || [];
+            if (problematicList.some(p => ingredientLower.includes(p))) {
+              isProblematic = true;
+              problematic.push({
+                name: result.name,
+                reason: `May not suit ${profile.skin_type} skin`
+              });
+              warnings.push(`⚠️ ${result.name} may not suit ${profile.skin_type} skin`);
             }
           }
           
-          // Check all concerns
+          // Check if problematic for concerns
           for (const concern of allConcerns) {
-            const beneficial = beneficialIngredients[concern] || [];
-            if (beneficial.some(b => ingredientLower.includes(b))) {
-              safe.push(`${result.name} (targets ${concern})`);
+            const problematicList = problematicIngredients[concern] || [];
+            if (problematicList.some(p => ingredientLower.includes(p))) {
+              if (!isProblematic) { // Avoid duplicate entries
+                isProblematic = true;
+                const concernLabel = concern.replace(/-/g, ' ');
+                problematic.push({
+                  name: result.name,
+                  reason: `May worsen ${concernLabel}`
+                });
+                warnings.push(`⚠️ ${result.name} may worsen ${concernLabel}`);
+              }
             }
           }
         }
+        
+        // Only add to "safe" if NOT problematic
+        if (!isProblematic) {
+          safe.push(result.name);
+          
+          // Check if it's BENEFICIAL (targets user's concerns)
+          if (profile) {
+            const allConcerns = [...(profile.skin_concerns || []), ...(profile.body_concerns || [])];
+            
+            // Check beneficial for skin type
+            if (productType === 'face' && profile.skin_type) {
+              const beneficialList = beneficialIngredients[profile.skin_type] || [];
+              if (beneficialList.some(b => ingredientLower.includes(b))) {
+                beneficial.push({
+                  name: result.name,
+                  benefit: `Beneficial for ${profile.skin_type} skin`
+                });
+              }
+            }
+            
+            // Check beneficial for concerns
+            for (const concern of allConcerns) {
+              const beneficialList = beneficialIngredients[concern] || [];
+              if (beneficialList.some(b => ingredientLower.includes(b))) {
+                const concernLabel = concern.replace(/-/g, ' ');
+                beneficial.push({
+                  name: result.name,
+                  benefit: `Targets ${concernLabel}`
+                });
+                break; // Only add once per ingredient
+              }
+            }
+          }
+        }
+        
       } else {
-        // Only flag as concern if NOT a commonly safe ingredient
+        // NOT in PubChem - check if it's a commonly safe ingredient
         if (!isCommonSafeIngredient(result.name)) {
           concerns.push(result.name);
         } else {
-          // Treat common safe ingredients as verified even without PubChem data
           safe.push(result.name);
           console.log(`Whitelisted safe ingredient: ${result.name}`);
         }
       }
-
-      // Check for problematic ingredients
-      if (profile) {
-        const allConcerns = [...(profile.skin_concerns || []), ...(profile.body_concerns || [])];
-        
-        if (productType === 'face' && profile.skin_type) {
-          const problematic = problematicIngredients[profile.skin_type] || [];
-          if (problematic.some(p => ingredientLower.includes(p))) {
-            warnings.push(`⚠️ ${result.name} may not suit ${profile.skin_type} skin`);
-          }
-        }
-        
-        for (const concern of allConcerns) {
-          const problematic = problematicIngredients[concern] || [];
-          if (problematic.some(p => ingredientLower.includes(p))) {
-            warnings.push(`⚠️ ${result.name} may worsen ${concern}`);
-          }
-        }
-      }
     }
 
-    // Calculate personalized EpiQ score with product type modifiers
+    // Calculate personalized EpiQ score with new logic
     const totalIngredients = ingredientsArray.length;
     const safeCount = safe.length;
+    const problematicCount = problematic.length;
+    const beneficialCount = beneficial.length;
+
+    // Base score: percentage of safe ingredients
     let epiqScore = totalIngredients > 0 
       ? Math.round((safeCount / totalIngredients) * 100) 
       : 50;
 
-    // Product type modifiers
-    if (productType === 'body') {
-      const fragranceWarnings = warnings.filter(w => w.toLowerCase().includes('fragrance'));
-      if (fragranceWarnings.length > 0) {
-        epiqScore = Math.min(100, epiqScore + 5);
-      }
+    // Heavy penalty for problematic ingredients (more severe than just warnings)
+    epiqScore = Math.max(0, epiqScore - (problematicCount * 10));  // -10 points per problematic ingredient
+
+    // Bonus for beneficial ingredients
+    epiqScore = Math.min(100, epiqScore + (beneficialCount * 5));  // +5 points per beneficial ingredient
+
+    // Apply product type modifiers
+    if (productType === 'face') {
+      epiqScore = Math.min(100, epiqScore + 5); // Face products get slight bonus
     }
 
-    if (productType === 'hair') {
-      const sulfateWarnings = warnings.filter(w => w.toLowerCase().includes('sulfate'));
-      if (sulfateWarnings.length > 0 && profile?.scalp_type !== 'dry') {
-        epiqScore = Math.min(100, epiqScore + 3);
-      }
-    }
-
-    // Apply profile modifiers
-    if (profile) {
-      epiqScore = Math.max(0, epiqScore - (warnings.length * 5));
-      const beneficialMatches = safe.filter(s => s.includes('beneficial') || s.includes('targets'));
-      epiqScore = Math.min(100, epiqScore + (beneficialMatches.length * 3));
-    }
+    console.log('EpiQ Score calculation:', {
+      totalIngredients,
+      safeCount,
+      problematicCount,
+      beneficialCount,
+      baseScore: Math.round((safeCount / totalIngredients) * 100),
+      finalScore: epiqScore
+    });
 
     // Expanded ingredient knowledge base
     const ingredientKnowledge: Record<string, any> = {
@@ -917,6 +949,8 @@ serve(async (req) => {
 
     const recommendations = {
       safe_ingredients: safe,
+      problematic_ingredients: problematic,  // NEW: Array of {name, reason}
+      beneficial_ingredients: beneficial,     // NEW: Array of {name, benefit}
       concern_ingredients: concerns,
       warnings: warnings,
       summary: generateSummary(epiqScore, profile, productType),
@@ -933,24 +967,11 @@ serve(async (req) => {
       }
     };
 
-    // Check if product exists in database
-    let productId = null;
-    if (barcode) {
-      const { data: existingProduct } = await supabase
-        .from('products')
-        .select('id')
-        .eq('barcode', barcode)
-        .maybeSingle();
-      
-      productId = existingProduct?.id || null;
-    }
-
     // Store analysis
     const { data: analysis, error: analysisError } = await supabase
       .from('user_analyses')
       .insert({
         user_id,
-        product_id: productId,
         product_name,
         brand: extractedBrand,
         category: extractedCategory,
