@@ -5,7 +5,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { AlertCircle, CheckCircle2, Sparkles, Home, ScanLine, Database, Users, Plus, Info } from "lucide-react";
+import { AlertCircle, CheckCircle2, Sparkles, Home, ScanLine, Database, Users, Plus, Info, HelpCircle } from "lucide-react";
 import PostAnalysisFeedback from "@/components/PostAnalysisFeedback";
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from "@/components/ui/tooltip";
 import { useTracking, trackEvent } from "@/hooks/useTracking";
@@ -477,32 +477,43 @@ const Analysis = () => {
         </Card>
 
         {analysis.recommendations_json.concern_ingredients.length > 0 && (
-          <Card className="p-6 mb-8">
+          <Card className="p-6 mb-8 border-amber-200 dark:border-amber-800">
             <div className="flex items-center gap-3 mb-4">
-              <AlertCircle className="w-8 h-8 text-yellow-500" />
+              <HelpCircle className="w-8 h-8 text-amber-500" />
               <div className="flex-1">
                 <div className="flex items-center gap-2">
-                  <h2 className="text-2xl font-bold">Ingredients Needing Attention</h2>
+                  <h2 className="text-2xl font-bold">Unverified Ingredients</h2>
                   <Tooltip>
                     <TooltipTrigger asChild>
                       <Info className="w-4 h-4 text-muted-foreground cursor-help" />
                     </TooltipTrigger>
-                    <TooltipContent className="max-w-xs">
-                      <p>These ingredients weren't found in our databases. This doesn't mean they're unsafe—just that we recommend researching them independently or consulting a dermatologist.</p>
+                    <TooltipContent className="max-w-sm">
+                      <p className="font-semibold mb-1">Not found in our scientific databases</p>
+                      <p className="mb-2">These ingredients don't appear in PubChem or Open Beauty Facts, but this doesn't mean they're unsafe or ineffective.</p>
+                      <p className="text-xs">Common reasons: proprietary names, trade secrets, new ingredients, or botanical extracts not yet catalogued.</p>
                     </TooltipContent>
                   </Tooltip>
                 </div>
                 <p className="text-sm text-muted-foreground">
-                  Not found in our database - research recommended
+                  Not in our database (PubChem, Open Beauty Facts) - may still be safe
                 </p>
               </div>
             </div>
             <div className="flex flex-wrap gap-2">
               {analysis.recommendations_json.concern_ingredients.map((ingredient, index) => (
-                <Badge key={index} variant="secondary" className="bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-100">
+                <Badge 
+                  key={index} 
+                  variant="secondary" 
+                  className="bg-amber-100 text-amber-900 dark:bg-amber-900 dark:text-amber-100"
+                >
                   {ingredient}
                 </Badge>
               ))}
+            </div>
+            <div className="mt-4 p-3 bg-amber-50 dark:bg-amber-950 rounded-lg border border-amber-200 dark:border-amber-800">
+              <p className="text-sm text-amber-900 dark:text-amber-100">
+                💡 <strong>What to do:</strong> These ingredients may be perfectly safe. Consider looking them up individually or asking a dermatologist if you have concerns.
+              </p>
             </div>
           </Card>
         )}

@@ -74,13 +74,15 @@ serve(async (req) => {
 
     // Helper: Get product type from category
     const getProductType = (category: string): 'face' | 'body' | 'hair' | 'other' => {
-      if (['face-cleanser', 'serum', 'face-moisturizer', 'sunscreen', 'toner', 'mask', 'eye-cream'].includes(category)) {
+      const lowerCategory = category.toLowerCase().trim(); // NORMALIZE HERE
+      
+      if (['face-cleanser', 'serum', 'face-moisturizer', 'sunscreen', 'toner', 'mask', 'eye-cream'].includes(lowerCategory)) {
         return 'face';
       }
-      if (['body-wash', 'body-lotion', 'hand-cream', 'foot-cream', 'deodorant', 'body-oil', 'body-scrub', 'body-sunscreen', 'shaving'].includes(category)) {
+      if (['body-wash', 'body-lotion', 'hand-cream', 'foot-cream', 'deodorant', 'body-oil', 'body-scrub', 'body-sunscreen', 'shaving'].includes(lowerCategory)) {
         return 'body';
       }
-      if (['shampoo', 'conditioner', 'hair-mask', 'scalp-treatment', 'hair-oil'].includes(category)) {
+      if (['shampoo', 'conditioner', 'hair-mask', 'scalp-treatment', 'hair-oil'].includes(lowerCategory)) {
         return 'hair';
       }
       return 'other';
@@ -136,7 +138,7 @@ serve(async (req) => {
     }
 
     const productType = getProductType(extractedCategory || 'unknown');
-    console.log('Detected product type:', productType);
+    console.log(`Product categorization: "${extractedCategory}" (${extractedBrand}) → productType: "${productType}"`);
 
     // Parse ingredients list
     const ingredientsArray = ingredients_list
@@ -202,6 +204,25 @@ serve(async (req) => {
       'dandruff': ['fragrance', 'dyes', 'harsh sulfates'],
     };
 
+    // Universally safe/common ingredients - should never be flagged as concerns
+    const SAFE_COMMON_INGREDIENTS = [
+      'water', 'eau', 'aqua', 'agua',  // Water in all languages
+      'glycerin', 'glycérine', 'glicerina',  // Humectant
+      'sodium chloride',  // Salt
+      'citric acid',  // pH adjuster
+      'sodium hydroxide',  // pH adjuster
+      'xanthan gum',  // Thickener
+      'cellulose',  // Thickener
+      'tocopherol',  // Vitamin E
+      'ascorbic acid',  // Vitamin C
+    ];
+
+    // Check if ingredient is universally safe
+    const isCommonSafeIngredient = (ingredientName: string): boolean => {
+      const lower = ingredientName.toLowerCase();
+      return SAFE_COMMON_INGREDIENTS.some(safe => lower.includes(safe));
+    };
+
     // Analyze ingredients
     const concerns = [];
     const safe = [];
@@ -234,7 +255,14 @@ serve(async (req) => {
           }
         }
       } else {
-        concerns.push(result.name);
+        // Only flag as concern if NOT a commonly safe ingredient
+        if (!isCommonSafeIngredient(result.name)) {
+          concerns.push(result.name);
+        } else {
+          // Treat common safe ingredients as verified even without PubChem data
+          safe.push(result.name);
+          console.log(`Whitelisted safe ingredient: ${result.name}`);
+        }
       }
 
       // Check for problematic ingredients
@@ -736,42 +764,70 @@ serve(async (req) => {
       return suggestions;
     };
 
-    // Generate recommendations
+    // Generate recommendations - REORDERED for better fallbacks
     const detectedActives = detectActives(ingredientsArray);
     const productCategory = extractedCategory || 'unknown';
     const allConcerns = [...(profile?.skin_concerns || []), ...(profile?.body_concerns || [])];
-    
+
+    // STEP 1: Start with general product guidance based on category (most reliable)
     let routineSuggestions = [
-      ...getTimingRecommendations(detectedActives, productType),
-      ...getConcernGuidance(allConcerns, detectedActives, productType, profile),
-      ...getApplicationTechnique(productCategory, productType),
-      ...getInteractionWarnings(detectedActives),
-      ...getProductTypeTips(profile, detectedActives, productType),
+      ...getGeneralProductGuidance(productCategory, productType, profile),
     ];
 
-    // Add active-specific tips if available and space permits
+    // STEP 2: Add active-specific guidance if available
+    routineSuggestions.push(...getTimingRecommendations(detectedActives, productType));
+    routineSuggestions.push(...getConcernGuidance(allConcerns, detectedActives, productType, profile));
+    routineSuggestions.push(...getInteractionWarnings(detectedActives));
+
+    // STEP 3: Add application technique if category is recognized
+    const applicationTechniques = getApplicationTechnique(productCategory, productType);
+    if (applicationTechniques.length > 0) {
+      routineSuggestions.push(...applicationTechniques);
+    }
+
+    // STEP 4: Add profile-specific tips (skin type, body concerns, scalp type)
+    routineSuggestions.push(...getProductTypeTips(profile, detectedActives, productType));
+
+    // STEP 5: Add active-specific tips if space permits
     for (const active of detectedActives.slice(0, 2)) {
-      if (active.info.tips && routineSuggestions.length < 5) {
+      if (active.info.tips && routineSuggestions.length < 8) {
         routineSuggestions.push(...active.info.tips.slice(0, 1));
       }
     }
 
-    // FALLBACK: If no suggestions generated (e.g., simple products without actives)
-    if (routineSuggestions.length === 0) {
-      console.log(`No routine suggestions generated for ${product_name}. Adding general guidance.`);
-      routineSuggestions = getGeneralProductGuidance(productCategory, productType, profile);
+    // STEP 6: Deduplicate suggestions (remove near-duplicates)
+    const uniqueSuggestions = [];
+    const seenKeywords = new Set();
+
+    for (const suggestion of routineSuggestions) {
+      // Extract key words (ignore emojis and common words)
+      const keywords = suggestion
+        .toLowerCase()
+        .replace(/[^\w\s]/g, '')
+        .split(/\s+/)
+        .filter(w => w.length > 4 && !['apply', 'after', 'before', 'using'].includes(w))
+        .slice(0, 3)
+        .join('-');
+      
+      if (!seenKeywords.has(keywords)) {
+        seenKeywords.add(keywords);
+        uniqueSuggestions.push(suggestion);
+      }
     }
 
-    // Limit to 5 suggestions total
-    routineSuggestions = routineSuggestions.slice(0, 5);
+    // Limit to 5-7 suggestions
+    routineSuggestions = uniqueSuggestions.slice(0, 7);
 
-    // Safety check: ALWAYS have at least 1 suggestion
+    // SAFETY CHECK: Always have at least 2 suggestions
     if (routineSuggestions.length === 0) {
+      console.warn(`No suggestions generated for ${product_name} (type: ${productType}, category: ${productCategory})`);
       routineSuggestions = [
-        '✨ Use consistently as part of your routine for best results',
+        '✨ Use consistently as directed on product label',
         `📅 Track your ${productType === 'face' ? 'skin' : productType === 'hair' ? 'hair' : 'body'}'s response over 4-6 weeks`
       ];
     }
+
+    console.log(`Generated ${routineSuggestions.length} routine suggestions for ${product_name}`);
 
     const recommendations = {
       safe_ingredients: safe,

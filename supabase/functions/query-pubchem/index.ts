@@ -126,10 +126,47 @@ serve(async (req) => {
       }
     }
 
+    // Common ingredient aliases (cosmetic names → scientific names)
+    const INGREDIENT_ALIASES: Record<string, string> = {
+      // Water variations
+      'eau': 'water',
+      'aqua': 'water',
+      'agua': 'water',
+      
+      // Common oils
+      'huile': 'oil',
+      'aceite': 'oil',
+      
+      // Glycerin variations
+      'glycérine': 'glycerin',
+      'glicerina': 'glycerin',
+      
+      // Alcohol variations
+      'alcool': 'alcohol',
+      
+      // Fragrance variations
+      'parfum': 'fragrance',
+      'perfume': 'fragrance',
+      
+      // Common botanical aliases
+      'shea butter': 'butyrospermum parkii',
+      'cocoa butter': 'theobroma cacao',
+      'coconut oil': 'cocos nucifera',
+      'jojoba oil': 'simmondsia chinensis',
+      'argan oil': 'argania spinosa',
+      'aloe vera': 'aloe barbadensis',
+    };
+
+    // Normalize ingredient name
+    const normalizeIngredient = (name: string): string => {
+      const cleaned = name.trim().toLowerCase();
+      return INGREDIENT_ALIASES[cleaned] || cleaned;
+    };
+
     const results = [];
 
     for (const ingredientName of ingredients) {
-      const cleanName = ingredientName.trim().toLowerCase();
+      const cleanName = normalizeIngredient(ingredientName);
       
       // Check cache first (permanent cache)
       const { data: cached } = await supabase
