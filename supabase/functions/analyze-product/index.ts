@@ -671,23 +671,106 @@ serve(async (req) => {
       }
     };
 
+    // Fallback guidance for products without strong actives
+    const getGeneralProductGuidance = (category: string, prodType: string, profile: any): string[] => {
+      const suggestions = [];
+      const lowerCategory = category?.toLowerCase() || '';
+      
+      if (prodType === 'body') {
+        if (lowerCategory.includes('oil')) {
+          suggestions.push('💧 Best applied to damp skin right after showering for maximum absorption');
+          suggestions.push('🌙 Perfect for evening use. Can be mixed with body lotion for lighter texture');
+          suggestions.push('⏱️ A little goes a long way. Start with 3-4 pumps and increase as needed');
+        } else if (lowerCategory.includes('lotion') || lowerCategory.includes('cream')) {
+          suggestions.push('🚿 Apply within 3 minutes of showering to lock in moisture');
+          suggestions.push('💪 Reapply to dry areas (elbows, knees, hands) throughout the day');
+          suggestions.push('🌡️ Store in cool, dry place. Body products last 12-18 months after opening');
+        } else if (lowerCategory.includes('deodorant')) {
+          suggestions.push('✨ Apply to clean, completely dry skin for best results');
+          suggestions.push('🌙 Consider applying at night—antiperspirants work better on inactive sweat glands');
+          suggestions.push('⚠️ Wait 2-3 minutes before dressing to prevent transfer to clothing');
+        } else if (lowerCategory.includes('scrub') || lowerCategory.includes('exfoliant')) {
+          suggestions.push('📅 Use 2-3 times per week, not daily, to avoid over-exfoliation');
+          suggestions.push('💦 Apply to damp skin in circular motions. Rinse thoroughly');
+          suggestions.push('🧴 Follow immediately with moisturizer or body oil');
+        } else {
+          suggestions.push('💧 Apply to clean, damp skin for best absorption');
+          suggestions.push('🧴 Use consistently for 4-6 weeks to see full benefits');
+        }
+      } else if (prodType === 'hair') {
+        if (lowerCategory.includes('shampoo')) {
+          suggestions.push('🚿 Focus on scalp, not lengths. Use fingertips (not nails) to massage');
+          suggestions.push('💧 Double cleanse if you use heavy styling products');
+          suggestions.push('⏱️ Adjust frequency based on scalp type: oily (daily), normal (2-3x/week), dry (1-2x/week)');
+        } else if (lowerCategory.includes('conditioner')) {
+          suggestions.push('📏 Apply from mid-length to ends, avoiding scalp unless very dry');
+          suggestions.push('⏱️ Leave on for 2-3 minutes minimum for best results');
+          suggestions.push('🧊 Finish with cool water rinse to seal cuticles and add shine');
+        } else if (lowerCategory.includes('oil') || lowerCategory.includes('serum')) {
+          suggestions.push('💧 Use on damp hair for easier distribution and better absorption');
+          suggestions.push('🌙 Can be used as overnight treatment. Shampoo out in morning');
+          suggestions.push('⚠️ Start with 1-2 drops. Fine hair needs less than thick/coarse hair');
+        } else {
+          suggestions.push('🚿 Use as directed on product label');
+          suggestions.push('💇 Adjust frequency based on your hair\'s response');
+        }
+      } else if (prodType === 'face') {
+        if (lowerCategory.includes('cleanser')) {
+          suggestions.push('🌡️ Use lukewarm water. Hot water strips natural oils, cold doesn\'t cleanse effectively');
+          suggestions.push('⏱️ Massage for 60 seconds to properly dissolve makeup and sunscreen');
+          suggestions.push('🌙 Double cleanse at night if wearing makeup or sunscreen');
+        } else if (lowerCategory.includes('moisturizer') || lowerCategory.includes('cream')) {
+          suggestions.push('💧 Apply to damp skin for better absorption (pat dry, don\'t rub)');
+          suggestions.push('⬆️ Use upward motions. Don\'t forget neck and décolletage');
+          suggestions.push('☀️ If no SPF, always apply sunscreen after moisturizer in AM');
+        } else if (lowerCategory.includes('oil')) {
+          suggestions.push('🌙 Oils work best as last step in PM routine to seal in moisture');
+          suggestions.push('💧 Mix 2-3 drops with moisturizer if pure oil feels too heavy');
+          suggestions.push('⚠️ Avoid if using water-based sunscreen in AM—oil can break down SPF');
+        } else {
+          suggestions.push('✨ Perform patch test before first full use');
+          suggestions.push('🧴 Use consistently as part of your routine');
+        }
+      }
+      
+      return suggestions;
+    };
+
     // Generate recommendations
     const detectedActives = detectActives(ingredientsArray);
     const productCategory = extractedCategory || 'unknown';
     const allConcerns = [...(profile?.skin_concerns || []), ...(profile?.body_concerns || [])];
     
-    const routineSuggestions = [
+    let routineSuggestions = [
       ...getTimingRecommendations(detectedActives, productType),
       ...getConcernGuidance(allConcerns, detectedActives, productType, profile),
       ...getApplicationTechnique(productCategory, productType),
       ...getInteractionWarnings(detectedActives),
       ...getProductTypeTips(profile, detectedActives, productType),
-    ].slice(0, 5);
+    ];
 
+    // Add active-specific tips if available and space permits
     for (const active of detectedActives.slice(0, 2)) {
       if (active.info.tips && routineSuggestions.length < 5) {
         routineSuggestions.push(...active.info.tips.slice(0, 1));
       }
+    }
+
+    // FALLBACK: If no suggestions generated (e.g., simple products without actives)
+    if (routineSuggestions.length === 0) {
+      console.log(`No routine suggestions generated for ${product_name}. Adding general guidance.`);
+      routineSuggestions = getGeneralProductGuidance(productCategory, productType, profile);
+    }
+
+    // Limit to 5 suggestions total
+    routineSuggestions = routineSuggestions.slice(0, 5);
+
+    // Safety check: ALWAYS have at least 1 suggestion
+    if (routineSuggestions.length === 0) {
+      routineSuggestions = [
+        '✨ Use consistently as part of your routine for best results',
+        `📅 Track your ${productType === 'face' ? 'skin' : productType === 'hair' ? 'hair' : 'body'}'s response over 4-6 weeks`
+      ];
     }
 
     const recommendations = {

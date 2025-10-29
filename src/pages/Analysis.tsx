@@ -510,16 +510,32 @@ const Analysis = () => {
         <Card className="p-6">
           <div className="flex items-center gap-3 mb-4">
             <Sparkles className="w-8 h-8 text-primary" />
-            <h2 className="text-2xl font-bold">Routine Suggestions</h2>
+            <div className="flex-1">
+              <h2 className="text-2xl font-bold">Routine Suggestions</h2>
+              {analysis.recommendations_json.product_metadata?.product_type && (
+                <p className="text-sm text-muted-foreground">
+                  {analysis.recommendations_json.product_metadata.product_type === 'body' && 'Body Care Specific'}
+                  {analysis.recommendations_json.product_metadata.product_type === 'hair' && 'Hair Care Specific'}
+                  {analysis.recommendations_json.product_metadata.product_type === 'face' && 'Facial Skincare Specific'}
+                </p>
+              )}
+            </div>
           </div>
-          <ul className="space-y-3">
-            {analysis.recommendations_json.routine_suggestions.map((suggestion, index) => (
-              <li key={index} className="flex items-start gap-3 p-3 bg-accent/5 rounded-lg">
-                <span className="text-primary mt-1">•</span>
-                <span className="flex-1">{suggestion}</span>
-              </li>
-            ))}
-          </ul>
+          {analysis.recommendations_json.routine_suggestions?.length > 0 ? (
+            <ul className="space-y-3">
+              {analysis.recommendations_json.routine_suggestions.map((suggestion, index) => (
+                <li key={index} className="flex items-start gap-3 p-3 bg-accent/5 rounded-lg">
+                  <span className="text-primary mt-1">•</span>
+                  <span className="flex-1">{suggestion}</span>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="text-muted-foreground text-center py-8">
+              No specific routine suggestions available for this product. 
+              Use as directed on product label.
+            </p>
+          )}
         </Card>
 
         {/* Post-Analysis Feedback */}
