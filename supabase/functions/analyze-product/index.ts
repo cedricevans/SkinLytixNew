@@ -6,6 +6,81 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+function generateSummary(score: number, profile: any, productType: 'face' | 'body' | 'hair' | 'other'): string {
+  if (score >= 70) {
+    return `This ${productType} product shows excellent ingredient safety and quality. Most ingredients are safe and beneficial${profile ? ' for your skin profile' : ''}.`;
+  } else if (score >= 50) {
+    return `This ${productType} product has decent ingredient quality with some room for improvement${profile ? ' based on your skin concerns' : ''}.`;
+  } else {
+    return `This ${productType} product contains several concerning ingredients that may not be ideal${profile ? ' for your skin type and concerns' : ''}.`;
+  }
+}
+
+function generatePersonalizedSummary(
+  score: number, 
+  profile: any, 
+  productType: 'face' | 'body' | 'hair' | 'other',
+  productName: string,
+  problematicIngredients: Array<{name: string, reason: string}>,
+  beneficialIngredients: Array<{name: string, benefit: string}>
+): string {
+  if (!profile) return generateSummary(score, profile, productType);
+  
+  const skinType = profile.skin_type || 'not specified';
+  const skinConcerns = Array.isArray(profile.skin_concerns) && profile.skin_concerns.length > 0 ? profile.skin_concerns : [];
+  let summary = '';
+  
+  if (productType === 'face') {
+    summary += `For your ${skinType} skin`;
+    if (skinConcerns.length > 0) summary += ` with ${skinConcerns.join(', ')} concerns`;
+    summary += ', ';
+  } else if (productType === 'body' && profile.body_concerns?.length > 0) {
+    summary += `For your body care needs (${profile.body_concerns.join(', ')}), `;
+  } else if (productType === 'hair' && profile.scalp_type) {
+    summary += `For your ${profile.scalp_type} scalp, `;
+  }
+  
+  if (score >= 70) {
+    summary += 'this product aligns well with your needs. ';
+    if (beneficialIngredients.length > 0) {
+      const topBeneficial = beneficialIngredients.slice(0, 2).map(i => i.name).join(' and ');
+      summary += `The ${topBeneficial} can help address your concerns. `;
+    }
+    summary += 'Continue using as directed for best results.';
+  } else if (score >= 50) {
+    summary += 'this product offers decent compatibility but has room for improvement. ';
+    if (problematicIngredients.length > 0) {
+      const concern = problematicIngredients[0];
+      summary += `Watch for ${concern.name} as it ${concern.reason.toLowerCase()}. `;
+    }
+    summary += 'Consider monitoring how your skin responds.';
+  } else {
+    summary += '⚠️ this product may not be ideal for you. ';
+    if (problematicIngredients.length > 0) {
+      const topConcerns = problematicIngredients.slice(0, 2);
+      summary += `It contains ${topConcerns.map(c => c.name).join(' and ')} which ${topConcerns[0].reason.toLowerCase()}. `;
+    }
+    if (productType === 'face') {
+      if (skinType === 'dry' || skinType === 'sensitive') {
+        summary += 'Consider products with ceramides, hyaluronic acid, or niacinamide instead.';
+      } else if (skinType === 'oily') {
+        summary += 'Look for lightweight, non-comedogenic formulas with salicylic acid or niacinamide.';
+      } else if (skinConcerns.includes('acne')) {
+        summary += 'Seek products with salicylic acid, benzoyl peroxide, or tea tree oil for better results.';
+      } else if (skinConcerns.includes('aging')) {
+        summary += 'Look for retinol, peptides, or vitamin C for anti-aging benefits.';
+      } else {
+        summary += 'Consider products specifically formulated for your skin type and concerns.';
+      }
+    } else if (productType === 'hair') {
+      summary += 'Look for gentler, sulfate-free alternatives for your scalp type.';
+    } else {
+      summary += 'Consider alternatives better suited to your specific needs.';
+    }
+  }
+  return summary;
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -947,13 +1022,23 @@ serve(async (req) => {
 
     console.log(`Generated ${routineSuggestions.length} routine suggestions for ${product_name}`);
 
+    // Generate personalized summary
+    const personalizedSummary = generatePersonalizedSummary(
+      epiqScore, 
+      profile, 
+      productType, 
+      product_name,
+      problematic,
+      beneficial
+    );
+
     const recommendations = {
       safe_ingredients: safe,
       problematic_ingredients: problematic,  // NEW: Array of {name, reason}
       beneficial_ingredients: beneficial,     // NEW: Array of {name, benefit}
       concern_ingredients: concerns,
       warnings: warnings,
-      summary: generateSummary(epiqScore, profile, productType),
+      summary: personalizedSummary,
       routine_suggestions: routineSuggestions,
       personalized: !!profile,
       product_metadata: {
