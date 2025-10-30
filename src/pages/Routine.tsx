@@ -184,7 +184,7 @@ export default function Routine() {
   const handleAddProduct = async () => {
     if (!routineId || !selectedAnalysisId) return;
 
-    const price = parseFloat(productPrice) || null;
+    const price = productPrice.trim() === "" ? null : parseFloat(productPrice);
 
     try {
       // Update price in user_analyses (permanent storage)

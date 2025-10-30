@@ -210,10 +210,14 @@ const Profile = () => {
           *,
           routine_products (
             id,
-            product_name,
-            product_price,
             usage_frequency,
-            epiq_score
+            category,
+            user_analyses (
+              product_name,
+              product_price,
+              epiq_score,
+              brand
+            )
           )
         `)
         .eq('user_id', user.id)
@@ -232,17 +236,23 @@ const Profile = () => {
             .limit(1)
             .maybeSingle();
 
-          return {
-            ...routine,
-            hasOptimization: !!optData,
-            optimizationId: optData?.id,
-            optimizationScore: optData?.optimization_data && typeof optData.optimization_data === 'object' && 'overallScore' in optData.optimization_data 
-              ? (optData.optimization_data as any).overallScore 
-              : undefined,
-            products: routine.routine_products,
-            productCount: routine.routine_products?.length || 0,
-            totalCost: routine.routine_products?.reduce((sum: number, p: any) => sum + (p.product_price || 0), 0) || 0
-          };
+        return {
+          ...routine,
+          hasOptimization: !!optData,
+          optimizationId: optData?.id,
+          optimizationScore: optData?.optimization_data && typeof optData.optimization_data === 'object' && 'overallScore' in optData.optimization_data 
+            ? (optData.optimization_data as any).overallScore 
+            : undefined,
+          products: routine.routine_products?.map((rp: any) => ({
+            ...rp,
+            product_name: rp.user_analyses?.product_name,
+            product_price: rp.user_analyses?.product_price,
+            epiq_score: rp.user_analyses?.epiq_score,
+            brand: rp.user_analyses?.brand
+          })) || [],
+          productCount: routine.routine_products?.length || 0,
+          totalCost: routine.routine_products?.reduce((sum: number, p: any) => sum + (p.user_analyses?.product_price || 0), 0) || 0
+        };
         })
       );
 
