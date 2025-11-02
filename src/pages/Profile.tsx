@@ -9,7 +9,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { Droplets, Wind, Flame, Shield, Sparkles, Home, ArrowLeft, User, TrendingUp, Calendar, DollarSign, Edit2, ChevronDown, ScanLine, Plus, History, Search } from "lucide-react";
+import { Droplets, Wind, Flame, Shield, Sparkles, Home, ArrowLeft, User, TrendingUp, Calendar, DollarSign, Edit2, ChevronDown, ScanLine, Plus, History, Search, Info } from "lucide-react";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { useTracking, trackEvent } from "@/hooks/useTracking";
 
 const skinTypes = [
@@ -550,13 +551,25 @@ const Profile = () => {
                     <DollarSign className="w-6 h-6 text-primary" />
                   </div>
                   <div>
-                    <p className="text-sm text-muted-foreground">Total Potential Savings</p>
+                    <div className="flex items-center gap-2 mb-1">
+                      <p className="text-sm text-muted-foreground">Potential Savings</p>
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Info className="w-4 h-4 text-muted-foreground cursor-help" />
+                          </TooltipTrigger>
+                          <TooltipContent className="max-w-xs">
+                            <p className="text-xs">Save this amount by switching to our recommended alternative products that offer similar benefits at lower prices.</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
+                    </div>
                     {isLoadingStats ? (
                       <p className="text-2xl font-bold text-muted-foreground">-</p>
                     ) : stats.totalSavings > 0 ? (
                       <p className="text-2xl font-bold text-green-600">${stats.totalSavings.toFixed(2)}</p>
                     ) : (
-                      <p className="text-sm text-muted-foreground">No optimizations yet</p>
+                      <p className="text-sm text-muted-foreground">No recommendations yet</p>
                     )}
                   </div>
                 </div>
