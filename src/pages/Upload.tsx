@@ -1,6 +1,6 @@
 import { useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
-import { Camera, Upload as UploadIcon, Loader2, Info, Home, User, Sparkles } from "lucide-react";
+import { Camera, Upload as UploadIcon, Loader2, Info, Home, User } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
@@ -10,7 +10,6 @@ import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import Tesseract from "tesseract.js";
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from "@/components/ui/tooltip";
-import { Switch } from "@/components/ui/switch";
 import { useTracking, trackEvent } from "@/hooks/useTracking";
 
 // Helper: Preprocess image for better OCR accuracy
@@ -68,7 +67,6 @@ const Upload = () => {
   const [isProcessingOCR, setIsProcessingOCR] = useState(false);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [ocrProgress, setOcrProgress] = useState(0);
-  const [useAIExtraction, setUseAIExtraction] = useState(true);
   const [productType, setProductType] = useState<'face' | 'body' | 'hair' | 'auto'>('auto');
   const [productPrice, setProductPrice] = useState("");
 
@@ -77,7 +75,6 @@ const Upload = () => {
       eventName: 'image_uploaded',
       eventCategory: 'upload',
       eventProperties: { 
-        useAIExtraction,
         productType 
       }
     });
@@ -87,13 +84,8 @@ const Upload = () => {
       const imageDataUrl = e.target?.result as string;
       setProductImage(imageDataUrl);
       
-      if (useAIExtraction) {
-        // Use AI-powered extraction
-        await handleAIExtraction(imageDataUrl);
-      } else {
-        // Use Tesseract with improvements
-        await handleTesseractOCR(imageDataUrl);
-      }
+      // Always attempt AI extraction first (automatic fallback to OCR on failure)
+      await handleAIExtraction(imageDataUrl);
     };
     reader.readAsDataURL(file);
   };
@@ -388,43 +380,21 @@ const Upload = () => {
 
           {/* Image Upload */}
           <div className="space-y-4">
-            <div className="flex items-center justify-between mb-2">
-              <Label className="flex items-center gap-2 flex-wrap">
-                <span className="flex items-center gap-1.5">
-                  📋 Ingredient List Photo
-                </span>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Info className="w-4 h-4 text-muted-foreground cursor-help" />
-                  </TooltipTrigger>
-                  <TooltipContent className="max-w-xs">
-                    <p className="text-xs leading-relaxed">
-                      Take a photo of <strong>where the ingredients are listed</strong> on your product packaging. The app extracts and analyzes the ingredient text from your photo — it doesn't automatically look up products by name or barcode.
-                    </p>
-                  </TooltipContent>
-                </Tooltip>
-              </Label>
-              <div className="flex items-center gap-2">
-                <Label htmlFor="ai-extraction" className="text-sm font-normal cursor-pointer">
-                  AI Extraction (Recommended)
-                </Label>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <div className="flex items-center gap-2">
-                      <Switch
-                        id="ai-extraction"
-                        checked={useAIExtraction}
-                        onCheckedChange={setUseAIExtraction}
-                      />
-                      <Sparkles className="w-4 h-4 text-primary" />
-                    </div>
-                  </TooltipTrigger>
-                  <TooltipContent className="max-w-xs">
-                    <p><strong>AI Extraction (Default):</strong> 99% accuracy, understands context, handles all languages. <strong>Standard OCR:</strong> Free alternative but may produce errors with special characters.</p>
-                  </TooltipContent>
-                </Tooltip>
-              </div>
-            </div>
+            <Label className="flex items-center gap-2 flex-wrap mb-2">
+              <span className="flex items-center gap-1.5">
+                📋 Ingredient List Photo
+              </span>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Info className="w-4 h-4 text-muted-foreground cursor-help" />
+                </TooltipTrigger>
+                <TooltipContent className="max-w-xs">
+                  <p className="text-xs leading-relaxed">
+                    Take a photo of <strong>where the ingredients are listed</strong> on your product packaging. We'll automatically extract the ingredient text using AI (with OCR fallback if needed).
+                  </p>
+                </TooltipContent>
+              </Tooltip>
+            </Label>
             <div className="flex flex-col sm:flex-row gap-4">
               <Button
                 variant="outline"
@@ -487,7 +457,7 @@ const Upload = () => {
               <div className="flex-1">
                 <div className="flex items-center gap-2">
                   <p className="text-sm font-medium">
-                    {useAIExtraction ? 'AI extracting ingredients...' : 'Extracting ingredients...'}
+                    Extracting ingredients...
                   </p>
                   <Tooltip>
                     <TooltipTrigger asChild>
@@ -495,9 +465,7 @@ const Upload = () => {
                     </TooltipTrigger>
                     <TooltipContent className="max-w-xs">
                       <p>
-                        {useAIExtraction 
-                          ? 'AI-powered extraction understands ingredient context and provides near-perfect accuracy.'
-                          : 'Enhanced OCR with image preprocessing and text cleaning for better accuracy. Review results carefully.'}
+                        Using AI-powered extraction for near-perfect accuracy. Automatically falls back to standard OCR if needed.
                       </p>
                     </TooltipContent>
                   </Tooltip>
