@@ -39,6 +39,8 @@ interface ProfileStats {
     lastUsed: string;
   } | null;
   totalSavings: number;
+  totalProductsScanned: number;
+  recommendationsAvailable: number;
 }
 
 const Profile = () => {
@@ -53,7 +55,9 @@ const Profile = () => {
   const [stats, setStats] = useState<ProfileStats>({
     totalAnalyses: 0,
     latestRoutine: null,
-    totalSavings: 0
+    totalSavings: 0,
+    totalProductsScanned: 0,
+    recommendationsAvailable: 0
   });
   const [isLoadingStats, setIsLoadingStats] = useState(true);
   const [activeTab, setActiveTab] = useState("overview");
@@ -135,6 +139,7 @@ const Profile = () => {
       const routineIds = routinesData?.map(r => r.id) || [];
       
       let totalSavings = 0;
+      let recommendationsCount = 0;
       if (routineIds.length > 0) {
         const { data: optimizationsData } = await supabase
           .from('routine_optimizations')
@@ -155,6 +160,7 @@ const Profile = () => {
                   // Only add if it's a valid number greater than 0
                   if (!isNaN(savings) && savings > 0) {
                     totalSavings += savings;
+                    recommendationsCount++;
                   }
                 }
               });
@@ -169,7 +175,9 @@ const Profile = () => {
           name: routineData.routine_name,
           lastUsed: new Date(routineData.updated_at).toLocaleDateString()
         } : null,
-        totalSavings
+        totalSavings,
+        totalProductsScanned: analysesCount || 0,
+        recommendationsAvailable: recommendationsCount
       });
     } catch (error) {
       console.error('Error fetching stats:', error);
@@ -570,6 +578,40 @@ const Profile = () => {
                       <p className="text-2xl font-bold text-green-600">${stats.totalSavings.toFixed(2)}</p>
                     ) : (
                       <p className="text-sm text-muted-foreground">No recommendations yet</p>
+                    )}
+                  </div>
+                </div>
+              </Card>
+
+              <Card className="p-6">
+                <div className="flex items-center gap-4">
+                  <div className="p-3 bg-primary/10 rounded-lg">
+                    <ScanLine className="w-6 h-6 text-primary" />
+                  </div>
+                  <div>
+                    <p className="text-sm text-muted-foreground">Products Scanned</p>
+                    {isLoadingStats ? (
+                      <p className="text-2xl font-bold text-muted-foreground">-</p>
+                    ) : (
+                      <p className="text-2xl font-bold">{stats.totalProductsScanned}</p>
+                    )}
+                  </div>
+                </div>
+              </Card>
+
+              <Card className="p-6">
+                <div className="flex items-center gap-4">
+                  <div className="p-3 bg-primary/10 rounded-lg">
+                    <Sparkles className="w-6 h-6 text-primary" />
+                  </div>
+                  <div>
+                    <p className="text-sm text-muted-foreground">Recommendations</p>
+                    {isLoadingStats ? (
+                      <p className="text-2xl font-bold text-muted-foreground">-</p>
+                    ) : stats.recommendationsAvailable > 0 ? (
+                      <p className="text-2xl font-bold">{stats.recommendationsAvailable}</p>
+                    ) : (
+                      <p className="text-sm text-muted-foreground">None yet</p>
                     )}
                   </div>
                 </div>
