@@ -11,6 +11,7 @@ import { supabase } from "@/integrations/supabase/client";
 import Tesseract from "tesseract.js";
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from "@/components/ui/tooltip";
 import { useTracking, trackEvent } from "@/hooks/useTracking";
+import OCRLoadingTips from "@/components/OCRLoadingTips";
 
 // Helper: Preprocess image for better OCR accuracy
 const preprocessImage = (imageDataUrl: string): Promise<string> => {
@@ -256,7 +257,7 @@ const Upload = () => {
 
       toast({
         title: "Analysis Complete!",
-        description: `EpiQ Score: ${data.epiq_score}/100`,
+        description: `EpiQ Score: ${data.epiq_score}/100. Add to routine to unlock cost savings!`,
       });
 
       navigate(`/analysis/${data.analysis_id}`);
@@ -452,27 +453,10 @@ const Upload = () => {
 
           {/* OCR Progress */}
           {isProcessingOCR && (
-            <div className="flex items-center gap-3 p-4 bg-muted rounded-lg">
-              <Loader2 className="w-5 h-5 animate-spin" />
-              <div className="flex-1">
-                <div className="flex items-center gap-2">
-                  <p className="text-sm font-medium">
-                    Extracting ingredients...
-                  </p>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Info className="w-4 h-4 text-muted-foreground cursor-help" />
-                    </TooltipTrigger>
-                    <TooltipContent className="max-w-xs">
-                      <p>
-                        Using AI-powered extraction for near-perfect accuracy. Automatically falls back to standard OCR if needed.
-                      </p>
-                    </TooltipContent>
-                  </Tooltip>
-                </div>
-                <p className="text-xs text-muted-foreground">{ocrProgress}% complete</p>
-              </div>
-            </div>
+            <OCRLoadingTips 
+              progress={ocrProgress}
+              message="Extracting ingredients with AI..."
+            />
           )}
 
           {/* Product Details */}

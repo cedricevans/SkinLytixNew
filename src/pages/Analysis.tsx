@@ -150,7 +150,7 @@ const Analysis = () => {
 
       toast({
         title: "Added to routine!",
-        description: "Product added to your skincare routine",
+        description: "View your routine to unlock cost optimization and savings",
       });
       navigate("/routine");
     } catch (error: any) {
@@ -208,6 +208,14 @@ const Analysis = () => {
           </Button>
           <div className="flex flex-col sm:flex-row gap-2">
             <Button
+              variant="cta"
+              onClick={() => navigate('/routine')}
+              className="touch-target w-full sm:w-auto"
+            >
+              <Plus className="w-4 h-4 mr-2" />
+              Create Routine & Find Savings
+            </Button>
+            <Button
               variant="outline"
               onClick={handleAddToRoutine}
               disabled={addingToRoutine}
@@ -218,7 +226,14 @@ const Analysis = () => {
             </Button>
             <Button 
               variant="outline" 
-              onClick={() => navigate('/upload')}
+              onClick={() => {
+                trackEvent({
+                  eventName: 'analyze_another_clicked',
+                  eventCategory: 'analysis',
+                  eventProperties: {}
+                });
+                navigate('/upload');
+              }}
               className="touch-target w-full sm:w-auto"
             >
               <ScanLine className="w-4 h-4 mr-2" />
@@ -226,6 +241,29 @@ const Analysis = () => {
             </Button>
           </div>
         </div>
+
+        {/* Routine Optimizer Info Banner */}
+        <Card className="p-6 mb-8 bg-gradient-to-r from-cta/10 via-accent/10 to-primary/10 border-cta/20">
+          <div className="flex items-start gap-4">
+            <div className="p-3 bg-cta/20 rounded-lg">
+              <Sparkles className="w-6 h-6 text-cta" />
+            </div>
+            <div className="flex-1">
+              <h3 className="font-semibold text-lg mb-2">💰 Unlock Cost Savings with Routine Optimizer</h3>
+              <p className="text-sm text-muted-foreground mb-3">
+                Add this and more products to your routine to discover cheaper alternatives with similar or better ingredients. 
+                Users save an average of <strong>$47/month</strong> on personal care products.
+              </p>
+              <Button 
+                variant="default"
+                size="sm"
+                onClick={() => navigate('/routine')}
+              >
+                View My Routine & Optimize
+              </Button>
+            </div>
+          </div>
+        </Card>
 
         <div className="mb-8">
           <h1 className="text-4xl font-bold mb-2">{analysis.product_name}</h1>

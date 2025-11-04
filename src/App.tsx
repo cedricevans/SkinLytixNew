@@ -12,6 +12,7 @@ import Walkthrough from "./pages/Walkthrough";
 import Profile from "./pages/Profile";
 import Routine from "./pages/Routine";
 import RoutineOptimization from "./pages/RoutineOptimization";
+import DemoAnalysis from "./pages/DemoAnalysis";
 import NotFound from "./pages/NotFound";
 import FeedbackWidget from "@/components/FeedbackWidget";
 
@@ -25,6 +26,7 @@ const App = () => (
       <BrowserRouter>
         <Routes>
           <Route path="/" element={<Index />} />
+          <Route path="/demo-analysis" element={<DemoAnalysis />} />
           <Route path="/upload" element={<Upload />} />
           <Route path="/analysis/:id" element={<Analysis />} />
           <Route path="/auth" element={<Auth />} />

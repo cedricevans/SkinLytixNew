@@ -74,6 +74,14 @@ const Hero = () => {
           <Button 
             variant="outline" 
             size="lg" 
+            className="touch-target text-base px-8 py-5 md:py-6 h-auto w-full sm:w-auto border-white/30 text-white hover:bg-white/10"
+            onClick={() => navigate('/demo-analysis')}
+          >
+            👁️ Try Demo First
+          </Button>
+          <Button 
+            variant="outline" 
+            size="lg" 
             className="touch-target text-base px-8 py-5 md:py-6 h-auto w-full sm:w-auto border-primary/30 hover:border-primary"
             onClick={() => {
               document.getElementById('how-it-works')?.scrollIntoView({ behavior: 'smooth' });

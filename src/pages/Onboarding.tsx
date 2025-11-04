@@ -66,7 +66,7 @@ const Onboarding = () => {
   useTracking('onboarding');
   const [step, setStep] = useState(0);
   
-  // Step 0: Product preferences
+  // Step 0: Product preferences (pre-select face)
   const [productPreferences, setProductPreferences] = useState({ face: true, body: false, hair: false });
   
   // Step 1: Skin types
@@ -179,7 +179,24 @@ const Onboarding = () => {
         <div className="mb-8">
           <div className="flex justify-between items-center mb-4">
             <h1 className="text-3xl font-bold">Complete Your Profile</h1>
-            <span className="text-sm text-muted-foreground">Step {step + 1} of {getTotalSteps()}</span>
+            <div className="flex items-center gap-2">
+              {/* Progress Indicator */}
+              <div className="flex items-center gap-1">
+                {[0, 1, 2].map((i) => (
+                  <div
+                    key={i}
+                    className={`h-2 w-8 rounded-full transition-all ${
+                      i === step ? 'bg-primary' : i < step ? 'bg-primary/60' : 'bg-muted'
+                    }`}
+                  />
+                ))}
+              </div>
+              <span className="text-sm text-muted-foreground ml-2">
+                {step === 0 && "~30 sec"}
+                {step === 1 && "~45 sec"}
+                {step === 2 && "~1 min"}
+              </span>
+            </div>
           </div>
           <p className="text-muted-foreground">
             Help us personalize your EpiQ scores based on your unique needs
@@ -490,9 +507,27 @@ const Onboarding = () => {
               <Button onClick={() => setStep(1)} variant="outline" size="lg" className="w-full sm:w-auto">
                 Back
               </Button>
-              <Button onClick={handleComplete} disabled={isLoading} size="lg" className="w-full sm:w-auto">
-                {isLoading ? "Saving..." : "Complete Profile"}
-              </Button>
+              <div className="flex flex-col sm:flex-row gap-3">
+                <Button 
+                  onClick={() => {
+                    trackEvent({
+                      eventName: 'onboarding_step_2_skipped',
+                      eventCategory: 'onboarding',
+                      eventProperties: {}
+                    });
+                    handleComplete();
+                  }} 
+                  variant="outline"
+                  disabled={isLoading} 
+                  size="lg" 
+                  className="w-full sm:w-auto"
+                >
+                  Skip & Finish
+                </Button>
+                <Button onClick={handleComplete} disabled={isLoading} size="lg" className="w-full sm:w-auto">
+                  {isLoading ? "Saving..." : "Complete Profile"}
+                </Button>
+              </div>
             </div>
           </div>
         )}

@@ -494,6 +494,37 @@ const Profile = () => {
           </div>
         </div>
 
+        {/* Profile Completion Banner */}
+        {!skinType && !isLoading && (
+          <Card className="p-6 mb-6 bg-gradient-to-r from-accent/10 to-cta/10 border-accent/30">
+            <div className="flex items-start gap-4">
+              <div className="p-3 bg-accent/20 rounded-lg">
+                <Sparkles className="w-6 h-6 text-accent" />
+              </div>
+              <div className="flex-1">
+                <h3 className="font-semibold text-lg mb-2">Complete Your Profile for Better Analysis</h3>
+                <p className="text-sm text-muted-foreground mb-3">
+                  Add your skin type and concerns to get personalized EpiQ scores and recommendations tailored to your needs.
+                </p>
+                <Button 
+                  variant="default"
+                  size="sm"
+                  onClick={() => {
+                    trackEvent({
+                      eventName: 'profile_banner_clicked',
+                      eventCategory: 'profile',
+                      eventProperties: {}
+                    });
+                    navigate('/onboarding');
+                  }}
+                >
+                  Complete Profile Now
+                </Button>
+              </div>
+            </div>
+          </Card>
+        )}
+
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
           <TabsList className="grid w-full grid-cols-3 mb-6">
             <TabsTrigger value="overview" className="text-xs sm:text-sm">
