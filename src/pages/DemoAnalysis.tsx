@@ -163,14 +163,14 @@ const DemoAnalysis = () => {
           {/* Category Tabs */}
           <Card className="p-6 mb-8">
             <Tabs value={activeTab} onValueChange={handleTabChange}>
-              <TabsList className="grid w-full grid-cols-3 mb-6">
-                <TabsTrigger value="face" className="text-base">
+              <TabsList className="flex w-full mb-6">
+                <TabsTrigger value="face" className="flex-1 text-base">
                   Face
                 </TabsTrigger>
-                <TabsTrigger value="body" className="text-base">
+                <TabsTrigger value="body" className="flex-1 text-base">
                   Body
                 </TabsTrigger>
-                <TabsTrigger value="hair" className="text-base">
+                <TabsTrigger value="hair" className="flex-1 text-base">
                   Hair
                 </TabsTrigger>
               </TabsList>
