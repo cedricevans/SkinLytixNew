@@ -46,7 +46,7 @@ const Hero = () => {
         </button>
 
         {/* Main Headline */}
-        <h1 className="text-4xl md:text-7xl font-heading font-bold mb-4 md:mb-6 leading-tight animate-fade-in-up" style={{ animationDelay: "0.1s" }}>
+        <h1 className="text-3xl sm:text-4xl md:text-6xl lg:text-7xl font-heading font-bold mb-4 md:mb-6 leading-tight animate-fade-in-up px-4 sm:px-0" style={{ animationDelay: "0.1s" }}>
           Stop Guessing.
           <br />
           <span className="bg-gradient-hero bg-clip-text text-transparent">
@@ -55,34 +55,36 @@ const Hero = () => {
         </h1>
 
         {/* Subheadline */}
-        <p className="text-lg md:text-2xl font-subheading text-muted-foreground max-w-3xl mx-auto mb-8 md:mb-12 animate-fade-in-up" style={{ animationDelay: "0.2s" }}>
+        <p className="text-base sm:text-lg md:text-xl lg:text-2xl font-subheading text-muted-foreground max-w-3xl mx-auto mb-8 md:mb-12 animate-fade-in-up px-4 sm:px-0" style={{ animationDelay: "0.2s" }}>
           70% of shoppers find ingredient lists confusing. SkinLytix decodes face, body, and hair products instantly, 
           optimizes your entire personal care routine, and helps you stop wasting money. Get started free today.
         </p>
 
         {/* CTA Buttons */}
-        <div className="flex flex-col sm:flex-row gap-3 md:gap-4 justify-center items-stretch sm:items-center animate-fade-in-up" style={{ animationDelay: "0.3s" }}>
+        <div className="flex flex-col gap-3 sm:flex-row sm:gap-4 justify-center items-stretch sm:items-center animate-fade-in-up px-4 sm:px-0" style={{ animationDelay: "0.3s" }}>
           <Button 
             variant="cta" 
             size="lg" 
-            className="touch-target text-base px-8 py-5 md:py-6 h-auto w-full sm:w-auto"
+            className="touch-target text-base px-6 sm:px-8 py-5 md:py-6 h-auto w-full sm:w-auto order-1"
             onClick={() => navigate('/auth')}
           >
-            Start Your First Analysis
+            <span className="hidden sm:inline">Start Your First Analysis</span>
+            <span className="sm:hidden">Try It Free - Start Analyzing</span>
             <ArrowRight className="ml-2 w-5 h-5" />
           </Button>
           <Button 
-            variant="outline" 
+            variant="secondary" 
             size="lg" 
-            className="touch-target text-base px-8 py-5 md:py-6 h-auto w-full sm:w-auto border-white/30 text-white hover:bg-white/10"
+            className="touch-target text-base px-6 sm:px-8 py-5 md:py-6 h-auto w-full sm:w-auto border-2 border-accent/50 hover:border-accent hover:bg-accent/10 order-2"
             onClick={() => navigate('/demo-analysis')}
           >
-            👁️ Try Demo First
+            <span className="text-xl mr-2">👁️</span>
+            Try Demo First
           </Button>
           <Button 
             variant="outline" 
             size="lg" 
-            className="touch-target text-base px-8 py-5 md:py-6 h-auto w-full sm:w-auto border-primary/30 hover:border-primary"
+            className="touch-target text-base px-6 sm:px-8 py-5 md:py-6 h-auto w-full sm:w-auto border-primary/30 hover:border-primary hover:bg-primary/5 order-3"
             onClick={() => {
               document.getElementById('how-it-works')?.scrollIntoView({ behavior: 'smooth' });
             }}
