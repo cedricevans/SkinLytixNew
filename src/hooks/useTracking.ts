@@ -50,3 +50,28 @@ export const useTracking = (pageName: string) => {
 
   return { trackEvent };
 };
+
+// Pre-defined tracking events for bounce rate optimization
+export const trackDemoCTAClicked = (location: string) => {
+  trackEvent({
+    eventName: 'demo_cta_clicked',
+    eventCategory: 'engagement',
+    eventProperties: { location }
+  });
+};
+
+export const trackExitIntentTriggered = (page: string) => {
+  trackEvent({
+    eventName: 'exit_intent_triggered',
+    eventCategory: 'engagement',
+    eventProperties: { page }
+  });
+};
+
+export const trackIgLandingViewed = (referrer: string) => {
+  trackEvent({
+    eventName: 'ig_landing_viewed',
+    eventCategory: 'navigation',
+    eventProperties: { referrer }
+  });
+};

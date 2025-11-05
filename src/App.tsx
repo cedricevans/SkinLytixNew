@@ -13,6 +13,7 @@ import Profile from "./pages/Profile";
 import Routine from "./pages/Routine";
 import RoutineOptimization from "./pages/RoutineOptimization";
 import DemoAnalysis from "./pages/DemoAnalysis";
+import InstagramLanding from "./pages/InstagramLanding";
 import NotFound from "./pages/NotFound";
 import FeedbackWidget from "@/components/FeedbackWidget";
 
@@ -26,6 +27,7 @@ const App = () => (
       <BrowserRouter>
         <Routes>
           <Route path="/" element={<Index />} />
+          <Route path="/ig" element={<InstagramLanding />} />
           <Route path="/demo-analysis" element={<DemoAnalysis />} />
           <Route path="/upload" element={<Upload />} />
           <Route path="/analysis/:id" element={<Analysis />} />

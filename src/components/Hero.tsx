@@ -3,6 +3,7 @@ import { Sparkles, ArrowRight, Hexagon } from "lucide-react";
 import heroBackground from "@/assets/hero-background.jpg";
 import { useNavigate } from "react-router-dom";
 import Navigation from "@/components/Navigation";
+import { trackEvent } from "@/hooks/useTracking";
 
 const Hero = () => {
   const navigate = useNavigate();
@@ -65,21 +66,29 @@ const Hero = () => {
           <Button 
             variant="cta" 
             size="lg" 
-            className="touch-target text-base px-6 sm:px-8 py-5 md:py-6 h-auto w-full sm:w-auto order-1"
-            onClick={() => navigate('/auth')}
+            className="touch-target text-base px-6 sm:px-8 py-5 md:py-6 sm:py-5 h-auto w-full sm:w-auto order-1 text-lg sm:text-base"
+            onClick={() => {
+              trackEvent({
+                eventName: 'demo_cta_clicked',
+                eventCategory: 'engagement',
+                eventProperties: { location: 'hero' }
+              });
+              navigate('/demo-analysis');
+            }}
           >
-            <span className="hidden sm:inline">Start Your First Analysis</span>
-            <span className="sm:hidden">Try It Free - Start Analyzing</span>
-            <ArrowRight className="ml-2 w-5 h-5" />
+            <span className="text-xl mr-2">🔬</span>
+            <span className="hidden sm:inline">Try Demo Analysis - No Sign-Up</span>
+            <span className="sm:hidden">Try Demo - No Sign-Up</span>
           </Button>
           <Button 
             variant="secondary" 
             size="lg" 
             className="touch-target text-base px-6 sm:px-8 py-5 md:py-6 h-auto w-full sm:w-auto border-2 border-accent/50 hover:border-accent hover:bg-accent/10 order-2"
-            onClick={() => navigate('/demo-analysis')}
+            onClick={() => navigate('/auth')}
           >
-            <span className="text-xl mr-2">👁️</span>
-            Try Demo First
+            <span className="hidden sm:inline">Start Your First Analysis</span>
+            <span className="sm:hidden">Sign Up Free</span>
+            <ArrowRight className="ml-2 w-5 h-5" />
           </Button>
           <Button 
             variant="outline" 
