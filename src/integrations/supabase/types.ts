@@ -348,6 +348,27 @@ export type Database = {
         }
         Relationships: []
       }
+      user_roles: {
+        Row: {
+          created_at: string | null
+          id: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id?: string
+        }
+        Relationships: []
+      }
       waitlist: {
         Row: {
           created_at: string
@@ -399,6 +420,45 @@ export type Database = {
         }
         Relationships: []
       }
+      conversion_funnel_metrics: {
+        Row: {
+          completed_onboarding: number | null
+          date: string | null
+          demo_clicks: number | null
+          demo_ctr: number | null
+          first_analysis: number | null
+          homepage_views: number | null
+          onboarding_completion_rate: number | null
+          signup_clicks: number | null
+          signup_ctr: number | null
+        }
+        Relationships: []
+      }
+      cta_performance_metrics: {
+        Row: {
+          cta_text: string | null
+          date: string | null
+          event_name: string | null
+          location: string | null
+          total_clicks: number | null
+          unique_users: number | null
+        }
+        Relationships: []
+      }
+      engagement_metrics_summary: {
+        Row: {
+          analyses: number | null
+          avg_conversions_per_user: number | null
+          avg_engagement_per_user: number | null
+          conversion_events: number | null
+          daily_active_users: number | null
+          date: string | null
+          engagement_events: number | null
+          routines_created: number | null
+          routines_optimized: number | null
+        }
+        Relationships: []
+      }
       rate_limit_abuse_alerts: {
         Row: {
           endpoint: string | null
@@ -407,6 +467,24 @@ export type Database = {
           last_request: string | null
           requests_last_5min: number | null
           total_requests: number | null
+        }
+        Relationships: []
+      }
+      user_journey_analysis: {
+        Row: {
+          avg_minutes_to_complete_onboarding: number | null
+          avg_minutes_to_demo: number | null
+          avg_minutes_to_signup: number | null
+          clicked_demo: number | null
+          clicked_signup: number | null
+          completed_first_analysis: number | null
+          completed_onboarding: number | null
+          homepage_to_demo_rate: number | null
+          homepage_to_signup_rate: number | null
+          onboarding_to_analysis_rate: number | null
+          signup_to_onboarding_rate: number | null
+          total_users: number | null
+          viewed_homepage: number | null
         }
         Relationships: []
       }
@@ -421,8 +499,16 @@ export type Database = {
         }
         Returns: Json
       }
+      has_role: {
+        Args: {
+          _role: Database["public"]["Enums"]["app_role"]
+          _user_id: string
+        }
+        Returns: boolean
+      }
     }
     Enums: {
+      app_role: "admin" | "moderator" | "user"
       skin_type_enum: "oily" | "dry" | "combination" | "sensitive" | "normal"
     }
     CompositeTypes: {
@@ -551,6 +637,7 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
+      app_role: ["admin", "moderator", "user"],
       skin_type_enum: ["oily", "dry", "combination", "sensitive", "normal"],
     },
   },
