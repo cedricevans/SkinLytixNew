@@ -6,9 +6,12 @@ interface IngredientCardProps {
   category: 'beneficial' | 'safe' | 'problematic' | 'unverified';
   details?: string;
   emoji?: string;
+  role?: string;
+  molecular_weight?: number | null;
+  safety_profile?: string;
 }
 
-export const IngredientCard = ({ name, category, details, emoji }: IngredientCardProps) => {
+export const IngredientCard = ({ name, category, details, emoji, role, molecular_weight, safety_profile }: IngredientCardProps) => {
   const [isFlipped, setIsFlipped] = useState(false);
 
   const getEmoji = () => {
@@ -84,14 +87,26 @@ export const IngredientCard = ({ name, category, details, emoji }: IngredientCar
         
         {/* Back Face */}
         <div className={cn(
-          "card-face card-face-back absolute inset-0 flex flex-col items-center justify-center p-4 rounded-lg border-2 shadow-md bg-gradient-to-br overflow-y-auto",
+          "card-face card-face-back absolute inset-0 flex flex-col items-start justify-start p-3 rounded-lg border-2 shadow-md bg-gradient-to-br overflow-y-auto",
           getCategoryStyles(),
           getTextColor()
         )}>
-          <p className="text-xs text-center leading-relaxed">
+          {role && (
+            <div className="w-full mb-2">
+              <span className="text-[10px] font-semibold uppercase tracking-wide opacity-70">
+                {role}
+              </span>
+            </div>
+          )}
+          <p className="text-xs leading-relaxed mb-2">
             {details || 'No additional information available.'}
           </p>
-          <p className="text-[10px] mt-2 opacity-70">Click to flip back</p>
+          {molecular_weight && (
+            <p className="text-[10px] opacity-70 mt-auto">
+              MW: {molecular_weight.toFixed(2)} g/mol
+            </p>
+          )}
+          <p className="text-[10px] opacity-70">Click to flip back</p>
         </div>
       </div>
     </div>

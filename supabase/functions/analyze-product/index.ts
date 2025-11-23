@@ -206,6 +206,48 @@ type SkinLytixGptResponse = {
   debug_notes: string;
 };
 
+// Generate AI explanation for individual ingredient
+async function generateIngredientExplanation(
+  ingredientName: string,
+  category: 'safe' | 'beneficial' | 'problematic' | 'unverified',
+  pubchemData: any,
+  lovableApiKey: string
+): Promise<string> {
+  try {
+    const systemPrompt = `You are an ingredient expert. Explain this skincare ingredient in 2-3 friendly sentences for consumers.
+Focus on: what it does (role/function), why it's used, and any key safety notes.
+Keep it conversational and non-technical. No medical claims.`;
+
+    const context = pubchemData ? `Molecular weight: ${pubchemData.molecular_weight || 'unknown'}` : 'Limited scientific data available';
+    const userMessage = `Explain ${ingredientName} (category: ${category}) for a consumer. ${context}`;
+
+    const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${lovableApiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'google/gemini-2.5-flash',
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: userMessage }
+        ],
+        max_tokens: 150,
+        temperature: 0.7,
+      }),
+    });
+
+    if (!response.ok) return 'No detailed information available.';
+    
+    const data = await response.json();
+    return data.choices[0].message.content.trim();
+  } catch (error) {
+    console.error(`Error generating explanation for ${ingredientName}:`, error);
+    return 'No detailed information available.';
+  }
+}
+
 async function generateGptExplanation(
   analysisData: {
     productName: string;
@@ -1373,11 +1415,85 @@ serve(async (req) => {
       beneficial
     );
 
+    // Enrich ALL ingredients with AI explanations and PubChem data
+    const lovableApiKey = Deno.env.get('LOVABLE_API_KEY');
+    console.log('Starting ingredient enrichment...');
+    
+    // Helper to classify ingredient role based on name and PubChem data
+    const classifyIngredientRole = (name: string, pubchemData: any): string => {
+      const nameLower = name.toLowerCase();
+      if (/acid|retinol|peptide|vitamin c|ascorbic/i.test(nameLower)) return 'active';
+      if (/hyaluronic|glycerin|aloe|aqua|water/i.test(nameLower)) return 'humectant';
+      if (/oil|butter|shea|cocoa|squalane/i.test(nameLower)) return 'emollient';
+      if (/dimethicone|silicone|petrolatum/i.test(nameLower)) return 'occlusive';
+      if (/cetyl|stearyl|alcohol/i.test(nameLower)) return 'emulsifier';
+      if (/fragrance|parfum|essential oil/i.test(nameLower)) return 'fragrance';
+      if (/paraben|phenoxyethanol|benzyl/i.test(nameLower)) return 'preservative';
+      return 'supporting';
+    };
+
+    // Enrich safe ingredients with AI explanations
+    const enrichedSafeIngredients = await Promise.all(
+      safe.slice(0, 30).map(async (ingredientName: string) => {
+        const pubchemData = ingredientResults.find((r: any) => 
+          r.searched_name?.toLowerCase() === ingredientName.toLowerCase()
+        );
+        
+        let explanation = 'Generally recognized as safe for topical use.';
+        if (lovableApiKey) {
+          explanation = await generateIngredientExplanation(
+            ingredientName,
+            'safe',
+            pubchemData,
+            lovableApiKey
+          );
+        }
+
+        return {
+          name: ingredientName,
+          role: classifyIngredientRole(ingredientName, pubchemData),
+          explanation,
+          molecular_weight: pubchemData?.molecular_weight || null,
+          safety_profile: 'safe'
+        };
+      })
+    );
+
+    // Enrich concern/unverified ingredients with AI explanations
+    const enrichedConcernIngredients = await Promise.all(
+      concerns.slice(0, 20).map(async (ingredientName: string) => {
+        const pubchemData = ingredientResults.find((r: any) => 
+          r.searched_name?.toLowerCase() === ingredientName.toLowerCase()
+        );
+        
+        let explanation = 'Not found in PubChem or Open Beauty Facts databases. May be a proprietary blend or trade name.';
+        if (lovableApiKey) {
+          explanation = await generateIngredientExplanation(
+            ingredientName,
+            'unverified',
+            pubchemData,
+            lovableApiKey
+          );
+        }
+
+        return {
+          name: ingredientName,
+          role: classifyIngredientRole(ingredientName, pubchemData),
+          explanation,
+          molecular_weight: pubchemData?.molecular_weight || null,
+          safety_profile: 'unverified'
+        };
+      })
+    );
+
+    console.log(`✓ Enriched ${enrichedSafeIngredients.length} safe ingredients`);
+    console.log(`✓ Enriched ${enrichedConcernIngredients.length} unverified ingredients`);
+
     const recommendations = {
-      safe_ingredients: safe,
-      problematic_ingredients: problematic,  // NEW: Array of {name, reason}
-      beneficial_ingredients: beneficial,     // NEW: Array of {name, benefit}
-      concern_ingredients: concerns,
+      safe_ingredients: enrichedSafeIngredients,
+      problematic_ingredients: problematic,  // Already enriched: Array of {name, reason}
+      beneficial_ingredients: beneficial,     // Already enriched: Array of {name, benefit}
+      concern_ingredients: enrichedConcernIngredients,
       warnings: warnings,
       summary: personalizedSummary,
       routine_suggestions: routineSuggestions,
@@ -1397,7 +1513,6 @@ serve(async (req) => {
     console.log('Analysis complete for:', product_name, 'EpiQ Score:', epiqScore);
 
     // Generate AI explanation using Gemini 2.5 Flash (graceful degradation)
-    const lovableApiKey = Deno.env.get('LOVABLE_API_KEY');
     let aiExplanation: SkinLytixGptResponse | null = null;
 
     if (lovableApiKey) {

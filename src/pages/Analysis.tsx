@@ -519,25 +519,32 @@ const Analysis = () => {
               </p>
             </div>
           </div>
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-            {analysis.recommendations_json.safe_ingredients.length > 0 ? (
-              <>
-                {analysis.recommendations_json.beneficial_ingredients?.map((item, index) => (
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+              {analysis.recommendations_json.safe_ingredients.length > 0 ? (
+                <>
+                {analysis.recommendations_json.beneficial_ingredients?.map((item: any, index: number) => (
                   <IngredientCard
                     key={`beneficial-${index}`}
                     name={item.name}
                     category="beneficial"
                     details={item.benefit}
                     emoji="✨"
+                    role={item.role}
+                    molecular_weight={item.molecular_weight}
+                    safety_profile={item.safety_profile}
                   />
                 ))}
                 {analysis.recommendations_json.safe_ingredients
-                  .filter(ing => !analysis.recommendations_json.beneficial_ingredients?.some(b => b.name === ing))
-                  .map((ingredient, index) => (
+                  .filter((ing: any) => !analysis.recommendations_json.beneficial_ingredients?.some((b: any) => b.name === (typeof ing === 'string' ? ing : ing.name)))
+                  .map((ingredient: any, index: number) => (
                     <IngredientCard
                       key={`safe-${index}`}
-                      name={ingredient}
+                      name={typeof ingredient === 'string' ? ingredient : ingredient.name}
                       category="safe"
+                      details={typeof ingredient === 'object' ? ingredient.explanation : undefined}
+                      role={typeof ingredient === 'object' ? ingredient.role : undefined}
+                      molecular_weight={typeof ingredient === 'object' ? ingredient.molecular_weight : undefined}
+                      safety_profile={typeof ingredient === 'object' ? ingredient.safety_profile : undefined}
                     />
                   ))
                 }
@@ -572,12 +579,15 @@ const Analysis = () => {
               </div>
             </div>
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-              {analysis.recommendations_json.concern_ingredients.map((ingredient, index) => (
+              {analysis.recommendations_json.concern_ingredients.map((ingredient: any, index: number) => (
                 <IngredientCard
                   key={index}
-                  name={ingredient}
+                  name={typeof ingredient === 'string' ? ingredient : ingredient.name}
                   category="unverified"
-                  details="Not found in PubChem or Open Beauty Facts databases. May be a proprietary blend or trade name."
+                  details={typeof ingredient === 'object' ? ingredient.explanation : "Not found in PubChem or Open Beauty Facts databases. May be a proprietary blend or trade name."}
+                  role={typeof ingredient === 'object' ? ingredient.role : undefined}
+                  molecular_weight={typeof ingredient === 'object' ? ingredient.molecular_weight : undefined}
+                  safety_profile={typeof ingredient === 'object' ? ingredient.safety_profile : undefined}
                 />
               ))}
             </div>
