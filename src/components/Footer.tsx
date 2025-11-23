@@ -1,4 +1,4 @@
-import { Heart, Instagram, Twitter, Facebook } from "lucide-react";
+import { Heart, Instagram, AtSign, Facebook } from "lucide-react";
 
 const Footer = () => {
   return (
@@ -45,7 +45,7 @@ const Footer = () => {
                 className="w-10 h-10 rounded-full bg-primary-foreground/10 hover:bg-primary-foreground/20 flex items-center justify-center transition-all hover:scale-110"
                 aria-label="Follow us on Threads"
               >
-                <Twitter className="w-5 h-5 text-primary-foreground" />
+                <AtSign className="w-5 h-5 text-primary-foreground" />
               </a>
               <a 
                 href="https://www.facebook.com/profile.php?id=61574847090738" 
