@@ -156,11 +156,30 @@ RESPONSE FORMAT:
     // Save user message if we have a conversation
     const userMessage = messages[messages.length - 1];
     if (currentConversationId && userMessage.role === 'user') {
-      await supabase.from('chat_messages').insert({
-        conversation_id: currentConversationId,
-        role: 'user',
-        content: userMessage.content,
-        metadata: {}
+      console.log('💾 Saving user message to database...', {
+        conversationId: currentConversationId,
+        contentLength: userMessage.content.length
+      });
+
+      const { data: userData, error: userError } = await supabase
+        .from('chat_messages')
+        .insert({
+          conversation_id: currentConversationId,
+          role: 'user',
+          content: userMessage.content,
+          metadata: {}
+        })
+        .select();
+
+      if (userError) {
+        console.error('❌ Failed to save user message:', userError);
+      } else {
+        console.log('✅ User message saved successfully:', userData?.[0]?.id);
+      }
+    } else {
+      console.log('⚠️ Skipping user message save:', {
+        hasConversationId: !!currentConversationId,
+        userMessageRole: userMessage?.role
       });
     }
 
@@ -221,21 +240,74 @@ RESPONSE FORMAT:
       },
       async flush() {
         // Save assistant message after stream completes
-        if (currentConversationId && assistantResponse) {
-          await supabase.from('chat_messages').insert({
-            conversation_id: currentConversationId,
-            role: 'assistant',
-            content: assistantResponse,
-            metadata: {}
+        console.log('🔄 FLUSH: Stream completed, checking save conditions...', {
+          hasConversationId: !!currentConversationId,
+          conversationId: currentConversationId,
+          hasResponse: !!assistantResponse,
+          responseLength: assistantResponse.length,
+          responsePreview: assistantResponse.substring(0, 100)
+        });
+
+        if (!currentConversationId) {
+          console.warn('⚠️ FLUSH: No conversation ID, skipping database save');
+          return;
+        }
+
+        if (!assistantResponse) {
+          console.warn('⚠️ FLUSH: No assistant response captured, skipping database save');
+          return;
+        }
+
+        try {
+          // Save assistant message
+          console.log('💾 FLUSH: Inserting assistant message to database...', {
+            conversationId: currentConversationId,
+            contentLength: assistantResponse.length
           });
-          
+
+          const { data: messageData, error: messageError } = await supabase
+            .from('chat_messages')
+            .insert({
+              conversation_id: currentConversationId,
+              role: 'assistant',
+              content: assistantResponse,
+              metadata: {}
+            })
+            .select();
+
+          if (messageError) {
+            console.error('❌ FLUSH: Failed to save assistant message:', messageError);
+            throw messageError;
+          }
+
+          console.log('✅ FLUSH: Assistant message saved successfully:', {
+            messageId: messageData?.[0]?.id,
+            conversationId: currentConversationId
+          });
+
           // Update conversation timestamp
-          await supabase
+          console.log('🕒 FLUSH: Updating conversation timestamp...');
+          
+          const { error: updateError } = await supabase
             .from('chat_conversations')
             .update({ updated_at: new Date().toISOString() })
             .eq('id', currentConversationId);
-          
-          console.log('Saved assistant response to database');
+
+          if (updateError) {
+            console.error('❌ FLUSH: Failed to update conversation timestamp:', updateError);
+          } else {
+            console.log('✅ FLUSH: Conversation timestamp updated successfully');
+          }
+
+          console.log('✨ FLUSH: Database save operations completed successfully');
+
+        } catch (error) {
+          console.error('❌ FLUSH: Error during database save:', error);
+          console.error('❌ FLUSH: Error details:', {
+            error: error instanceof Error ? error.message : String(error),
+            conversationId: currentConversationId,
+            responseLength: assistantResponse.length
+          });
         }
       }
     });
