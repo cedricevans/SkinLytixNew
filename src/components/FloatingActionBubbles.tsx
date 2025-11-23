@@ -1,4 +1,4 @@
-import { Home, Plus, Microscope, TrendingUp, Bug } from "lucide-react";
+import { Home, Plus, Microscope, TrendingUp } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import {
@@ -50,14 +50,6 @@ export const FloatingActionBubbles = ({
       position: "top-52 left-4",
       gradient: "from-[hsl(192,51%,48%)] to-[hsl(192,51%,56%)]",
       action: () => navigate('/upload'),
-      show: true,
-    },
-    {
-      icon: Bug,
-      label: "Report Bug",
-      position: "top-[17rem] left-4",
-      gradient: "from-[hsl(197,75%,30%)] to-[hsl(192,51%,42%)]",
-      action: () => window.open('https://forms.gle/your-bug-report-form', '_blank'),
       show: true,
     },
   ];
