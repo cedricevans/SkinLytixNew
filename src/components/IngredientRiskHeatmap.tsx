@@ -14,7 +14,7 @@ interface IngredientRiskHeatmapProps {
 
 export const IngredientRiskHeatmap = ({ ingredients, onIngredientClick }: IngredientRiskHeatmapProps) => {
   const [hoveredIngredient, setHoveredIngredient] = useState<string | null>(null);
-  const [isOpen, setIsOpen] = useState(true);
+  const [isOpen, setIsOpen] = useState(false);
 
   const getRiskColor = (riskScore: number) => {
     if (riskScore < 30) return 'bg-green-500 hover:bg-green-600';

@@ -19,6 +19,7 @@ import { FloatingActionBubbles } from "@/components/FloatingActionBubbles";
 import { ResponsiveBottomNav } from "@/components/ResponsiveBottomNav";
 import { IngredientRiskHeatmap } from "@/components/IngredientRiskHeatmap";
 import { ScoreBreakdownAccordion } from "@/components/ScoreBreakdownAccordion";
+import { AIExplanationAccordion } from "@/components/AIExplanationAccordion";
 import { AIExplanationLoader } from "@/components/AIExplanationLoader";
 import { SkinLytixGPTChat } from "@/components/SkinLytixGPTChat";
 
@@ -401,80 +402,7 @@ const Analysis = () => {
 
         {/* AI Explanation Section - SkinLytix GPT */}
         {analysis.recommendations_json.ai_explanation && (
-          <Card className="shadow-md hover:shadow-lg transition-all mb-6 md:mb-8 overflow-hidden">
-            <div className="bg-gradient-to-r from-purple-50 to-pink-50 dark:from-purple-950/20 dark:to-pink-950/20 border-b p-4 md:p-6">
-              <div className="flex items-start justify-between gap-4 mb-4">
-                <div className="flex items-center gap-2 flex-1">
-                  <Sparkles className="w-5 h-5 text-purple-600 dark:text-purple-400 flex-shrink-0" />
-                   <div>
-                     <h2 className="text-lg font-semibold">🤖✨ AI Explanation</h2>
-                     {analysis.recommendations_json.ai_explanation.summary_one_liner && (
-                       <p className="text-sm text-muted-foreground mt-1 font-normal">
-                         {analysis.recommendations_json.ai_explanation.summary_one_liner}
-                       </p>
-                     )}
-                   </div>
-                </div>
-              </div>
-              
-              <SafetyLevelMeter
-                safetyLevel={analysis.recommendations_json.ai_explanation.safety_level as 'low' | 'moderate' | 'high' | 'unknown'}
-                score={
-                  analysis.recommendations_json.ai_explanation.safety_level === 'low' ? 25 :
-                  analysis.recommendations_json.ai_explanation.safety_level === 'moderate' ? 55 :
-                  analysis.recommendations_json.ai_explanation.safety_level === 'high' ? 85 :
-                  50
-                }
-              />
-            </div>
-            <div className="p-4 md:p-6">
-              {/* Professional Referral Alert (Priority Display) */}
-              {analysis.recommendations_json.ai_explanation.professional_referral.needed && (
-                <Alert className="mb-6 border-amber-500 bg-amber-50 dark:bg-amber-950/20">
-                  <AlertTriangle className="h-4 w-4 text-amber-600 dark:text-amber-500" />
-                  <AlertTitle className="text-amber-900 dark:text-amber-100">
-                    Professional Consultation Recommended
-                  </AlertTitle>
-                  <AlertDescription className="text-amber-800 dark:text-amber-200">
-                    {analysis.recommendations_json.ai_explanation.professional_referral.reason}
-                    {analysis.recommendations_json.ai_explanation.professional_referral.suggested_professional_type !== 'none' && (
-                      <span className="block mt-2 font-medium">
-                        Consider consulting: {
-                          analysis.recommendations_json.ai_explanation.professional_referral.suggested_professional_type === 'dermatologist' ? '🩺 Dermatologist' :
-                          analysis.recommendations_json.ai_explanation.professional_referral.suggested_professional_type === 'esthetician' ? '💆 Licensed Esthetician' :
-                          '🩺 Dermatologist or 💆 Licensed Esthetician'
-                        }
-                      </span>
-                    )}
-                  </AlertDescription>
-                </Alert>
-              )}
-
-              {/* Markdown-rendered AI explanation */}
-              <div className="prose prose-sm max-w-none dark:prose-invert prose-headings:font-semibold prose-headings:text-lg prose-p:text-muted-foreground prose-li:text-muted-foreground prose-strong:text-foreground">
-                <ReactMarkdown>
-                  {analysis.recommendations_json.ai_explanation.answer_markdown}
-                </ReactMarkdown>
-              </div>
-
-              {/* Metadata Footer */}
-              <div className="mt-6 pt-4 border-t flex flex-wrap gap-2 text-xs text-muted-foreground items-center">
-                {analysis.recommendations_json.ai_explanation.ingredient_focus && (
-                  <Badge variant="outline" className="text-xs">
-                    🧪 Ingredient-focused
-                  </Badge>
-                )}
-                {analysis.recommendations_json.ai_explanation.epiQ_or_score_used && (
-                  <Badge variant="outline" className="text-xs">
-                    📊 EpiQ Score Analysis
-                  </Badge>
-                )}
-                <span className="ml-auto text-muted-foreground">
-                  Powered by SkinLytix GPT
-                </span>
-              </div>
-            </div>
-          </Card>
+          <AIExplanationAccordion aiExplanation={analysis.recommendations_json.ai_explanation} />
         )}
 
         {/* Ingredient Risk Heatmap */}
