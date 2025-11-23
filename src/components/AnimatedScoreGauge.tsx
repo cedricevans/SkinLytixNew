@@ -55,7 +55,7 @@ export const AnimatedScoreGauge = ({ score, className }: AnimatedScoreGaugeProps
     <div className={cn("flex flex-col items-center", className)}>
       <div className="relative w-64 h-64 mb-6">
         {/* Background circle */}
-        <svg className="w-full h-full transform -rotate-90">
+        <svg className="w-full h-full transform -rotate-90" viewBox="0 0 256 256">
           <circle
             cx="128"
             cy="128"
