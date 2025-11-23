@@ -20,6 +20,7 @@ import { MobileBottomNav } from "@/components/MobileBottomNav";
 import { IngredientRiskHeatmap } from "@/components/IngredientRiskHeatmap";
 import { ScoreBreakdownAccordion } from "@/components/ScoreBreakdownAccordion";
 import { AIExplanationLoader } from "@/components/AIExplanationLoader";
+import { SkinLytixGPTChat } from "@/components/SkinLytixGPTChat";
 
 interface AnalysisData {
   id: string;
@@ -723,6 +724,13 @@ const Analysis = () => {
         <MobileBottomNav 
           onAddToRoutine={handleAddToRoutine}
           showAddToRoutine={true}
+        />
+
+        {/* SkinLytixGPT Chat with Voice */}
+        <SkinLytixGPTChat 
+          analysisId={analysis.id}
+          productName={analysis.product_name}
+          skinType={analysis.recommendations_json?.product_metadata?.product_type}
         />
       </div>
     </main>
