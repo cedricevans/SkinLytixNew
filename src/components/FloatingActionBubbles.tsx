@@ -31,7 +31,7 @@ export const FloatingActionBubbles = ({
     {
       icon: Plus,
       label: "Add to Routine",
-      position: "top-4 right-4",
+      position: "top-20 right-4",
       gradient: "from-accent to-accent/80",
       action: onAddToRoutine,
       show: showAddToRoutine && !!onAddToRoutine,
@@ -39,7 +39,7 @@ export const FloatingActionBubbles = ({
     {
       icon: Microscope,
       label: "Analyze Another",
-      position: "bottom-4 right-4",
+      position: "top-4 right-4",
       gradient: "from-secondary to-secondary/80",
       action: () => navigate('/upload'),
       show: true,

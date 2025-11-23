@@ -27,11 +27,19 @@ export const IngredientRiskHeatmap = ({ ingredients, onIngredientClick }: Ingred
 
   return (
     <div className="w-full mb-8 animate-fade-in-up">
-      <h3 className="text-xl font-semibold mb-4 flex items-center gap-2">
-        🗺️ Ingredient Risk Overview
-      </h3>
-      <div className="relative bg-card rounded-lg p-6 border border-border shadow-soft">
-        <div className="grid grid-cols-6 md:grid-cols-10 gap-2">
+      <div className="flex items-center gap-3 mb-6">
+        <div className="w-12 h-12 rounded-full bg-gradient-to-br from-primary to-primary-glow flex items-center justify-center shadow-elegant">
+          <span className="text-2xl">🗺️</span>
+        </div>
+        <div>
+          <h3 className="text-2xl font-bold">Ingredient Risk Overview</h3>
+          <p className="text-sm text-muted-foreground">
+            Visual risk assessment at a glance • {ingredients.length} ingredients analyzed
+          </p>
+        </div>
+      </div>
+      <div className="relative bg-gradient-to-br from-card to-card/50 rounded-xl p-8 border border-border shadow-elegant backdrop-blur-sm">
+        <div className="grid grid-cols-6 md:grid-cols-10 gap-3 md:gap-4">
           {ingredients.map((ingredient, index) => {
             const riskScore = ingredient.risk_score || 
               (ingredient.category === 'problematic' ? 85 :
@@ -42,9 +50,13 @@ export const IngredientRiskHeatmap = ({ ingredients, onIngredientClick }: Ingred
               <div
                 key={index}
                 className={cn(
-                  "relative aspect-square rounded cursor-pointer transition-all duration-200 transform hover:scale-110 hover:z-10",
+                  "relative aspect-square rounded-full cursor-pointer transition-all duration-300 transform hover:scale-125 hover:z-10 shadow-md hover:shadow-glow",
+                  "animate-fade-in",
                   getRiskColor(riskScore)
                 )}
+                style={{
+                  animationDelay: `${index * 20}ms`,
+                }}
                 onMouseEnter={() => setHoveredIngredient(ingredient.name)}
                 onMouseLeave={() => setHoveredIngredient(null)}
                 onClick={() => onIngredientClick?.(ingredient.name)}
@@ -53,27 +65,29 @@ export const IngredientRiskHeatmap = ({ ingredients, onIngredientClick }: Ingred
                 aria-label={`${ingredient.name} - ${getRiskLabel(riskScore)}`}
               >
                 {hoveredIngredient === ingredient.name && (
-                  <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 bg-popover text-popover-foreground text-xs rounded shadow-lg whitespace-nowrap z-50 border border-border">
-                    <div className="font-semibold">{ingredient.name}</div>
-                    <div className="text-muted-foreground">{getRiskLabel(riskScore)}</div>
+                  <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-3 px-4 py-3 bg-popover text-popover-foreground text-sm rounded-lg shadow-elegant whitespace-nowrap z-50 border border-border backdrop-blur-sm animate-fade-in">
+                    <div className="font-bold mb-1">{ingredient.name}</div>
+                    <div className="text-muted-foreground text-xs flex items-center gap-1">
+                      {riskScore < 30 && '✓'} {riskScore >= 60 && '⚡'} {getRiskLabel(riskScore)} • {riskScore}/100
+                    </div>
                   </div>
                 )}
               </div>
             );
           })}
         </div>
-        <div className="mt-4 flex items-center justify-center gap-6 text-sm text-muted-foreground">
+        <div className="mt-6 flex items-center justify-center gap-8 text-sm">
           <div className="flex items-center gap-2">
-            <div className="w-4 h-4 rounded bg-green-500"></div>
-            <span>Low Risk</span>
+            <div className="w-5 h-5 rounded-full bg-gradient-to-br from-green-400 to-green-600 shadow-md"></div>
+            <span className="font-medium">Low Risk</span>
           </div>
           <div className="flex items-center gap-2">
-            <div className="w-4 h-4 rounded bg-yellow-500"></div>
-            <span>Moderate</span>
+            <div className="w-5 h-5 rounded-full bg-gradient-to-br from-yellow-400 to-yellow-600 shadow-md"></div>
+            <span className="font-medium">Moderate</span>
           </div>
           <div className="flex items-center gap-2">
-            <div className="w-4 h-4 rounded bg-red-500"></div>
-            <span>High Risk</span>
+            <div className="w-5 h-5 rounded-full bg-gradient-to-br from-red-400 to-red-600 shadow-md"></div>
+            <span className="font-medium">High Risk</span>
           </div>
         </div>
       </div>
