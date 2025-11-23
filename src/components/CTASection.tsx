@@ -29,7 +29,7 @@ const CTASection = () => {
           Join beauty enthusiasts who analyze before they buy. Start analyzing your products for free—no waiting, no credit card required.
         </p>
 
-        <div className="flex flex-col sm:flex-row gap-3 md:gap-4 justify-center items-stretch sm:items-center animate-fade-in-up" style={{ animationDelay: "0.3s" }}>
+        <div className="flex justify-center items-center animate-fade-in-up" style={{ animationDelay: "0.3s" }}>
           <Button 
             variant="cta" 
             size="lg" 
@@ -38,14 +38,6 @@ const CTASection = () => {
           >
             Get Started Free
             <ArrowRight className="ml-2 w-5 h-5" />
-          </Button>
-          <Button
-            variant="default"
-            size="lg"
-            className="touch-target text-base px-8 py-5 md:py-6 h-auto w-full sm:w-auto bg-primary hover:bg-primary/90 text-primary-foreground"
-            onClick={() => window.open('https://www.skinlytix.com', '_blank')}
-          >
-            Learn More About SkinLytix
           </Button>
         </div>
 

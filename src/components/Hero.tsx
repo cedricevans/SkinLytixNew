@@ -62,11 +62,11 @@ const Hero = () => {
         </p>
 
         {/* CTA Buttons */}
-        <div className="flex flex-col gap-3 sm:flex-row sm:gap-4 justify-center items-stretch sm:items-center animate-fade-in-up px-4 sm:px-0" style={{ animationDelay: "0.3s" }}>
+        <div className="flex justify-center items-center animate-fade-in-up px-4 sm:px-0" style={{ animationDelay: "0.3s" }}>
           <Button 
             variant="cta" 
             size="lg" 
-            className="touch-target text-base px-6 sm:px-8 py-5 md:py-6 sm:py-5 h-auto w-full sm:w-auto order-1 text-lg sm:text-base"
+            className="touch-target text-base px-6 sm:px-8 py-5 md:py-6 sm:py-5 h-auto w-full sm:w-auto text-lg sm:text-base"
             onClick={() => {
               trackEvent({
                 eventName: 'demo_cta_clicked',
@@ -79,23 +79,6 @@ const Hero = () => {
             <span className="text-xl mr-2">🔬</span>
             <span className="hidden sm:inline">Try Demo Analysis - No Sign-Up</span>
             <span className="sm:hidden">Try Demo - No Sign-Up</span>
-          </Button>
-          <Button 
-            variant="secondary" 
-            size="lg" 
-            className="touch-target text-base px-6 sm:px-8 py-5 md:py-6 h-auto w-full sm:w-auto border-2 border-accent/50 hover:border-accent hover:bg-accent/10 order-2"
-            onClick={() => {
-              trackEvent({
-                eventName: 'signup_cta_clicked',
-                eventCategory: 'conversion',
-                eventProperties: { location: 'hero', text: 'Sign Up Free' }
-              });
-              navigate('/auth');
-            }}
-          >
-            <span className="hidden sm:inline">Sign Up Free</span>
-            <span className="sm:hidden">Sign Up Free</span>
-            <ArrowRight className="ml-2 w-5 h-5" />
           </Button>
         </div>
 

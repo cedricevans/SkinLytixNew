@@ -9,6 +9,7 @@ import { trackEvent } from "@/hooks/useTracking";
 import ReactMarkdown from "react-markdown";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { supabase } from "@/integrations/supabase/client";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 interface Message {
   role: 'user' | 'assistant';
@@ -360,20 +361,29 @@ export const SkinLytixGPTChat = ({
     <>
       {/* Floating Chat Bubble - Desktop Only */}
       {!isOpen && (
-        <button
-          onClick={() => {
-            setIsOpen(true);
-            trackEvent({
-              eventName: 'chat_opened',
-              eventCategory: 'chat',
-              eventProperties: { analysisId, source: 'floating_bubble' }
-            });
-          }}
-          className="hidden lg:block fixed bottom-6 right-24 z-40 bg-gradient-to-r from-[hsl(346,100%,60%)] to-[hsl(346,100%,70%)] text-white rounded-full p-4 shadow-lg transition-all hover:scale-110 focus:outline-none focus:ring-2 focus:ring-[hsl(346,100%,60%)] focus:ring-offset-2 animate-pulse"
-          aria-label="Open SkinLytixGPT chat"
-        >
-          <Sparkles className="w-6 h-6" />
-        </button>
+        <TooltipProvider>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button
+                onClick={() => {
+                  setIsOpen(true);
+                  trackEvent({
+                    eventName: 'chat_opened',
+                    eventCategory: 'chat',
+                    eventProperties: { analysisId, source: 'floating_bubble' }
+                  });
+                }}
+                className="hidden lg:block fixed bottom-6 right-24 z-40 bg-gradient-to-r from-[hsl(346,100%,60%)] to-[hsl(346,100%,70%)] text-white rounded-full p-4 shadow-lg transition-all hover:scale-110 focus:outline-none focus:ring-2 focus:ring-[hsl(346,100%,60%)] focus:ring-offset-2 animate-pulse"
+                aria-label="Open SkinLytixGPT chat"
+              >
+                <Sparkles className="w-6 h-6" />
+              </button>
+            </TooltipTrigger>
+            <TooltipContent>
+              <p>SkinLytixGPT</p>
+            </TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
       )}
 
       {/* Chat Panel/Sheet */}
