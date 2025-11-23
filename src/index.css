@@ -23,6 +23,7 @@ All colors MUST be HSL.
     /* Brand Colors */
     --primary: 197 75% 24%; /* Deep Azure - Trust */
     --primary-foreground: 0 0% 98%;
+    --primary-glow: 192 51% 48%; /* Soft Teal - Glow effect */
 
     --secondary: 238 14% 93%; /* Platinum Grey */
     --secondary-foreground: 197 75% 24%;
@@ -79,6 +80,7 @@ All colors MUST be HSL.
 
     --primary: 0 0% 98%;
     --primary-foreground: 197 75% 24%;
+    --primary-glow: 192 51% 58%; /* Brighter glow for dark mode */
 
     --secondary: 197 40% 20%;
     --secondary-foreground: 0 0% 98%;
