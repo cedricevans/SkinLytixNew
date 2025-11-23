@@ -13,6 +13,9 @@ import { useTracking, trackEvent } from "@/hooks/useTracking";
 import ReactMarkdown from 'react-markdown';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { AnimatedScoreGauge } from "@/components/AnimatedScoreGauge";
+import { SafetyLevelMeter } from "@/components/SafetyLevelMeter";
+import { ProfessionalReferralBanner } from "@/components/ProfessionalReferralBanner";
+import { FloatingActionBubbles } from "@/components/FloatingActionBubbles";
 
 interface AnalysisData {
   id: string;
@@ -217,6 +220,12 @@ const Analysis = () => {
 
   return (
     <TooltipProvider>
+      {analysis?.recommendations_json?.ai_explanation?.professional_referral?.needed && (
+        <ProfessionalReferralBanner
+          reason={analysis.recommendations_json.ai_explanation.professional_referral.reason}
+          suggestedProfessionalType={analysis.recommendations_json.ai_explanation.professional_referral.suggested_professional_type}
+        />
+      )}
       <main className="min-h-screen bg-gradient-to-b from-background to-muted py-12 px-4">
       <div className="container max-w-4xl mx-auto">
         <div className="flex items-center justify-between mb-8">
@@ -356,7 +365,7 @@ const Analysis = () => {
         {analysis.recommendations_json.ai_explanation && (
           <Card className="shadow-md hover:shadow-lg transition-all mb-8 overflow-hidden">
             <div className="bg-gradient-to-r from-purple-50 to-pink-50 dark:from-purple-950/20 dark:to-pink-950/20 border-b p-6">
-              <div className="flex items-start justify-between gap-4">
+              <div className="flex items-start justify-between gap-4 mb-4">
                 <div className="flex items-center gap-2 flex-1">
                   <Sparkles className="w-5 h-5 text-purple-600 dark:text-purple-400 flex-shrink-0" />
                    <div>
@@ -368,21 +377,17 @@ const Analysis = () => {
                      )}
                    </div>
                 </div>
-                <Badge 
-                  variant={
-                    analysis.recommendations_json.ai_explanation.safety_level === 'high' ? 'destructive' :
-                    analysis.recommendations_json.ai_explanation.safety_level === 'moderate' ? 'secondary' :
-                    analysis.recommendations_json.ai_explanation.safety_level === 'low' ? 'default' :
-                    'outline'
-                  }
-                  className="flex-shrink-0"
-                >
-                  {analysis.recommendations_json.ai_explanation.safety_level === 'low' && '✓ Low Risk'}
-                  {analysis.recommendations_json.ai_explanation.safety_level === 'moderate' && '⚠ Moderate Risk'}
-                  {analysis.recommendations_json.ai_explanation.safety_level === 'high' && '⚡ High Risk'}
-                  {analysis.recommendations_json.ai_explanation.safety_level === 'unknown' && '? Unknown'}
-                </Badge>
               </div>
+              
+              <SafetyLevelMeter
+                safetyLevel={analysis.recommendations_json.ai_explanation.safety_level as 'low' | 'moderate' | 'high' | 'unknown'}
+                score={
+                  analysis.recommendations_json.ai_explanation.safety_level === 'low' ? 25 :
+                  analysis.recommendations_json.ai_explanation.safety_level === 'moderate' ? 55 :
+                  analysis.recommendations_json.ai_explanation.safety_level === 'high' ? 85 :
+                  50
+                }
+              />
             </div>
             <div className="p-6">
               {/* Professional Referral Alert (Priority Display) */}
@@ -632,6 +637,12 @@ const Analysis = () => {
 
         {/* Post-Analysis Feedback */}
         <PostAnalysisFeedback analysisId={analysis.id} />
+
+        {/* Floating Action Bubbles */}
+        <FloatingActionBubbles 
+          onAddToRoutine={handleAddToRoutine}
+          showAddToRoutine={true}
+        />
       </div>
     </main>
     </TooltipProvider>
