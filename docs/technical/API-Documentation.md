@@ -1,7 +1,7 @@
 # API Documentation
 
-**Document Version:** 1.0  
-**Last Updated:** November 11, 2025  
+**Document Version:** 1.1  
+**Last Updated:** November 23, 2025  
 **Owner:** Engineering Team  
 **Status:** Active
 
@@ -44,6 +44,7 @@ https://yflbjaetupvakadqjhfb.supabase.co/functions/v1/
 | **AI Provider** | Lovable AI Gateway | Gemini 2.5 Flash models |
 | **OCR** | Tesseract.js | Ingredient extraction |
 | **External APIs** | Open Beauty Facts, PubChem | Product & ingredient data |
+| **Real-time** | Server-Sent Events (SSE) | Streaming chat responses |
 
 ### API Design Principles
 
@@ -162,8 +163,29 @@ interface AnalyzeProductRequest {
 ```typescript
 interface AnalyzeProductResponse {
   epiq_score: number;        // 0-100 overall quality score
+  sub_scores: {              // NEW: Detailed scoring breakdown
+    ingredient_safety: number;      // 0-100, based on problematic ingredient count
+    skin_compatibility: number;     // 0-100, profile matching score
+    active_quality: number;         // 0-100, beneficial ingredient count
+    preservative_safety: number;    // 0-100, preservative system assessment
+  };
   recommendations_json: {
     overall_assessment: string;
+    product_metadata: {      // NEW: Product classification
+      product_type: string;           // "moisturizer", "cleanser", "serum", etc.
+      product_type_label: string;     // Human-readable type
+      brand: string;
+      category: string;
+    };
+    enriched_ingredients: Array<{    // NEW: Enhanced ingredient data
+      name: string;
+      role: string;                   // "Humectant", "Emollient", etc.
+      explanation: string;            // AI-generated 2-3 sentence explanation
+      molecular_weight: number | null;
+      safety_profile: string;         // "low", "medium", "high" risk
+      risk_score: number;             // 1-10 risk score for heatmap
+      category: "safe" | "beneficial" | "problematic" | "unverified";
+    }>;
     key_actives: Array<{
       name: string;
       function: string;
@@ -182,6 +204,16 @@ interface AnalyzeProductResponse {
       reason: string;
       price_difference: number;
     }>;
+    ai_explanation: {        // NEW: Product-level AI insights
+      answer_markdown: string;        // Full markdown explanation
+      summary_one_liner: string;      // Quick takeaway
+      safety_level: "low" | "moderate" | "high" | "unknown";
+      professional_referral: {
+        needed: boolean;
+        reason: string;
+        suggested_professional_type: "none" | "dermatologist" | "esthetician" | "either";
+      };
+    };
   };
   analysis_id: string;       // UUID of saved analysis
 }
@@ -277,7 +309,139 @@ console.log(data);
 
 ---
 
-### 2. optimize-routine
+### 2. chat-skinlytix
+
+**Purpose:** Enable conversational AI chat about product analysis with context awareness and conversation persistence.
+
+**Endpoint:** `POST /functions/v1/chat-skinlytix`
+
+**Authentication:** Optional (JWT token recommended for persistence)
+
+**Request Body:**
+
+```typescript
+interface ChatRequest {
+  analysisId: string;        // UUID of product analysis
+  conversationId?: string;   // Optional: existing conversation ID
+  userId?: string;           // Optional: user ID for persistence
+  messages: Array<{
+    role: 'user' | 'assistant';
+    content: string;
+  }>;
+}
+```
+
+**Response:** Server-Sent Events (SSE) stream
+
+The response is streamed token-by-token using Server-Sent Events format:
+
+```
+data: {"choices":[{"delta":{"content":"Hello"}}]}
+
+data: {"choices":[{"delta":{"content":" there"}}]}
+
+data: {"choices":[{"delta":{"content":"!"}}]}
+
+data: [DONE]
+```
+
+**Response Headers:**
+- `Content-Type: text/event-stream`
+- `X-Conversation-Id: <uuid>` - Conversation UUID for follow-up messages
+- `Cache-Control: no-cache`
+- `Connection: keep-alive`
+
+**Example Request:**
+
+```typescript
+const response = await fetch(`${SUPABASE_URL}/functions/v1/chat-skinlytix`, {
+  method: 'POST',
+  headers: {
+    'Authorization': `Bearer ${jwt_token}`,
+    'Content-Type': 'application/json'
+  },
+  body: JSON.stringify({
+    analysisId: 'analysis-uuid-1234',
+    conversationId: 'existing-conv-uuid', // Optional
+    userId: 'user-uuid-5678',
+    messages: [
+      {
+        role: 'user',
+        content: 'Is this product safe for sensitive skin?'
+      }
+    ]
+  })
+});
+
+// Parse SSE stream
+const reader = response.body.getReader();
+const decoder = new TextDecoder();
+let fullResponse = '';
+
+while (true) {
+  const { done, value } = await reader.read();
+  if (done) break;
+  
+  const chunk = decoder.decode(value);
+  const lines = chunk.split('\n');
+  
+  for (const line of lines) {
+    if (line.startsWith('data: ')) {
+      const data = line.substring(6);
+      if (data === '[DONE]') break;
+      
+      try {
+        const parsed = JSON.parse(data);
+        const token = parsed.choices[0]?.delta?.content || '';
+        fullResponse += token;
+        console.log(token); // Render token-by-token
+      } catch (e) {
+        // Skip parsing errors
+      }
+    }
+  }
+}
+
+// Get conversation ID from response header
+const conversationId = response.headers.get('X-Conversation-Id');
+console.log('Conversation ID:', conversationId);
+```
+
+**Features:**
+- **Context-Aware**: AI knows current product analysis details
+- **Conversation Persistence**: Messages saved to database
+- **Streaming Responses**: Token-by-token delivery for perceived speed
+- **Professional Guardrails**: No medical diagnosis or treatment advice
+- **One Conversation Per Analysis**: Unique constraint on `(user_id, analysis_id)`
+
+**Error Responses:**
+
+```json
+// 400 Bad Request - Missing required fields
+{
+  "error": "Missing required field: analysisId"
+}
+
+// 429 Too Many Requests - Rate limit exceeded
+{
+  "error": "Rate limit exceeded. Please try again later.",
+  "retry_after_seconds": 60
+}
+
+// 402 Payment Required - AI credits depleted
+{
+  "error": "AI credits depleted. Please contact support@skinlytix.com"
+}
+
+// 500 Internal Server Error
+{
+  "error": "Failed to generate response. Please try again."
+}
+```
+
+---
+
+### 3. optimize-routine
 
 **Purpose:** Analyze a user's skincare routine and provide optimization recommendations (cost savings, redundancies, better order).
 
@@ -424,7 +588,7 @@ const data = await response.json();
 
 ---
 
-### 3. extract-ingredients
+### 4. extract-ingredients
 
 **Purpose:** Extract ingredients from product image using OCR (Tesseract.js).
 
@@ -515,7 +679,7 @@ const data = await response.json();
 
 ---
 
-### 4. query-pubchem
+### 5. query-pubchem
 
 **Purpose:** Query PubChem database for ingredient information (molecular weight, safety data, properties).
 
@@ -602,7 +766,7 @@ const data = await response.json();
 
 ---
 
-### 5. query-open-beauty-facts
+### 6. query-open-beauty-facts
 
 **Purpose:** Query Open Beauty Facts database for product information by barcode.
 
@@ -687,6 +851,7 @@ SkinLytix uses database-backed rate limiting via the `check_rate_limit` function
 | `analyze-product` | 10 requests | 1 hour | User ID |
 | `optimize-routine` | 5 requests | 1 hour | User ID |
 | `extract-ingredients` | 20 requests | 1 hour | User ID |
+| `chat-skinlytix` | 20 messages | 1 minute | User ID or IP |
 | `query-pubchem` | 100 requests | 1 hour | IP address |
 | `query-open-beauty-facts` | 100 requests | 1 hour | IP address |
 

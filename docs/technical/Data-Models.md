@@ -1,7 +1,7 @@
 # Data Models & JSON Schemas
 
-**Document Version:** 1.0  
-**Last Updated:** November 11, 2025  
+**Document Version:** 1.1  
+**Last Updated:** November 23, 2025  
 **Owner:** Engineering Team  
 **Status:** Active
 
@@ -30,11 +30,33 @@ erDiagram
     profiles ||--o{ user_events : generates
     profiles ||--o{ feedback : submits
     profiles ||--o{ user_roles : has
+    profiles ||--o{ chat_conversations : has
+    
+    user_analyses ||--o{ chat_conversations : discussed_in
+    chat_conversations ||--o{ chat_messages : contains
     
     routines ||--o{ routine_products : contains
     routines ||--o{ routine_optimizations : has
     
     routine_products }o--|| user_analyses : references
+    
+    chat_conversations {
+        uuid id PK
+        uuid user_id FK
+        uuid analysis_id FK
+        text title
+        timestamptz created_at
+        timestamptz updated_at
+    }
+    
+    chat_messages {
+        uuid id PK
+        uuid conversation_id FK
+        text role
+        text content
+        jsonb metadata
+        timestamptz created_at
+    }
     
     user_analyses {
         uuid id PK
@@ -222,6 +244,27 @@ interface UserAnalysis {
   epiq_score: number | null;
   recommendations_json: {
     overall_assessment: string;
+    sub_scores: {                           // NEW: Detailed scoring breakdown
+      ingredient_safety: number;            // 0-100
+      skin_compatibility: number;           // 0-100
+      active_quality: number;               // 0-100
+      preservative_safety: number;          // 0-100
+    };
+    product_metadata: {                     // NEW: Product classification
+      product_type: string;
+      product_type_label: string;
+      brand: string;
+      category: string;
+    };
+    enriched_ingredients: Array<{           // NEW: Enhanced ingredient data
+      name: string;
+      role: string;
+      explanation: string;
+      molecular_weight: number | null;
+      safety_profile: string;
+      risk_score: number;
+      category: 'safe' | 'beneficial' | 'problematic' | 'unverified';
+    }>;
     key_actives: Array<{
       name: string;
       function: string;
@@ -241,6 +284,16 @@ interface UserAnalysis {
       reason: string;
       price_difference: number;
     }>;
+    ai_explanation: {                       // NEW: Product-level AI insights
+      answer_markdown: string;
+      summary_one_liner: string;
+      safety_level: 'low' | 'moderate' | 'high' | 'unknown';
+      professional_referral: {
+        needed: boolean;
+        reason: string;
+        suggested_professional_type: 'none' | 'dermatologist' | 'esthetician' | 'either';
+      };
+    };
   } | null;
   product_name: string;
   brand: string | null;

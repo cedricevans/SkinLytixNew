@@ -1,7 +1,7 @@
 # Engineering Standard Operating Procedures (SOPs)
 
-**Document Version:** 1.0  
-**Last Updated:** November 11, 2025  
+**Document Version:** 1.1  
+**Last Updated:** November 23, 2025  
 **Owner:** Engineering Team  
 **Status:** Active
 
@@ -339,6 +339,71 @@ git push origin --delete feature/your-feature-name
 ❌ Bad: "This won't scale"
 
 ✅ Good: "This query might have performance issues at scale. Consider adding an index on `user_id` and `created_at` columns for faster lookups."
+
+---
+
+## Progressive Disclosure UI Pattern (Collapsible Components)
+
+### When to Use
+
+Use collapsible components to reduce initial cognitive load on data-heavy pages while maintaining access to detailed information.
+
+### Implementation Pattern
+
+```tsx
+const [isExpanded, setIsExpanded] = useState(false); // Default: collapsed
+
+return (
+  <div className="rounded-lg border bg-card">
+    {/* Header (always visible) */}
+    <button
+      onClick={() => setIsExpanded(!isExpanded)}
+      className="w-full flex items-center justify-between p-4"
+    >
+      <h3 className="font-semibold">{title}</h3>
+      <ChevronDown
+        className={cn(
+          "h-5 w-5 transition-transform duration-300",
+          isExpanded && "rotate-180"
+        )}
+      />
+    </button>
+
+    {/* Content (collapsible) */}
+    <div
+      className={cn(
+        "overflow-hidden transition-all duration-300",
+        isExpanded ? "max-h-[3000px] opacity-100" : "max-h-0 opacity-0"
+      )}
+    >
+      <div className="p-4 pt-0">{content}</div>
+    </div>
+  </div>
+);
+```
+
+### Design Principles
+
+1. **Default to Collapsed** for secondary content
+2. **Keep Critical Metrics** always visible (e.g., EpiQ score)
+3. **Smooth Transitions** (300ms duration recommended)
+4. **Clear Visual Affordance** (chevron icon rotation)
+5. **Keyboard Navigation** (Enter/Space to toggle)
+6. **Accessibility** (aria-expanded, role="button")
+
+### Current Implementation
+
+**Analysis Page Collapsible Sections:**
+- ✅ Score Breakdown Accordion (4 sub-scores) - Default: collapsed
+- ✅ AI Explanation Accordion (product-level insights) - Default: collapsed
+- ✅ Ingredient Risk Heatmap (visual grid) - Default: collapsed
+- 🔒 EpiQ Score Gauge - Always visible (non-collapsible)
+
+**Benefits:**
+- Reduced initial page height by ~40%
+- Progressive disclosure of complexity
+- Improved mobile scrolling experience
+- Faster perceived load time
 
 ---
 

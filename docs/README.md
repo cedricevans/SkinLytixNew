@@ -81,6 +81,11 @@ Located in `/docs/technical/`:
 | **MVP** | 35+ | Oct 6, 2025 | Active |
 | **Scaling Strategy** | 30+ | Oct 6, 2025 | Active |
 | **Technical Stack** | 40+ | Oct 6, 2025 | Active |
+| **API Documentation** | 60+ | Nov 23, 2025 | Active |
+| **Data Models** | 70+ | Nov 23, 2025 | Active |
+| **Engineering SOPs** | 55+ | Nov 23, 2025 | Active |
+| **AI Explanation Integration** | 20+ | Nov 23, 2025 | Active |
+| **Chat Feature Guide** | 15+ | Nov 23, 2025 | Active |
 
 ---
 
@@ -95,10 +100,13 @@ Located in `/docs/technical/`:
 - 🚀 Launch target: Week 12
 
 ### Technology Highlights
-- **Frontend:** React 18 + TypeScript + Vite
-- **Backend:** Lovable Cloud / Supabase (PostgreSQL + Edge Functions)
-- **AI:** Lovable AI Gateway (Gemini 2.5 Flash)
-- **OCR:** Tesseract.js
+- **Frontend:** React 18 + TypeScript + Vite + TanStack Query
+- **Backend:** Lovable Cloud (Supabase: PostgreSQL + Edge Functions)
+- **AI:** Lovable AI Gateway (Gemini 2.5 Flash for analysis & chat)
+- **OCR:** Tesseract.js for ingredient extraction
+- **UI Components:** Radix UI + Tailwind CSS + shadcn/ui
+- **Real-time:** Server-Sent Events (SSE) for chat streaming
+- **Voice:** Web Speech API (SpeechRecognition + SpeechSynthesis)
 
 ### Key Metrics (Target - Month 6)
 - 10,000+ Monthly Active Users
@@ -137,10 +145,69 @@ Documents frequently reference each other:
 - **GitHub Repository:** [Link to repo]
 - **Design System:** Figma (if applicable)
 
+### Technical Documentation
+
+Located in `/docs/technical/`:
+
+1. **[API Documentation](./technical/API-Documentation.md)**
+   - Complete edge function reference
+   - Request/response schemas
+   - Authentication and rate limiting
+   - Error handling patterns
+   - **Audience:** Engineers, API consumers
+
+2. **[Data Models](./technical/Data-Models.md)**
+   - Database schema and ERD
+   - Table definitions and relationships
+   - JSON schemas for JSONB fields
+   - TypeScript interfaces
+   - **Audience:** Engineers, database administrators
+
+3. **[Engineering SOPs](./technical/Engineering-SOPs.md)**
+   - Development workflow and Git strategy
+   - Code review process
+   - Deployment procedures
+   - Edge function development guide
+   - Testing standards
+   - **Audience:** Engineers, contributors
+
+4. **[Chat Tables Documentation](./technical/Data-Models-Chat-Tables.md)**
+   - Detailed chat feature database schema
+   - Query examples and RLS policies
+   - Data flow diagrams
+   - **Audience:** Engineers
+
+5. **[Chat Development Guide](./technical/Chat-Feature-Development-Guide.md)**
+   - Complete SkinLytixGPT implementation guide
+   - Streaming SSE patterns
+   - Voice feature integration
+   - Troubleshooting guide
+   - **Audience:** Engineers developing chat features
+
+### Feature Documentation
+
+Located in `/docs/features/`:
+
+1. **[AI Explanation Integration](./features/AI-Explanation-Integration.md)**
+   - Product-level and ingredient-level AI explanations
+   - SkinLytixGPT chat architecture
+   - Professional referral system
+   - Safety level assessment
+   - Voice features (input/output)
+   - **Audience:** Engineers, product team
+
+2. **[Animated Dashboard](./features/Animated-Dashboard.md)**
+   - Interactive component catalog
+   - Animation performance guidelines
+   - Collapsible UI patterns
+   - **Audience:** Engineers, designers
+
 ### Related Documentation
 - Lovable AI Documentation: https://docs.lovable.dev/features/ai
-- Supabase Documentation: https://supabase.com/docs
+- Lovable Cloud Documentation: https://docs.lovable.dev/features/cloud
 - React Query Documentation: https://tanstack.com/query/latest/docs/react
+- Radix UI Documentation: https://www.radix-ui.com/primitives
+- Web Speech API: https://developer.mozilla.org/en-US/docs/Web/API/Web_Speech_API
 
 ---
 

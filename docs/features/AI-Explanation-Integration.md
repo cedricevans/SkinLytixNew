@@ -1,7 +1,15 @@
 # AI Explanation Integration
 
+**Document Version:** 1.1  
+**Last Updated:** November 23, 2025
+
 ## Overview
-SkinLytix integrates AI-powered explanations at two levels: **product-level analysis** (overall snapshot) and **ingredient-level explanations** (individual component analysis). This dual-layer approach provides both macro and micro insights for comprehensive understanding.
+SkinLytix integrates AI-powered explanations at three levels:
+1. **Product-level analysis** (overall snapshot via SkinLytixGPT)
+2. **Ingredient-level explanations** (individual component analysis)
+3. **Conversational chat** (interactive Q&A via SkinLytixGPT Chat)
+
+This multi-layer approach provides comprehensive understanding from macro insights to micro details, with interactive exploration capabilities.
 
 ## Architecture
 
@@ -53,26 +61,38 @@ SkinLytix integrates AI-powered explanations at two levels: **product-level anal
 
 ### 2. Frontend: Display & Interaction
 
-#### Product-Level Display
-**Location**: `src/pages/Analysis.tsx` - AI Explanation card
+#### Product-Level Display (Collapsible)
+**Location**: `src/pages/Analysis.tsx` → `src/components/AIExplanationAccordion.tsx`
 
 **Features**:
-1. **Safety Level Visual Meter**:
+1. **Collapsible Accordion** (NEW):
+   - Defaults to collapsed state to reduce page height
+   - Smooth expand/collapse animation (300ms)
+   - Chevron icon rotation for clear affordance
+   - Click header to toggle visibility
+   
+2. **Safety Level Visual Meter**:
    - Converts `safety_level` to visual progress bar
    - Color-coded zones (low, moderate, high risk)
+   - Always visible when accordion expanded
    
-2. **Professional Referral Alert**:
+3. **Professional Referral Alert**:
    - Conditionally displayed if `professional_referral.needed === true`
    - Amber-styled alert with suggested professional type
+   - Sticky banner for high-priority referrals
    
-3. **Markdown Content Rendering**:
+4. **Markdown Content Rendering**:
    - Uses `react-markdown` for formatted display
    - Sections: Overall Snapshot, Key Ingredients, Flagged Items, Routine Fit
    
-4. **Metadata Badges**:
+5. **Metadata Badges**:
    - Ingredient-focused badge
    - EpiQ Score Analysis badge
    - "Powered by SkinLytix GPT" footer
+
+6. **Interactive Chat Access**:
+   - "Ask SkinLytixGPT" button opens conversational chat
+   - Context-aware AI assistant for follow-up questions
 
 #### Ingredient-Level Display
 **Location**: `src/components/IngredientCard.tsx` - Card back face
@@ -265,15 +285,107 @@ try {
 - [ ] Markdown formatting renders properly
 - [ ] Graceful degradation when AI fails
 
+## Chat Feature (SkinLytixGPT) - NEW
+
+### Overview
+SkinLytixGPT Chat provides conversational AI assistance for understanding product analysis results. It combines context awareness, conversation history, and professional guardrails to deliver personalized skincare guidance.
+
+### Architecture
+**Edge Function:** `supabase/functions/chat-skinlytix/index.ts`
+- Streams responses token-by-token using Server-Sent Events (SSE)
+- Maintains conversation context across messages
+- Persists chat history to database (`chat_conversations` + `chat_messages`)
+- Injects analysis data into system prompt for context awareness
+
+**Frontend Component:** `src/components/SkinLytixGPTChat.tsx`
+- **Mobile**: Bottom sheet modal (slides up from bottom)
+- **Desktop**: Side panel (docked to right side)
+- **Voice Input**: Web Speech API for hands-free interaction
+- **Text-to-Speech**: Optional voice playback of responses
+- **Markdown Rendering**: Formatted responses with lists, bold, etc.
+
+### System Prompt Design
+
+**Guardrails (Never Violate):**
+- No medical diagnosis (rosacea, eczema, fungal acne, etc.)
+- No treatment plans or prescription advice
+- No pregnancy/breastfeeding safety confirmation
+- Must refer to professionals for medical concerns
+
+**Context Injection:**
+```typescript
+const systemPrompt = `You are SkinLytixGPT...
+
+CURRENT ANALYSIS CONTEXT:
+Product: ${analysis.product_name}
+EpiQ Score: ${analysis.epiq_score}/100
+Sub-Scores:
+- Ingredient Safety: ${subScores.ingredient_safety}/100
+- Skin Compatibility: ${subScores.skin_compatibility}/100
+
+Safe Ingredients: ${safeIngredients.map(i => i.name).join(', ')}
+Flagged Concerns: ${problematicIngredients.map(i => i.name + ': ' + i.concern).join(', ')}
+
+Answer user questions about this specific analysis.`;
+```
+
+### Conversation Persistence
+
+**Database Schema:**
+- `chat_conversations`: One conversation per user per analysis (unique constraint)
+- `chat_messages`: All messages with role (user/assistant)
+- Automatic conversation retrieval on subsequent chats
+
+**Flow:**
+1. User opens chat on Analysis page
+2. Frontend checks for existing `conversation_id`
+3. Edge function retrieves or creates conversation
+4. Loads message history from `chat_messages`
+5. Injects history + analysis context into AI call
+6. Streams response and saves to database
+
+### Voice Features
+
+**Input:** Web Speech API (`SpeechRecognition`)
+- Continuous listening mode
+- Real-time transcription display
+- Auto-send on silence detection
+- Browser compatibility: Chrome, Edge, Safari 14.1+
+
+**Output:** Text-to-Speech API (`SpeechSynthesis`)
+- Optional voice playback of responses
+- User toggle control
+- Respects browser TTS settings
+- All modern browsers supported
+
+### Performance
+
+- **First Response**: 1-3 seconds (after user message)
+- **Streaming**: Token-by-token rendering (perceived as instant)
+- **History Load**: <500ms for 50 messages
+- **Database Write**: Async (doesn't block response stream)
+
+### Security & Privacy
+
+- **No PII**: User names, emails not sent to AI
+- **Server-side System Prompts**: Never exposed to client
+- **RLS Enforcement**: Users can only access their own conversations
+- **Rate Limiting**: 20 messages/minute per user
+
+---
+
 ## Future Enhancements
 
 ### Short-term
 1. **Ingredient explanation caching**: Store AI explanations in `ingredient_cache` table
 2. **Batch processing**: Generate ingredient explanations in batches of 10
 3. **Retry logic**: Automatic retry on transient failures
+4. **Chat export**: Download conversation as PDF/TXT
 
 ### Long-term
 1. **Multi-language support**: Generate explanations in user's preferred language
-2. **Voice explanations**: Text-to-speech integration for accessibility
+2. **Voice-first interface**: Hands-free chat mode for accessibility
 3. **Personalized tone**: Adjust explanation complexity based on user expertise level
 4. **Real-time streaming**: Stream AI explanations token-by-token for faster perceived performance
+5. **Multi-product comparison**: Chat about multiple analyses simultaneously
+6. **Routine builder assistant**: AI helps create optimized routines through conversation
