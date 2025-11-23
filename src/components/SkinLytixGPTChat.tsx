@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from "react";
-import { X, Send, Mic, Volume2, VolumeX, Sparkles } from "lucide-react";
+import { X, Send, Mic, Volume2, VolumeX, Sparkles, RotateCcw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -8,6 +8,7 @@ import { useToast } from "@/hooks/use-toast";
 import { trackEvent } from "@/hooks/useTracking";
 import ReactMarkdown from "react-markdown";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { supabase } from "@/integrations/supabase/client";
 
 interface Message {
   role: 'user' | 'assistant';
@@ -18,14 +19,27 @@ interface SkinLytixGPTChatProps {
   analysisId: string;
   productName: string;
   skinType?: string;
+  isOpen?: boolean;
+  onOpenChange?: (open: boolean) => void;
 }
 
-export const SkinLytixGPTChat = ({ analysisId, productName, skinType }: SkinLytixGPTChatProps) => {
-  const [isOpen, setIsOpen] = useState(false);
+export const SkinLytixGPTChat = ({ 
+  analysisId, 
+  productName, 
+  skinType,
+  isOpen: controlledIsOpen,
+  onOpenChange
+}: SkinLytixGPTChatProps) => {
+  const [internalIsOpen, setInternalIsOpen] = useState(false);
+  const isOpen = controlledIsOpen !== undefined ? controlledIsOpen : internalIsOpen;
+  const setIsOpen = onOpenChange || setInternalIsOpen;
+
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [showReferralBanner, setShowReferralBanner] = useState(false);
+  const [conversationId, setConversationId] = useState<string | null>(null);
+  const [isLoadingHistory, setIsLoadingHistory] = useState(false);
   
   // Voice features
   const [isListening, setIsListening] = useState(false);
@@ -36,10 +50,54 @@ export const SkinLytixGPTChat = ({ analysisId, productName, skinType }: SkinLyti
   const { toast } = useToast();
   const scrollRef = useRef<HTMLDivElement>(null);
 
+  // Load existing conversation on mount
+  useEffect(() => {
+    const loadConversation = async () => {
+      try {
+        setIsLoadingHistory(true);
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return;
+
+        // Try to find existing conversation
+        const { data: conversation } = await supabase
+          .from('chat_conversations')
+          .select('id')
+          .eq('user_id', user.id)
+          .eq('analysis_id', analysisId)
+          .single();
+
+        if (conversation) {
+          setConversationId(conversation.id);
+          
+          // Load messages
+          const { data: chatMessages } = await supabase
+            .from('chat_messages')
+            .select('role, content')
+            .eq('conversation_id', conversation.id)
+            .order('created_at', { ascending: true });
+
+          if (chatMessages) {
+            setMessages(chatMessages as Message[]);
+            trackEvent({
+              eventName: 'chat_conversation_resumed',
+              eventCategory: 'chat',
+              eventProperties: { analysisId, messageCount: chatMessages.length }
+            });
+          }
+        }
+      } catch (error) {
+        console.error('Error loading conversation:', error);
+      } finally {
+        setIsLoadingHistory(false);
+      }
+    };
+
+    loadConversation();
+  }, [analysisId]);
+
   // Initialize Web Speech API
   useEffect(() => {
     if (typeof window !== 'undefined') {
-      // Speech Recognition (for voice input)
       const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
       if (SpeechRecognition) {
         recognitionRef.current = new SpeechRecognition();
@@ -67,7 +125,6 @@ export const SkinLytixGPTChat = ({ analysisId, productName, skinType }: SkinLyti
         };
       }
 
-      // Speech Synthesis (for voice output)
       synthRef.current = window.speechSynthesis;
     }
 
@@ -117,10 +174,8 @@ export const SkinLytixGPTChat = ({ analysisId, productName, skinType }: SkinLyti
   const speakText = (text: string) => {
     if (!synthRef.current) return;
 
-    // Cancel any ongoing speech
     synthRef.current.cancel();
 
-    // Clean markdown from text
     const cleanText = text
       .replace(/[#*_`]/g, '')
       .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
@@ -137,6 +192,17 @@ export const SkinLytixGPTChat = ({ analysisId, productName, skinType }: SkinLyti
       eventName: 'chat_voice_output_played',
       eventCategory: 'chat',
       eventProperties: { analysisId }
+    });
+  };
+
+  // Start new conversation
+  const handleNewChat = () => {
+    setMessages([]);
+    setConversationId(null);
+    setShowReferralBanner(false);
+    toast({
+      title: "New conversation started",
+      description: "Previous chat history cleared"
     });
   };
 
@@ -157,6 +223,8 @@ export const SkinLytixGPTChat = ({ analysisId, productName, skinType }: SkinLyti
     });
 
     try {
+      const { data: { user } } = await supabase.auth.getUser();
+      
       const response = await fetch(
         `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/chat-skinlytix`,
         {
@@ -167,6 +235,8 @@ export const SkinLytixGPTChat = ({ analysisId, productName, skinType }: SkinLyti
           },
           body: JSON.stringify({
             analysisId,
+            conversationId,
+            userId: user?.id,
             messages: [...messages, userMessage].map(m => ({ role: m.role, content: m.content }))
           }),
         }
@@ -194,6 +264,17 @@ export const SkinLytixGPTChat = ({ analysisId, productName, skinType }: SkinLyti
 
       if (!response.ok || !response.body) {
         throw new Error('Failed to get response');
+      }
+
+      // Get conversationId from response headers
+      const newConvId = response.headers.get('X-Conversation-Id');
+      if (newConvId && !conversationId) {
+        setConversationId(newConvId);
+        trackEvent({
+          eventName: 'chat_conversation_created',
+          eventCategory: 'chat',
+          eventProperties: { analysisId, conversationId: newConvId }
+        });
       }
 
       // Stream response
@@ -226,7 +307,6 @@ export const SkinLytixGPTChat = ({ analysisId, productName, skinType }: SkinLyti
             if (content) {
               assistantContent += content;
               
-              // Update assistant message in real-time
               setMessages(prev => {
                 const last = prev[prev.length - 1];
                 if (last?.role === 'assistant') {
@@ -237,7 +317,6 @@ export const SkinLytixGPTChat = ({ analysisId, productName, skinType }: SkinLyti
                 return [...prev, { role: 'assistant', content: assistantContent }];
               });
 
-              // Check for professional referral marker
               if (assistantContent.includes('⚕️ REFERRAL:')) {
                 setShowReferralBanner(true);
                 trackEvent({
@@ -248,12 +327,11 @@ export const SkinLytixGPTChat = ({ analysisId, productName, skinType }: SkinLyti
               }
             }
           } catch {
-            // Ignore parse errors for partial JSON
+            // Ignore parse errors
           }
         }
       }
 
-      // Auto-read response if enabled
       if (isAutoRead && assistantContent) {
         speakText(assistantContent);
       }
@@ -280,7 +358,7 @@ export const SkinLytixGPTChat = ({ analysisId, productName, skinType }: SkinLyti
 
   return (
     <>
-      {/* Floating Chat Bubble */}
+      {/* Floating Chat Bubble - Desktop Only */}
       {!isOpen && (
         <button
           onClick={() => {
@@ -288,10 +366,10 @@ export const SkinLytixGPTChat = ({ analysisId, productName, skinType }: SkinLyti
             trackEvent({
               eventName: 'chat_opened',
               eventCategory: 'chat',
-              eventProperties: { analysisId }
+              eventProperties: { analysisId, source: 'floating_bubble' }
             });
           }}
-          className="fixed bottom-20 right-6 md:bottom-6 md:right-24 z-40 bg-gradient-to-r from-primary to-accent text-primary-foreground rounded-full p-4 shadow-lg transition-all hover:scale-110 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 animate-pulse"
+          className="hidden lg:block fixed bottom-6 right-24 z-40 bg-gradient-to-r from-primary to-accent text-primary-foreground rounded-full p-4 shadow-lg transition-all hover:scale-110 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 animate-pulse"
           aria-label="Open SkinLytixGPT chat"
         >
           <Sparkles className="w-6 h-6" />
@@ -300,15 +378,26 @@ export const SkinLytixGPTChat = ({ analysisId, productName, skinType }: SkinLyti
 
       {/* Chat Panel/Sheet */}
       {isOpen && (
-        <div className="fixed inset-0 md:inset-auto md:right-0 md:top-0 md:bottom-0 md:w-[400px] z-50 bg-background border-l shadow-2xl flex flex-col animate-slide-in-right">
+        <div className="fixed inset-0 lg:inset-auto lg:right-0 lg:top-0 lg:bottom-0 lg:w-[400px] z-50 bg-background border-l shadow-2xl flex flex-col animate-slide-in-right">
           {/* Header */}
           <div className="flex items-center justify-between p-4 border-b bg-gradient-to-r from-primary/10 to-accent/10">
-            <div className="flex items-center gap-2">
-              <Sparkles className="w-5 h-5 text-primary" />
-              <h3 className="font-semibold">Ask SkinLytixGPT</h3>
+            <div className="flex items-center gap-2 flex-1 min-w-0">
+              <Sparkles className="w-5 h-5 text-primary flex-shrink-0" />
+              <div className="flex flex-col min-w-0">
+                <h3 className="font-semibold text-sm">Ask SkinLytixGPT</h3>
+                <p className="text-xs text-muted-foreground truncate">{productName}</p>
+              </div>
             </div>
-            <div className="flex items-center gap-2">
-              {/* Voice output toggle */}
+            <div className="flex items-center gap-2 flex-shrink-0">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={handleNewChat}
+                className="p-2"
+                title="New conversation"
+              >
+                <RotateCcw className="w-4 h-4" />
+              </Button>
               <Button
                 variant="ghost"
                 size="sm"
@@ -345,8 +434,15 @@ export const SkinLytixGPTChat = ({ analysisId, productName, skinType }: SkinLyti
             </Alert>
           )}
 
+          {/* Loading History */}
+          {isLoadingHistory && (
+            <div className="p-4 text-center text-sm text-muted-foreground">
+              Loading conversation history...
+            </div>
+          )}
+
           {/* Suggested Questions */}
-          {messages.length === 0 && (
+          {!isLoadingHistory && messages.length === 0 && (
             <div className="p-4 space-y-3">
               <p className="text-sm text-muted-foreground">
                 Ask me anything about <strong>{productName}</strong>
@@ -432,7 +528,6 @@ export const SkinLytixGPTChat = ({ analysisId, productName, skinType }: SkinLyti
                 disabled={isLoading}
               />
               <div className="flex flex-col gap-2">
-                {/* Voice input button */}
                 <Button
                   variant={isListening ? "default" : "outline"}
                   size="icon"
@@ -442,7 +537,6 @@ export const SkinLytixGPTChat = ({ analysisId, productName, skinType }: SkinLyti
                 >
                   <Mic className="w-4 h-4" />
                 </Button>
-                {/* Send button */}
                 <Button
                   size="icon"
                   onClick={() => sendMessage()}

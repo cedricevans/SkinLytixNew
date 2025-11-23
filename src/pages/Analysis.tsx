@@ -16,7 +16,7 @@ import { AnimatedScoreGauge } from "@/components/AnimatedScoreGauge";
 import { SafetyLevelMeter } from "@/components/SafetyLevelMeter";
 import { ProfessionalReferralBanner } from "@/components/ProfessionalReferralBanner";
 import { FloatingActionBubbles } from "@/components/FloatingActionBubbles";
-import { MobileBottomNav } from "@/components/MobileBottomNav";
+import { ResponsiveBottomNav } from "@/components/ResponsiveBottomNav";
 import { IngredientRiskHeatmap } from "@/components/IngredientRiskHeatmap";
 import { ScoreBreakdownAccordion } from "@/components/ScoreBreakdownAccordion";
 import { AIExplanationLoader } from "@/components/AIExplanationLoader";
@@ -90,6 +90,7 @@ const Analysis = () => {
   useTracking('analysis');
   const [analysis, setAnalysis] = useState<AnalysisData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [isChatOpen, setIsChatOpen] = useState(false);
   const [addingToRoutine, setAddingToRoutine] = useState(false);
 
   const fetchAnalysis = async () => {
@@ -720,10 +721,18 @@ const Analysis = () => {
           showAddToRoutine={true}
         />
 
-        {/* Mobile Bottom Navigation */}
-        <MobileBottomNav 
+        {/* Responsive Bottom Navigation (Mobile + Tablet) */}
+        <ResponsiveBottomNav 
           onAddToRoutine={handleAddToRoutine}
           showAddToRoutine={true}
+          onChatOpen={() => {
+            setIsChatOpen(true);
+            trackEvent({
+              eventName: 'chat_opened',
+              eventCategory: 'chat',
+              eventProperties: { analysisId: analysis.id, source: 'bottom_nav' }
+            });
+          }}
         />
 
         {/* SkinLytixGPT Chat with Voice */}
@@ -731,6 +740,8 @@ const Analysis = () => {
           analysisId={analysis.id}
           productName={analysis.product_name}
           skinType={analysis.recommendations_json?.product_metadata?.product_type}
+          isOpen={isChatOpen}
+          onOpenChange={setIsChatOpen}
         />
       </div>
     </main>

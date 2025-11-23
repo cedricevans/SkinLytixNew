@@ -5,6 +5,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.38.4';
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Expose-Headers': 'X-Conversation-Id',
 };
 
 serve(async (req) => {
@@ -13,14 +14,52 @@ serve(async (req) => {
   }
 
   try {
-    const { analysisId, messages } = await req.json();
+    const { analysisId, conversationId, userId, messages } = await req.json();
 
-    console.log('Chat request received:', { analysisId, messageCount: messages?.length });
+    console.log('Chat request received:', { analysisId, conversationId, messageCount: messages?.length });
 
-    // Initialize Supabase client
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseKey);
+
+    // Load or create conversation
+    let currentConversationId = conversationId;
+    
+    if (!currentConversationId && userId) {
+      // Try to find existing conversation
+      const { data: existingConv } = await supabase
+        .from('chat_conversations')
+        .select('id')
+        .eq('user_id', userId)
+        .eq('analysis_id', analysisId)
+        .single();
+
+      if (existingConv) {
+        currentConversationId = existingConv.id;
+      } else {
+        // Create new conversation
+        const { data: analysis } = await supabase
+          .from('user_analyses')
+          .select('product_name')
+          .eq('id', analysisId)
+          .single();
+
+        const { data: newConv } = await supabase
+          .from('chat_conversations')
+          .insert({
+            user_id: userId,
+            analysis_id: analysisId,
+            title: `Chat about ${analysis?.product_name || 'Product'}`
+          })
+          .select()
+          .single();
+
+        if (newConv) {
+          currentConversationId = newConv.id;
+          console.log('Created new conversation:', currentConversationId);
+        }
+      }
+    }
 
     // Load analysis context
     const { data: analysis, error } = await supabase
@@ -36,15 +75,12 @@ serve(async (req) => {
 
     console.log('Analysis loaded:', { productName: analysis.product_name, score: analysis.epiq_score });
 
-    // Parse recommendations
     const recommendations = typeof analysis.recommendations_json === 'string'
       ? JSON.parse(analysis.recommendations_json)
       : analysis.recommendations_json;
 
-    // Parse AI explanation if available
     const aiExplanation = recommendations.ai_explanation || null;
 
-    // Build context-aware system prompt
     const systemPrompt = `You are SkinLytixGPT, an AI assistant helping users understand their product analysis results in the SkinLytix app.
 
 CRITICAL GUARDRAILS (ABSOLUTE - NEVER VIOLATE):
@@ -110,13 +146,23 @@ RESPONSE FORMAT:
 - Reference specific ingredients/data from the analysis
 - If you mention professional referral, start response with "⚕️ REFERRAL:" so it can be detected`;
 
-    // Call Lovable AI Gateway for streaming response
     const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
     if (!LOVABLE_API_KEY) {
       throw new Error('LOVABLE_API_KEY not configured');
     }
 
     console.log('Calling AI Gateway with', messages.length, 'messages');
+
+    // Save user message if we have a conversation
+    const userMessage = messages[messages.length - 1];
+    if (currentConversationId && userMessage.role === 'user') {
+      await supabase.from('chat_messages').insert({
+        conversation_id: currentConversationId,
+        role: 'user',
+        content: userMessage.content,
+        metadata: {}
+      });
+    }
 
     const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
       method: 'POST',
@@ -153,9 +199,55 @@ RESPONSE FORMAT:
 
     console.log('Streaming response back to client');
 
-    // Stream response back to client
-    return new Response(response.body, {
-      headers: { ...corsHeaders, 'Content-Type': 'text/event-stream' },
+    // Create a TransformStream to capture the assistant's response
+    let assistantResponse = '';
+    const { readable, writable } = new TransformStream({
+      transform(chunk, controller) {
+        // Capture text content from SSE stream
+        const text = new TextDecoder().decode(chunk);
+        const lines = text.split('\n');
+        for (const line of lines) {
+          if (line.startsWith('data: ') && !line.includes('[DONE]')) {
+            try {
+              const json = JSON.parse(line.slice(6));
+              const content = json.choices?.[0]?.delta?.content;
+              if (content) {
+                assistantResponse += content;
+              }
+            } catch {}
+          }
+        }
+        controller.enqueue(chunk);
+      },
+      async flush() {
+        // Save assistant message after stream completes
+        if (currentConversationId && assistantResponse) {
+          await supabase.from('chat_messages').insert({
+            conversation_id: currentConversationId,
+            role: 'assistant',
+            content: assistantResponse,
+            metadata: {}
+          });
+          
+          // Update conversation timestamp
+          await supabase
+            .from('chat_conversations')
+            .update({ updated_at: new Date().toISOString() })
+            .eq('id', currentConversationId);
+          
+          console.log('Saved assistant response to database');
+        }
+      }
+    });
+
+    response.body?.pipeTo(writable);
+
+    return new Response(readable, {
+      headers: {
+        ...corsHeaders,
+        'Content-Type': 'text/event-stream',
+        'X-Conversation-Id': currentConversationId || '',
+      },
     });
 
   } catch (error) {
