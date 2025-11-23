@@ -131,7 +131,7 @@ const FeedbackWidget = () => {
       {/* Floating Button - Mobile first positioning */}
       <button
         onClick={handleOpen}
-        className="fixed bottom-6 left-6 md:left-auto md:right-6 z-50 bg-primary hover:bg-primary/90 text-primary-foreground rounded-full p-3 md:p-4 shadow-lg transition-all hover:scale-110 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2"
+        className="fixed bottom-24 left-6 md:left-auto md:bottom-6 md:right-6 z-50 bg-primary hover:bg-primary/90 text-primary-foreground rounded-full p-3 md:p-4 shadow-lg transition-all hover:scale-110 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2"
         aria-label="Open feedback form"
       >
         <MessageSquare className="w-5 h-5 md:w-6 md:h-6 text-background" />

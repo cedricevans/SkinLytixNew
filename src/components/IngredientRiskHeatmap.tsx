@@ -26,20 +26,20 @@ export const IngredientRiskHeatmap = ({ ingredients, onIngredientClick }: Ingred
   };
 
   return (
-    <div className="w-full mb-8 animate-fade-in-up">
-      <div className="flex items-center gap-3 mb-6">
-        <div className="w-12 h-12 rounded-full bg-gradient-to-br from-primary to-primary-glow flex items-center justify-center shadow-elegant">
-          <span className="text-2xl">🗺️</span>
+    <div className="w-full mb-6 md:mb-8 animate-fade-in-up">
+      <div className="flex items-center gap-2 md:gap-3 mb-4 md:mb-6">
+        <div className="w-10 h-10 md:w-12 md:h-12 rounded-full bg-gradient-to-br from-primary to-primary-glow flex items-center justify-center shadow-elegant">
+          <span className="text-xl md:text-2xl">🗺️</span>
         </div>
         <div>
-          <h3 className="text-2xl font-bold">Ingredient Risk Overview</h3>
-          <p className="text-sm text-muted-foreground">
-            Visual risk assessment at a glance • {ingredients.length} ingredients analyzed
+          <h3 className="text-lg md:text-2xl font-bold">Ingredient Risk Overview</h3>
+          <p className="text-xs md:text-sm text-muted-foreground">
+            {ingredients.length} ingredients analyzed
           </p>
         </div>
       </div>
-      <div className="relative bg-gradient-to-br from-card to-card/50 rounded-xl p-4 md:p-6 lg:p-8 border border-border shadow-elegant backdrop-blur-sm">
-        <div className="grid grid-cols-4 md:grid-cols-8 lg:grid-cols-10 gap-2 md:gap-3 lg:gap-4">
+      <div className="relative bg-gradient-to-br from-card to-card/50 rounded-xl p-3 md:p-6 lg:p-8 border border-border shadow-elegant backdrop-blur-sm">
+        <div className="grid grid-cols-6 md:grid-cols-8 lg:grid-cols-10 gap-1.5 md:gap-3 lg:gap-4">
           {ingredients.map((ingredient, index) => {
             const riskScore = ingredient.risk_score || 
               (ingredient.category === 'problematic' ? 85 :
@@ -76,7 +76,7 @@ export const IngredientRiskHeatmap = ({ ingredients, onIngredientClick }: Ingred
             );
           })}
         </div>
-        <div className="mt-4 md:mt-6 flex flex-wrap items-center justify-center gap-4 md:gap-8 text-xs md:text-sm">
+        <div className="mt-3 md:mt-6 flex flex-wrap items-center justify-center gap-3 md:gap-8 text-xs md:text-sm">
           <div className="flex items-center gap-2">
             <div className="w-5 h-5 rounded-full bg-gradient-to-br from-green-400 to-green-600 shadow-md"></div>
             <span className="font-medium">Low Risk</span>

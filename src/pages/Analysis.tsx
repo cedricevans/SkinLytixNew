@@ -259,25 +259,25 @@ const Analysis = () => {
               </div>
             </div>
             <div className="grid grid-cols-3 gap-2 md:gap-3">
-              <div className="flex flex-col items-center justify-center px-2 md:px-3 py-2 bg-card rounded-lg shadow-md border border-border">
+              <div className="flex flex-col items-center justify-center p-2 md:p-3 bg-card rounded-lg shadow-md border border-border">
                 <span className="text-lg md:text-xl mb-1">🧪</span>
-                <span className="text-[9px] md:text-[10px] text-muted-foreground">Ingredients</span>
-                <span className="text-sm md:text-base font-bold">
+                <span className="text-[10px] md:text-xs text-muted-foreground">Ingredients</span>
+                <span className="text-lg md:text-2xl lg:text-3xl font-bold">
                   {(analysis.recommendations_json.safe_ingredients?.length || 0) +
                    (analysis.recommendations_json.problematic_ingredients?.length || 0) +
                    (analysis.recommendations_json.beneficial_ingredients?.length || 0) +
                    ((analysis.recommendations_json as any).concern_ingredients?.length || 0)}
                 </span>
               </div>
-              <div className="flex flex-col items-center justify-center px-2 md:px-3 py-2 bg-card rounded-lg shadow-md border border-border">
+              <div className="flex flex-col items-center justify-center p-2 md:p-3 bg-card rounded-lg shadow-md border border-border">
                 <span className="text-lg md:text-xl mb-1">✅</span>
-                <span className="text-[9px] md:text-[10px] text-muted-foreground">Safe</span>
-                <span className="text-sm md:text-base font-bold">{analysis.recommendations_json.safe_ingredients?.length || 0}</span>
+                <span className="text-[10px] md:text-xs text-muted-foreground">Safe</span>
+                <span className="text-lg md:text-2xl lg:text-3xl font-bold">{analysis.recommendations_json.safe_ingredients?.length || 0}</span>
               </div>
-              <div className="flex flex-col items-center justify-center px-2 md:px-3 py-2 bg-card rounded-lg shadow-md border border-border">
+              <div className="flex flex-col items-center justify-center p-2 md:p-3 bg-card rounded-lg shadow-md border border-border">
                 <span className="text-lg md:text-xl mb-1">⚠️</span>
-                <span className="text-[9px] md:text-[10px] text-muted-foreground">Concerns</span>
-                <span className="text-sm md:text-base font-bold">{analysis.recommendations_json.problematic_ingredients?.length || 0}</span>
+                <span className="text-[10px] md:text-xs text-muted-foreground">Concerns</span>
+                <span className="text-lg md:text-2xl lg:text-3xl font-bold">{analysis.recommendations_json.problematic_ingredients?.length || 0}</span>
               </div>
             </div>
           </div>
@@ -682,7 +682,7 @@ const Analysis = () => {
           </Card>
         )}
 
-         <Card className="p-4 md:p-6 mb-20 md:mb-0">
+         <Card className="p-4 md:p-6 mb-24 md:mb-0">
            <div className="flex items-center gap-3 mb-4">
              <Sparkles className="w-8 h-8 text-primary animate-pulse" />
              <div className="flex-1">
