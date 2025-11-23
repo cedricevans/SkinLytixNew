@@ -56,7 +56,7 @@ export const FloatingActionBubbles = ({
 
   return (
     <TooltipProvider>
-      <div className="hidden md:block">
+      <div className="hidden lg:block">
       {bubbles.map((bubble, index) => {
         if (!bubble.show) return null;
         
