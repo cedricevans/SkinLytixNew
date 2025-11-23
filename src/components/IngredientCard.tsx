@@ -9,6 +9,7 @@ interface IngredientCardProps {
   role?: string;
   molecular_weight?: number | null;
   safety_profile?: string;
+  risk_score?: number;
 }
 
 export const IngredientCard = ({ name, category, details, emoji, role, molecular_weight, safety_profile }: IngredientCardProps) => {

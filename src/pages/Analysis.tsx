@@ -16,6 +16,9 @@ import { AnimatedScoreGauge } from "@/components/AnimatedScoreGauge";
 import { SafetyLevelMeter } from "@/components/SafetyLevelMeter";
 import { ProfessionalReferralBanner } from "@/components/ProfessionalReferralBanner";
 import { FloatingActionBubbles } from "@/components/FloatingActionBubbles";
+import { IngredientRiskHeatmap } from "@/components/IngredientRiskHeatmap";
+import { ScoreBreakdownAccordion } from "@/components/ScoreBreakdownAccordion";
+import { AIExplanationLoader } from "@/components/AIExplanationLoader";
 
 interface AnalysisData {
   id: string;
@@ -25,20 +28,28 @@ interface AnalysisData {
   ingredients_list: string;
   epiq_score: number;
   recommendations_json: {
-    safe_ingredients: string[];
+    safe_ingredients: Array<{ name: string; risk_score?: number; role?: string; explanation?: string; molecular_weight?: number; safety_profile?: string }>;
     problematic_ingredients?: Array<{
       name: string;
       reason: string;
+      risk_score?: number;
     }>;
     beneficial_ingredients?: Array<{
       name: string;
       benefit: string;
+      risk_score?: number;
     }>;
-    concern_ingredients: string[];
+    concern_ingredients: Array<{ name: string; risk_score?: number; role?: string; explanation?: string; molecular_weight?: number; safety_profile?: string }>;
     warnings?: string[];
     summary: string;
     routine_suggestions: string[];
     personalized?: boolean;
+    sub_scores?: {
+      ingredient_safety: number;
+      skin_compatibility: number;
+      active_quality: number;
+      preservative_safety: number;
+    };
     product_metadata?: {
       brand?: string;
       category?: string;
@@ -336,6 +347,10 @@ const Analysis = () => {
           </p>
         </Card>
 
+        {/* Score Breakdown Accordion */}
+        {analysis.recommendations_json.sub_scores && (
+          <ScoreBreakdownAccordion subScores={analysis.recommendations_json.sub_scores} />
+        )}
 
         {analysis.recommendations_json.personalized && (
           <Card className="p-6 mb-8 bg-primary/5 border-primary/20">
@@ -439,6 +454,42 @@ const Analysis = () => {
           </Card>
         )}
 
+        {/* Ingredient Risk Heatmap */}
+        {(() => {
+          const allIngredients = [
+            ...(analysis.recommendations_json.beneficial_ingredients?.map((ing: any) => ({
+              name: ing.name,
+              category: 'beneficial' as const,
+              risk_score: ing.risk_score
+            })) || []),
+            ...(analysis.recommendations_json.safe_ingredients?.map((ing: any) => ({
+              name: typeof ing === 'string' ? ing : ing.name,
+              category: 'safe' as const,
+              risk_score: typeof ing === 'object' ? ing.risk_score : undefined
+            })) || []),
+            ...(analysis.recommendations_json.problematic_ingredients?.map((ing: any) => ({
+              name: ing.name,
+              category: 'problematic' as const,
+              risk_score: ing.risk_score
+            })) || []),
+            ...(analysis.recommendations_json.concern_ingredients?.map((ing: any) => ({
+              name: typeof ing === 'string' ? ing : ing.name,
+              category: 'unverified' as const,
+              risk_score: typeof ing === 'object' ? ing.risk_score : undefined
+            })) || [])
+          ];
+
+          return allIngredients.length > 0 ? (
+            <IngredientRiskHeatmap
+              ingredients={allIngredients}
+              onIngredientClick={(ingredientName) => {
+                const element = document.getElementById(`ingredient-${ingredientName.replace(/\s+/g, '-')}`);
+                element?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+              }}
+            />
+          ) : null;
+        })()}
+
         {analysis.recommendations_json.problematic_ingredients &&
          analysis.recommendations_json.problematic_ingredients.length > 0 && (
            <Card className="p-6 mb-8 border-destructive/50 bg-destructive/5">
@@ -464,12 +515,13 @@ const Analysis = () => {
             </div>
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
               {analysis.recommendations_json.problematic_ingredients.map((item, index) => (
-                <IngredientCard
-                  key={index}
-                  name={item.name}
-                  category="problematic"
-                  details={item.reason}
-                />
+                <div key={index} id={`ingredient-${item.name.replace(/\s+/g, '-')}`}>
+                  <IngredientCard
+                    name={item.name}
+                    category="problematic"
+                    details={item.reason}
+                  />
+                </div>
               ))}
             </div>
             <div className="mt-4 p-3 bg-destructive/10 rounded-lg border border-destructive/30">
