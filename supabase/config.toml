@@ -11,3 +11,6 @@ verify_jwt = true
 
 [functions.optimize-routine]
 verify_jwt = true
+
+[functions.chat-skinlytix]
+verify_jwt = false
