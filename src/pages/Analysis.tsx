@@ -11,6 +11,7 @@ import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from "@/comp
 import { useTracking, trackEvent } from "@/hooks/useTracking";
 import ReactMarkdown from 'react-markdown';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { AnimatedScoreGauge } from "@/components/AnimatedScoreGauge";
 
 interface AnalysisData {
   id: string;
@@ -306,7 +307,7 @@ const Analysis = () => {
         </div>
 
         <Card className="p-8 mb-8 text-center bg-gradient-to-br from-primary/5 to-accent/5">
-          <div className="flex items-center justify-center gap-2 mb-4">
+          <div className="flex items-center justify-center gap-2 mb-6">
             <h2 className="text-2xl font-semibold">EpiQ Score</h2>
             <Tooltip>
               <TooltipTrigger asChild>
@@ -317,13 +318,10 @@ const Analysis = () => {
               </TooltipContent>
             </Tooltip>
           </div>
-          <div className={`text-7xl font-bold mb-4 ${getScoreColor(analysis.epiq_score)}`}>
-            {analysis.epiq_score}
-          </div>
-          <Badge variant="secondary" className="text-lg px-4 py-2">
-            {getScoreLabel(analysis.epiq_score)}
-          </Badge>
-          <p className="mt-6 text-muted-foreground max-w-2xl mx-auto">
+          
+          <AnimatedScoreGauge score={analysis.epiq_score} />
+          
+          <p className="mt-4 text-muted-foreground max-w-2xl mx-auto">
             {analysis.recommendations_json.summary}
           </p>
         </Card>
@@ -360,14 +358,14 @@ const Analysis = () => {
               <div className="flex items-start justify-between gap-4">
                 <div className="flex items-center gap-2 flex-1">
                   <Sparkles className="w-5 h-5 text-purple-600 dark:text-purple-400 flex-shrink-0" />
-                  <div>
-                    <h2 className="text-lg font-semibold">AI Explanation</h2>
-                    {analysis.recommendations_json.ai_explanation.summary_one_liner && (
-                      <p className="text-sm text-muted-foreground mt-1 font-normal">
-                        {analysis.recommendations_json.ai_explanation.summary_one_liner}
-                      </p>
-                    )}
-                  </div>
+                   <div>
+                     <h2 className="text-lg font-semibold">🤖✨ AI Explanation</h2>
+                     {analysis.recommendations_json.ai_explanation.summary_one_liner && (
+                       <p className="text-sm text-muted-foreground mt-1 font-normal">
+                         {analysis.recommendations_json.ai_explanation.summary_one_liner}
+                       </p>
+                     )}
+                   </div>
                 </div>
                 <Badge 
                   variant={
@@ -437,12 +435,12 @@ const Analysis = () => {
 
         {analysis.recommendations_json.problematic_ingredients &&
          analysis.recommendations_json.problematic_ingredients.length > 0 && (
-          <Card className="p-6 mb-8 border-destructive/50 bg-destructive/5">
-            <div className="flex items-center gap-3 mb-4">
-              <AlertTriangle className="w-8 h-8 text-destructive" />
-              <div className="flex-1">
-                <div className="flex items-center gap-2">
-                  <h2 className="text-2xl font-bold text-destructive">Ingredients to Avoid</h2>
+           <Card className="p-6 mb-8 border-destructive/50 bg-destructive/5">
+             <div className="flex items-center gap-3 mb-4">
+               <AlertTriangle className="w-8 h-8 text-destructive animate-pulse" />
+               <div className="flex-1">
+                 <div className="flex items-center gap-2">
+                   <h2 className="text-2xl font-bold text-destructive">🚨 Ingredients to Avoid</h2>
                   <Tooltip>
                     <TooltipTrigger asChild>
                       <Info className="w-4 h-4 text-muted-foreground cursor-help" />
@@ -499,12 +497,12 @@ const Analysis = () => {
           </Card>
         )}
 
-        <Card className="p-6 mb-8">
-          <div className="flex items-center gap-3 mb-4">
-            <CheckCircle2 className="w-8 h-8 text-green-500" />
-            <div className="flex-1">
-              <div className="flex items-center gap-2">
-                <h2 className="text-2xl font-bold">Safe Ingredients</h2>
+         <Card className="p-6 mb-8">
+           <div className="flex items-center gap-3 mb-4">
+             <CheckCircle2 className="w-8 h-8 text-green-500 animate-pulse" />
+             <div className="flex-1">
+               <div className="flex items-center gap-2">
+                 <h2 className="text-2xl font-bold">✅ Safe Ingredients</h2>
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <Info className="w-4 h-4 text-muted-foreground cursor-help" />
@@ -554,12 +552,12 @@ const Analysis = () => {
         </Card>
 
         {analysis.recommendations_json.concern_ingredients.length > 0 && (
-          <Card className="p-6 mb-8 border-amber-200 dark:border-amber-800">
-            <div className="flex items-center gap-3 mb-4">
-              <HelpCircle className="w-8 h-8 text-amber-500" />
-              <div className="flex-1">
-                <div className="flex items-center gap-2">
-                  <h2 className="text-2xl font-bold">Unverified Ingredients</h2>
+           <Card className="p-6 mb-8 border-amber-200 dark:border-amber-800">
+             <div className="flex items-center gap-3 mb-4">
+               <HelpCircle className="w-8 h-8 text-amber-500 animate-pulse" />
+               <div className="flex-1">
+                 <div className="flex items-center gap-2">
+                   <h2 className="text-2xl font-bold">🔍 Unverified Ingredients</h2>
                   <Tooltip>
                     <TooltipTrigger asChild>
                       <Info className="w-4 h-4 text-muted-foreground cursor-help" />
@@ -595,11 +593,11 @@ const Analysis = () => {
           </Card>
         )}
 
-        <Card className="p-6">
-          <div className="flex items-center gap-3 mb-4">
-            <Sparkles className="w-8 h-8 text-primary" />
-            <div className="flex-1">
-              <h2 className="text-2xl font-bold">Routine Suggestions</h2>
+         <Card className="p-6">
+           <div className="flex items-center gap-3 mb-4">
+             <Sparkles className="w-8 h-8 text-primary animate-pulse" />
+             <div className="flex-1">
+               <h2 className="text-2xl font-bold">📋💡 Routine Suggestions</h2>
               {analysis.recommendations_json.product_metadata?.product_type && (
                 <p className="text-sm text-muted-foreground">
                   {analysis.recommendations_json.product_metadata.product_type === 'body' && 'Body Care Specific'}
