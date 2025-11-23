@@ -306,24 +306,19 @@ const Analysis = () => {
 
         {/* Routine Optimizer Info Banner */}
         <Card className="p-4 md:p-6 mb-6 md:mb-8 bg-gradient-to-r from-cta/10 via-accent/10 to-primary/10 border-cta/20">
-          <div className="flex items-start gap-4">
-            <div className="p-3 bg-cta/20 rounded-lg">
-              <Sparkles className="w-6 h-6 text-cta" />
-            </div>
-            <div className="flex-1">
-              <h3 className="font-semibold text-lg mb-2">💰 Unlock Cost Savings with Routine Optimizer</h3>
-              <p className="text-sm text-muted-foreground mb-3">
-                Add this and more products to your routine to discover cheaper alternatives with similar or better ingredients. 
-                Users save an average of <strong>$47/month</strong> on personal care products.
-              </p>
-              <Button 
-                variant="default"
-                size="sm"
-                onClick={() => navigate('/routine')}
-              >
-                View My Routine & Optimize
-              </Button>
-            </div>
+          <div className="flex-1">
+            <h3 className="font-semibold text-lg mb-2">💰 Unlock Cost Savings with Routine Optimizer</h3>
+            <p className="text-sm text-muted-foreground mb-3">
+              Add this and more products to your routine to discover cheaper alternatives with similar or better ingredients. 
+              Users save an average of <strong>$47/month</strong> on personal care products.
+            </p>
+            <Button 
+              variant="default"
+              size="sm"
+              onClick={() => navigate('/routine')}
+            >
+              View My Routine & Optimize
+            </Button>
           </div>
         </Card>
 
@@ -684,7 +679,7 @@ const Analysis = () => {
 
          <Card className="p-4 md:p-6 mb-24 md:mb-0">
            <div className="flex items-center gap-3 mb-4">
-             <Sparkles className="w-8 h-8 text-primary animate-pulse" />
+             <Sparkles className="w-8 h-8 text-amber-600 dark:text-amber-400 animate-pulse" />
              <div className="flex-1">
                <h2 className="text-2xl font-bold">📋💡 Routine Suggestions</h2>
               {analysis.recommendations_json.product_metadata?.product_type && (
@@ -714,7 +709,9 @@ const Analysis = () => {
         </Card>
 
         {/* Post-Analysis Feedback */}
-        <PostAnalysisFeedback analysisId={analysis.id} />
+        <div className="mb-24 md:mb-8">
+          <PostAnalysisFeedback analysisId={analysis.id} />
+        </div>
 
         {/* Floating Action Bubbles - Desktop only */}
         <FloatingActionBubbles 

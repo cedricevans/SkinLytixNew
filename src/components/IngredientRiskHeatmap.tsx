@@ -1,5 +1,7 @@
 import { useState } from 'react';
 import { cn } from '@/lib/utils';
+import { ChevronDown, ChevronRight } from "lucide-react";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 
 interface IngredientRiskHeatmapProps {
   ingredients: Array<{
@@ -12,6 +14,7 @@ interface IngredientRiskHeatmapProps {
 
 export const IngredientRiskHeatmap = ({ ingredients, onIngredientClick }: IngredientRiskHeatmapProps) => {
   const [hoveredIngredient, setHoveredIngredient] = useState<string | null>(null);
+  const [isOpen, setIsOpen] = useState(true);
 
   const getRiskColor = (riskScore: number) => {
     if (riskScore < 30) return 'bg-green-500 hover:bg-green-600';
@@ -26,19 +29,34 @@ export const IngredientRiskHeatmap = ({ ingredients, onIngredientClick }: Ingred
   };
 
   return (
-    <div className="w-full mb-6 md:mb-8 animate-fade-in-up">
-      <div className="flex items-center gap-2 md:gap-3 mb-4 md:mb-6">
-        <div className="w-10 h-10 md:w-12 md:h-12 rounded-full bg-gradient-to-br from-primary to-primary-glow flex items-center justify-center shadow-elegant">
-          <span className="text-xl md:text-2xl">🗺️</span>
+    <Collapsible open={isOpen} onOpenChange={setIsOpen} className="w-full mb-6 md:mb-8 animate-fade-in-up">
+      <div className="flex items-center justify-between mb-4 md:mb-6">
+        <div className="flex items-center gap-2 md:gap-3">
+          <div className="w-10 h-10 md:w-12 md:h-12 rounded-full bg-gradient-to-br from-primary to-primary-glow flex items-center justify-center shadow-elegant">
+            <span className="text-xl md:text-2xl">🗺️</span>
+          </div>
+          <div>
+            <h3 className="text-lg md:text-2xl font-bold">Ingredient Risk Overview</h3>
+            <p className="text-xs md:text-sm text-muted-foreground">
+              {ingredients.length} ingredients analyzed
+            </p>
+          </div>
         </div>
-        <div>
-          <h3 className="text-lg md:text-2xl font-bold">Ingredient Risk Overview</h3>
-          <p className="text-xs md:text-sm text-muted-foreground">
-            {ingredients.length} ingredients analyzed
-          </p>
-        </div>
+        <CollapsibleTrigger asChild>
+          <button
+            className="p-2 hover:bg-accent rounded-lg transition-colors"
+            aria-label={isOpen ? "Collapse heatmap" : "Expand heatmap"}
+          >
+            {isOpen ? (
+              <ChevronDown className="w-5 h-5 text-muted-foreground" />
+            ) : (
+              <ChevronRight className="w-5 h-5 text-muted-foreground" />
+            )}
+          </button>
+        </CollapsibleTrigger>
       </div>
-      <div className="relative bg-gradient-to-br from-card to-card/50 rounded-xl p-3 md:p-6 lg:p-8 border border-border shadow-elegant backdrop-blur-sm">
+      <CollapsibleContent>
+        <div className="relative bg-gradient-to-br from-card to-card/50 rounded-xl p-3 md:p-6 lg:p-8 border border-border shadow-elegant backdrop-blur-sm">
         <div className="grid grid-cols-6 md:grid-cols-8 lg:grid-cols-10 gap-1.5 md:gap-3 lg:gap-4">
           {ingredients.map((ingredient, index) => {
             const riskScore = ingredient.risk_score || 
@@ -90,7 +108,8 @@ export const IngredientRiskHeatmap = ({ ingredients, onIngredientClick }: Ingred
             <span className="font-medium">High Risk</span>
           </div>
         </div>
-      </div>
-    </div>
+        </div>
+      </CollapsibleContent>
+    </Collapsible>
   );
 };
