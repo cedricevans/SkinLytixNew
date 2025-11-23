@@ -6,6 +6,7 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { AlertCircle, CheckCircle2, Sparkles, Home, ScanLine, Plus, Info, HelpCircle, AlertTriangle } from "lucide-react";
+import { IngredientCard } from "@/components/IngredientCard";
 import PostAnalysisFeedback from "@/components/PostAnalysisFeedback";
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from "@/components/ui/tooltip";
 import { useTracking, trackEvent } from "@/hooks/useTracking";
@@ -456,17 +457,14 @@ const Analysis = () => {
                 </p>
               </div>
             </div>
-            <div className="space-y-3">
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
               {analysis.recommendations_json.problematic_ingredients.map((item, index) => (
-                <div key={index} className="p-4 bg-background rounded-lg border border-destructive/30">
-                  <div className="flex items-start gap-3">
-                    <AlertTriangle className="w-5 h-5 text-destructive mt-0.5 flex-shrink-0" />
-                    <div className="flex-1">
-                      <p className="font-semibold text-destructive">{item.name}</p>
-                      <p className="text-sm text-muted-foreground mt-1">{item.reason}</p>
-                    </div>
-                  </div>
-                </div>
+                <IngredientCard
+                  key={index}
+                  name={item.name}
+                  category="problematic"
+                  details={item.reason}
+                />
               ))}
             </div>
             <div className="mt-4 p-3 bg-destructive/10 rounded-lg border border-destructive/30">
@@ -521,27 +519,26 @@ const Analysis = () => {
               </p>
             </div>
           </div>
-          <div className="flex flex-wrap gap-2">
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
             {analysis.recommendations_json.safe_ingredients.length > 0 ? (
               <>
                 {analysis.recommendations_json.beneficial_ingredients?.map((item, index) => (
-                  <Tooltip key={`beneficial-${index}`}>
-                    <TooltipTrigger asChild>
-                      <Badge variant="secondary" className="bg-emerald-100 text-emerald-900 dark:bg-emerald-900 dark:text-emerald-100 border border-emerald-300 dark:border-emerald-700">
-                        ✨ {item.name}
-                      </Badge>
-                    </TooltipTrigger>
-                    <TooltipContent>
-                      <p className="text-xs">{item.benefit}</p>
-                    </TooltipContent>
-                  </Tooltip>
+                  <IngredientCard
+                    key={`beneficial-${index}`}
+                    name={item.name}
+                    category="beneficial"
+                    details={item.benefit}
+                    emoji="✨"
+                  />
                 ))}
                 {analysis.recommendations_json.safe_ingredients
                   .filter(ing => !analysis.recommendations_json.beneficial_ingredients?.some(b => b.name === ing))
                   .map((ingredient, index) => (
-                    <Badge key={`safe-${index}`} variant="secondary" className="bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-100">
-                      {ingredient}
-                    </Badge>
+                    <IngredientCard
+                      key={`safe-${index}`}
+                      name={ingredient}
+                      category="safe"
+                    />
                   ))
                 }
               </>
@@ -574,15 +571,14 @@ const Analysis = () => {
                 </p>
               </div>
             </div>
-            <div className="flex flex-wrap gap-2">
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
               {analysis.recommendations_json.concern_ingredients.map((ingredient, index) => (
-                <Badge 
-                  key={index} 
-                  variant="secondary" 
-                  className="bg-amber-100 text-amber-900 dark:bg-amber-900 dark:text-amber-100"
-                >
-                  {ingredient}
-                </Badge>
+                <IngredientCard
+                  key={index}
+                  name={ingredient}
+                  category="unverified"
+                  details="Not found in PubChem or Open Beauty Facts databases. May be a proprietary blend or trade name."
+                />
               ))}
             </div>
             <div className="mt-4 p-3 bg-amber-50 dark:bg-amber-950 rounded-lg border border-amber-200 dark:border-amber-800">

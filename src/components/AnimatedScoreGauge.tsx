@@ -31,9 +31,9 @@ export const AnimatedScoreGauge = ({ score, className }: AnimatedScoreGaugeProps
   }, [score]);
 
   const getScoreColor = () => {
-    if (score >= 70) return "hsl(var(--chart-1))"; // Green
-    if (score >= 50) return "hsl(var(--chart-3))"; // Yellow
-    return "hsl(var(--destructive))"; // Red
+    if (score >= 70) return "hsl(162, 41%, 72%)"; // Sage Green
+    if (score >= 50) return "hsl(43, 96%, 56%)"; // Golden Amber
+    return "hsl(346, 100%, 60%)"; // Hot Pink
   };
 
   const getScoreEmoji = () => {

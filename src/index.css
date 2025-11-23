@@ -157,3 +157,26 @@ All colors MUST be HSL.
     opacity: 0.7;
   }
 }
+
+/* 3D Flip Card Styles */
+.ingredient-card-perspective {
+  perspective: 1000px;
+}
+
+.ingredient-card {
+  transform-style: preserve-3d;
+  transition: transform 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.ingredient-card-flipped {
+  transform: rotateY(180deg);
+}
+
+.card-face {
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+}
+
+.card-face-back {
+  transform: rotateY(180deg);
+}
