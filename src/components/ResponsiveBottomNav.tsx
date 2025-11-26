@@ -40,7 +40,7 @@ export const ResponsiveBottomNav = ({ onAddToRoutine, showAddToRoutine = true, o
       icon: MessageSquare,
       label: "Feedback",
       action: () => navigate('/beta-feedback'),
-      show: !onChatOpen, // Only show when chat isn't available
+      show: true, // Always show feedback button
     },
     {
       icon: Sparkles,
@@ -55,7 +55,7 @@ export const ResponsiveBottomNav = ({ onAddToRoutine, showAddToRoutine = true, o
       className="lg:hidden fixed bottom-0 left-0 right-0 z-50 bg-card/95 backdrop-blur-lg border-t border-border shadow-lg"
       style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}
     >
-      <div className="grid grid-cols-5 gap-1 px-2 py-3">
+      <div className={`grid grid-cols-${navItems.length} gap-1 px-2 py-3`}>
         {navItems.map((item, index) => {
           const Icon = item.icon;
           return (
@@ -68,7 +68,7 @@ export const ResponsiveBottomNav = ({ onAddToRoutine, showAddToRoutine = true, o
                 "hover:bg-accent/50 active:bg-accent"
               )}
             >
-              <Icon className="w-5 h-5 text-foreground" />
+              <Icon className="w-4 h-4 text-foreground" />
               <span className="text-xs font-medium text-muted-foreground">{item.label}</span>
             </button>
           );
