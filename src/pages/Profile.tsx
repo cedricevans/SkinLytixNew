@@ -842,6 +842,24 @@ const Profile = () => {
                 <span className="font-semibold">Manage Routine</span>
               </Button>
             </div>
+
+            {/* Help & Feedback Section */}
+            <Card className="p-6 bg-gradient-to-r from-primary/5 to-accent/5 border-primary/20">
+              <div className="flex items-start gap-4">
+                <div className="p-3 bg-primary/20 rounded-lg">
+                  <MessageSquare className="w-6 h-6 text-primary" />
+                </div>
+                <div className="flex-1">
+                  <h3 className="font-semibold text-lg mb-2">Help & Feedback</h3>
+                  <p className="text-sm text-muted-foreground mb-3">
+                    Your voice helps shape SkinLytix. Tell us what's working, what's not, and what you wish existed.
+                  </p>
+                  <Button onClick={() => navigate('/beta-feedback')}>
+                    Give Feedback
+                  </Button>
+                </div>
+              </div>
+            </Card>
           </TabsContent>
 
           {/* Products Tab */}

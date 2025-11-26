@@ -8,6 +8,8 @@ import { Badge } from "@/components/ui/badge";
 import { AlertCircle, CheckCircle2, Sparkles, Home, ScanLine, Plus, Info, HelpCircle, AlertTriangle } from "lucide-react";
 import { IngredientCard } from "@/components/IngredientCard";
 import PostAnalysisFeedback from "@/components/PostAnalysisFeedback";
+import { PostAnalysisFeedbackCard } from "@/components/PostAnalysisFeedbackCard";
+import { FrictionFeedbackBanner } from "@/components/FrictionFeedbackBanner";
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from "@/components/ui/tooltip";
 import { useTracking, trackEvent } from "@/hooks/useTracking";
 import ReactMarkdown from 'react-markdown';
@@ -638,9 +640,21 @@ const Analysis = () => {
           )}
         </Card>
 
+        {/* Friction Feedback Banner - Show for low EpiQ scores */}
+        {analysis.epiq_score < 50 && (
+          <div className="mb-6">
+            <FrictionFeedbackBanner trigger="low_score" context={`EpiQ Score: ${analysis.epiq_score}`} />
+          </div>
+        )}
+
         {/* Post-Analysis Feedback */}
-        <div className="mb-24 md:mb-8">
+        <div className="mb-6">
           <PostAnalysisFeedback analysisId={analysis.id} />
+        </div>
+
+        {/* Post-Analysis Feedback Card */}
+        <div className="mb-24 md:mb-8">
+          <PostAnalysisFeedbackCard />
         </div>
 
         {/* Floating Action Bubbles - Desktop only */}

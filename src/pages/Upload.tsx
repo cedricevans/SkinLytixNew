@@ -12,6 +12,7 @@ import Tesseract from "tesseract.js";
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from "@/components/ui/tooltip";
 import { useTracking, trackEvent } from "@/hooks/useTracking";
 import OCRLoadingTips from "@/components/OCRLoadingTips";
+import { FrictionFeedbackBanner } from "@/components/FrictionFeedbackBanner";
 
 // Helper: Preprocess image for better OCR accuracy
 const preprocessImage = (imageDataUrl: string): Promise<string> => {
@@ -70,6 +71,7 @@ const Upload = () => {
   const [ocrProgress, setOcrProgress] = useState(0);
   const [productType, setProductType] = useState<'face' | 'body' | 'hair' | 'auto'>('auto');
   const [productPrice, setProductPrice] = useState("");
+  const [showFrictionBanner, setShowFrictionBanner] = useState(false);
 
   const handleImageUpload = async (file: File) => {
     trackEvent({
@@ -264,6 +266,7 @@ const Upload = () => {
 
     } catch (error) {
       console.error('Analysis error:', error);
+      setShowFrictionBanner(true);
       toast({
         title: "Analysis Failed",
         description: "Could not analyze product. Please try again.",
@@ -278,6 +281,12 @@ const Upload = () => {
     <TooltipProvider>
       <main className="min-h-screen bg-gradient-to-b from-background to-muted py-12 px-4 overflow-x-hidden">
       <div className="container max-w-3xl mx-auto w-full">
+        {/* Friction Feedback Banner */}
+        {showFrictionBanner && (
+          <div className="mb-6">
+            <FrictionFeedbackBanner trigger="error" context="Analysis failed" />
+          </div>
+        )}
         {/* Navigation Header */}
         <div className="flex justify-between items-center mb-8">
           <Button

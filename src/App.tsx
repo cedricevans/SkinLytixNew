@@ -15,6 +15,7 @@ import RoutineOptimization from "./pages/RoutineOptimization";
 import DemoAnalysis from "./pages/DemoAnalysis";
 import InstagramLanding from "./pages/InstagramLanding";
 import Analytics from "./pages/Analytics";
+import BetaFeedback from "./pages/BetaFeedback";
 import NotFound from "./pages/NotFound";
 import FeedbackWidget from "@/components/FeedbackWidget";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
@@ -40,6 +41,7 @@ const App = () => (
           <Route path="/routine" element={<Routine />} />
           <Route path="/routine/optimization/:id" element={<RoutineOptimization />} />
           <Route path="/analytics" element={<ProtectedRoute><Analytics /></ProtectedRoute>} />
+          <Route path="/beta-feedback" element={<BetaFeedback />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>

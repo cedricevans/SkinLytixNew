@@ -14,6 +14,63 @@ export type Database = {
   }
   public: {
     Tables: {
+      beta_feedback: {
+        Row: {
+          created_at: string | null
+          email: string | null
+          frustrations: string | null
+          id: string
+          missing_feature: string | null
+          most_helpful_feature: string | null
+          motivation: string | null
+          perceived_accuracy: string | null
+          pmf_core_value: string | null
+          pmf_disappointment: string | null
+          pmf_price_expectation: string | null
+          pmf_substitute: string | null
+          pmf_willing_to_pay: string | null
+          report_clarity: string | null
+          user_id: string | null
+          wants_session: boolean | null
+        }
+        Insert: {
+          created_at?: string | null
+          email?: string | null
+          frustrations?: string | null
+          id?: string
+          missing_feature?: string | null
+          most_helpful_feature?: string | null
+          motivation?: string | null
+          perceived_accuracy?: string | null
+          pmf_core_value?: string | null
+          pmf_disappointment?: string | null
+          pmf_price_expectation?: string | null
+          pmf_substitute?: string | null
+          pmf_willing_to_pay?: string | null
+          report_clarity?: string | null
+          user_id?: string | null
+          wants_session?: boolean | null
+        }
+        Update: {
+          created_at?: string | null
+          email?: string | null
+          frustrations?: string | null
+          id?: string
+          missing_feature?: string | null
+          most_helpful_feature?: string | null
+          motivation?: string | null
+          perceived_accuracy?: string | null
+          pmf_core_value?: string | null
+          pmf_disappointment?: string | null
+          pmf_price_expectation?: string | null
+          pmf_substitute?: string | null
+          pmf_willing_to_pay?: string | null
+          report_clarity?: string | null
+          user_id?: string | null
+          wants_session?: boolean | null
+        }
+        Relationships: []
+      }
       chat_conversations: {
         Row: {
           analysis_id: string

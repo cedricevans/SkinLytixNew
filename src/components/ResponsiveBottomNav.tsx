@@ -1,4 +1,4 @@
-import { Home, Plus, Microscope, TrendingUp, Sparkles } from "lucide-react";
+import { Home, Plus, Microscope, TrendingUp, Sparkles, MessageSquare } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
 
@@ -35,6 +35,12 @@ export const ResponsiveBottomNav = ({ onAddToRoutine, showAddToRoutine = true, o
       label: "Routine",
       action: () => navigate('/routine'),
       show: true,
+    },
+    {
+      icon: MessageSquare,
+      label: "Feedback",
+      action: () => navigate('/beta-feedback'),
+      show: !onChatOpen, // Only show when chat isn't available
     },
     {
       icon: Sparkles,
