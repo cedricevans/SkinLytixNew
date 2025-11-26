@@ -5,9 +5,10 @@ interface SafetyLevelMeterProps {
   safetyLevel: 'low' | 'moderate' | 'high' | 'unknown';
   score: number; // 0-100 risk score
   className?: string;
+  showScore?: boolean; // Optional: hide the numeric score (defaults to true)
 }
 
-export const SafetyLevelMeter = ({ safetyLevel, score, className }: SafetyLevelMeterProps) => {
+export const SafetyLevelMeter = ({ safetyLevel, score, className, showScore = true }: SafetyLevelMeterProps) => {
   const getIcon = () => {
     switch (safetyLevel) {
       case 'low':
@@ -54,7 +55,9 @@ export const SafetyLevelMeter = ({ safetyLevel, score, className }: SafetyLevelM
           {getIcon()}
           <span className="text-sm font-semibold">{getLabel()}</span>
         </div>
-        <span className="text-xs text-muted-foreground">{score}/100</span>
+        {showScore && (
+          <span className="text-xs text-muted-foreground">{score}/100</span>
+        )}
       </div>
       
       {/* Meter with color zones */}

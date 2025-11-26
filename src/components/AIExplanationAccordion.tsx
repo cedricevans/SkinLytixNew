@@ -62,6 +62,7 @@ export const AIExplanationAccordion = ({ aiExplanation }: AIExplanationAccordion
           <SafetyLevelMeter
             safetyLevel={aiExplanation.safety_level as 'low' | 'moderate' | 'high' | 'unknown'}
             score={safetyScore}
+            showScore={false}
           />
         </div>
       </button>
