@@ -24,6 +24,7 @@ import { ScoreBreakdownAccordion } from "@/components/ScoreBreakdownAccordion";
 import { AIExplanationAccordion } from "@/components/AIExplanationAccordion";
 import { AIExplanationLoader } from "@/components/AIExplanationLoader";
 import { SkinLytixGPTChat } from "@/components/SkinLytixGPTChat";
+import { DemoModeToggle } from "@/components/DemoModeToggle";
 
 interface AnalysisData {
   id: string;
@@ -678,6 +679,7 @@ const Analysis = () => {
         />
 
         {/* SkinLytixGPT Chat with Voice */}
+        {/* SkinLytixGPT Chat with Voice */}
         <SkinLytixGPTChat 
           analysisId={analysis.id}
           productName={analysis.product_name}
@@ -685,6 +687,9 @@ const Analysis = () => {
           isOpen={isChatOpen}
           onOpenChange={setIsChatOpen}
         />
+
+        {/* Demo Mode Toggle - Admin Only */}
+        <DemoModeToggle />
       </div>
     </main>
     </TooltipProvider>

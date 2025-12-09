@@ -10,6 +10,9 @@ import ReactMarkdown from "react-markdown";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { supabase } from "@/integrations/supabase/client";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { useSubscription } from "@/hooks/useSubscription";
+import { useUsageLimits } from "@/hooks/useUsageLimits";
+import { UsageCounter, PaywallModal } from "@/components/paywall";
 
 interface Message {
   role: 'user' | 'assistant';
@@ -41,6 +44,12 @@ export const SkinLytixGPTChat = ({
   const [showReferralBanner, setShowReferralBanner] = useState(false);
   const [conversationId, setConversationId] = useState<string | null>(null);
   const [isLoadingHistory, setIsLoadingHistory] = useState(false);
+  const [showPaywall, setShowPaywall] = useState(false);
+  
+  // Subscription and usage
+  const { canAccess, effectiveTier } = useSubscription();
+  const { usage, incrementUsage, isLoading: limitsLoading } = useUsageLimits();
+  const hasUnlimitedChat = canAccess('chat_unlimited');
   
   // Voice features
   const [isListening, setIsListening] = useState(false);
@@ -207,20 +216,42 @@ export const SkinLytixGPTChat = ({
     });
   };
 
+  // Chat limit for free tier: 3 messages/month, Premium: 30, Pro: unlimited
+  const getChatLimit = () => {
+    if (hasUnlimitedChat) return Infinity;
+    if (effectiveTier === 'premium') return 30;
+    return 3; // free
+  };
+
+  const chatLimit = getChatLimit();
+  const chatUsed = usage?.chatMessagesUsed || 0;
+  const canSendMessage = hasUnlimitedChat || chatUsed < chatLimit;
+
   // Send message handler
   const sendMessage = async (messageText?: string) => {
     const textToSend = messageText || input.trim();
     if (!textToSend || isLoading) return;
+
+    // Check chat limit
+    if (!canSendMessage) {
+      setShowPaywall(true);
+      return;
+    }
 
     const userMessage: Message = { role: 'user', content: textToSend };
     setMessages(prev => [...prev, userMessage]);
     setInput("");
     setIsLoading(true);
 
+    // Increment usage for non-unlimited tiers
+    if (!hasUnlimitedChat) {
+      await incrementUsage('chatMessagesUsed');
+    }
+
     trackEvent({
       eventName: 'chat_message_sent',
       eventCategory: 'chat',
-      eventProperties: { analysisId, messageLength: textToSend.length }
+      eventProperties: { analysisId, messageLength: textToSend.length, tier: effectiveTier }
     });
 
     try {
@@ -451,6 +482,18 @@ export const SkinLytixGPTChat = ({
             </div>
           )}
 
+          {/* Usage Counter for non-unlimited tiers */}
+          {!hasUnlimitedChat && !limitsLoading && (
+            <div className="px-4 py-2 border-b">
+              <UsageCounter
+                used={chatUsed}
+                limit={chatLimit}
+                label="Chat messages"
+                feature="Unlimited Chat"
+              />
+            </div>
+          )}
+
           {/* Suggested Questions */}
           {!isLoadingHistory && messages.length === 0 && (
             <div className="p-4 space-y-3">
@@ -562,6 +605,14 @@ export const SkinLytixGPTChat = ({
           </div>
         </div>
       )}
+
+      {/* Paywall Modal */}
+      <PaywallModal
+        open={showPaywall}
+        onOpenChange={setShowPaywall}
+        feature="Unlimited Chat"
+        featureDescription="Get unlimited conversations with SkinLytixGPT to ask questions about any product analysis."
+      />
     </>
   );
 };

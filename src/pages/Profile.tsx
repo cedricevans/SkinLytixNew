@@ -9,9 +9,11 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { Droplets, Wind, Flame, Shield, Sparkles, Home, ArrowLeft, User, TrendingUp, Calendar, DollarSign, Edit2, ChevronDown, ScanLine, Plus, History, Search, Info, MessageSquare } from "lucide-react";
+import { Droplets, Wind, Flame, Shield, Sparkles, Home, ArrowLeft, User, TrendingUp, Calendar, DollarSign, Edit2, ChevronDown, ScanLine, Plus, History, Search, Info, MessageSquare, Crown } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { useTracking, trackEvent } from "@/hooks/useTracking";
+import { DemoModeToggle } from "@/components/DemoModeToggle";
+import { useSubscription } from "@/hooks/useSubscription";
 
 const skinTypes = [
   { value: "oily", label: "Oily", icon: Droplets, description: "Shiny, prone to breakouts" },
@@ -1205,6 +1207,9 @@ const Profile = () => {
           </TabsContent>
         </Tabs>
       </div>
+
+      {/* Demo Mode Toggle - Admin Only */}
+      <DemoModeToggle />
     </main>
   );
 };
