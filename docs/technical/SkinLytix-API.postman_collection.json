@@ -1,0 +1,433 @@
+{
+  "info": {
+    "name": "SkinLytix API",
+    "description": "API collection for SkinLytix skincare analysis platform",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "_exporter_id": "skinlytix"
+  },
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "https://yflbjaetupvakadqjhfb.supabase.co",
+      "type": "string"
+    },
+    {
+      "key": "anon_key",
+      "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlmbGJqYWV0dXB2YWthZHFqaGZiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTk1MDMzMzcsImV4cCI6MjA3NTA3OTMzN30.va2MzsdWUoRMthRFtsteL-Qx27T4DlNISY2KNJzfgHU",
+      "type": "string"
+    },
+    {
+      "key": "access_token",
+      "value": "",
+      "type": "string",
+      "description": "Set after authentication"
+    }
+  ],
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{access_token}}",
+        "type": "string"
+      }
+    ]
+  },
+  "item": [
+    {
+      "name": "Authentication",
+      "item": [
+        {
+          "name": "Sign Up",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "apikey",
+                "value": "{{anon_key}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"test@example.com\",\n  \"password\": \"securepassword123\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/auth/v1/signup",
+              "host": ["{{base_url}}"],
+              "path": ["auth", "v1", "signup"]
+            }
+          }
+        },
+        {
+          "name": "Sign In",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "var jsonData = pm.response.json();",
+                  "if (jsonData.access_token) {",
+                  "    pm.collectionVariables.set('access_token', jsonData.access_token);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "apikey",
+                "value": "{{anon_key}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"test@example.com\",\n  \"password\": \"securepassword123\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/auth/v1/token?grant_type=password",
+              "host": ["{{base_url}}"],
+              "path": ["auth", "v1", "token"],
+              "query": [
+                {
+                  "key": "grant_type",
+                  "value": "password"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Current User",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "apikey",
+                "value": "{{anon_key}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/auth/v1/user",
+              "host": ["{{base_url}}"],
+              "path": ["auth", "v1", "user"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Edge Functions",
+      "item": [
+        {
+          "name": "Analyze Product",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "apikey",
+                "value": "{{anon_key}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"ingredients\": \"Water, Glycerin, Niacinamide, Hyaluronic Acid, Phenoxyethanol\",\n  \"productName\": \"Test Serum\",\n  \"skinType\": \"oily\",\n  \"skinConcerns\": [\"acne\", \"hyperpigmentation\"]\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/functions/v1/analyze-product",
+              "host": ["{{base_url}}"],
+              "path": ["functions", "v1", "analyze-product"]
+            }
+          }
+        },
+        {
+          "name": "Chat with SkinLytixGPT",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "apikey",
+                "value": "{{anon_key}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"message\": \"Is niacinamide good for oily skin?\",\n  \"conversationId\": null,\n  \"analysisContext\": {\n    \"productName\": \"Test Serum\",\n    \"epiqScore\": 85,\n    \"ingredients\": [\"Niacinamide\", \"Hyaluronic Acid\"]\n  }\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/functions/v1/chat-skinlytix",
+              "host": ["{{base_url}}"],
+              "path": ["functions", "v1", "chat-skinlytix"]
+            }
+          }
+        },
+        {
+          "name": "Optimize Routine",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "apikey",
+                "value": "{{anon_key}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"routineId\": \"uuid-here\",\n  \"skinType\": \"combination\",\n  \"skinConcerns\": [\"aging\", \"dryness\"]\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/functions/v1/optimize-routine",
+              "host": ["{{base_url}}"],
+              "path": ["functions", "v1", "optimize-routine"]
+            }
+          }
+        },
+        {
+          "name": "Extract Ingredients (OCR)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "apikey",
+                "value": "{{anon_key}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"imageBase64\": \"base64-encoded-image-here\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/functions/v1/extract-ingredients",
+              "host": ["{{base_url}}"],
+              "path": ["functions", "v1", "extract-ingredients"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Database",
+      "item": [
+        {
+          "name": "Get User Profile",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "apikey",
+                "value": "{{anon_key}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/rest/v1/profiles?select=*",
+              "host": ["{{base_url}}"],
+              "path": ["rest", "v1", "profiles"],
+              "query": [
+                {
+                  "key": "select",
+                  "value": "*"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get User Analyses",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "apikey",
+                "value": "{{anon_key}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/rest/v1/user_analyses?select=*&order=analyzed_at.desc",
+              "host": ["{{base_url}}"],
+              "path": ["rest", "v1", "user_analyses"],
+              "query": [
+                {
+                  "key": "select",
+                  "value": "*"
+                },
+                {
+                  "key": "order",
+                  "value": "analyzed_at.desc"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get User Routines",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "apikey",
+                "value": "{{anon_key}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/rest/v1/routines?select=*,routine_products(*)",
+              "host": ["{{base_url}}"],
+              "path": ["rest", "v1", "routines"],
+              "query": [
+                {
+                  "key": "select",
+                  "value": "*,routine_products(*)"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Usage Limits",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "apikey",
+                "value": "{{anon_key}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/rest/v1/usage_limits?select=*&order=period_start.desc&limit=1",
+              "host": ["{{base_url}}"],
+              "path": ["rest", "v1", "usage_limits"],
+              "query": [
+                {
+                  "key": "select",
+                  "value": "*"
+                },
+                {
+                  "key": "order",
+                  "value": "period_start.desc"
+                },
+                {
+                  "key": "limit",
+                  "value": "1"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Check Admin Role",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "apikey",
+                "value": "{{anon_key}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"_user_id\": \"user-uuid-here\",\n  \"_role\": \"admin\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/rest/v1/rpc/has_role",
+              "host": ["{{base_url}}"],
+              "path": ["rest", "v1", "rpc", "has_role"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Subscriptions",
+      "item": [
+        {
+          "name": "Get Subscription Status",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "apikey",
+                "value": "{{anon_key}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/rest/v1/profiles?select=subscription_tier,trial_started_at,trial_ends_at,stripe_customer_id",
+              "host": ["{{base_url}}"],
+              "path": ["rest", "v1", "profiles"],
+              "query": [
+                {
+                  "key": "select",
+                  "value": "subscription_tier,trial_started_at,trial_ends_at,stripe_customer_id"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Update Demo Mode (Admin)",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "apikey",
+                "value": "{{anon_key}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Prefer",
+                "value": "return=representation"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"demo_mode_tier\": \"free\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/rest/v1/profiles?id=eq.user-uuid-here",
+              "host": ["{{base_url}}"],
+              "path": ["rest", "v1", "profiles"],
+              "query": [
+                {
+                  "key": "id",
+                  "value": "eq.user-uuid-here"
+                }
+              ]
+            },
+            "description": "Set demo_mode_tier to 'free', 'premium', 'pro', or null (disabled)"
+          }
+        }
+      ]
+    }
+  ]
+}

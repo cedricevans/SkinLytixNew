@@ -221,43 +221,79 @@ export type Database = {
         Row: {
           body_concerns: Json | null
           created_at: string | null
+          demo_mode_tier:
+            | Database["public"]["Enums"]["subscription_tier"]
+            | null
           display_name: string | null
           email: string | null
           has_seen_walkthrough: boolean | null
           id: string
           is_profile_complete: boolean | null
+          last_activity_date: string | null
           product_preferences: Json | null
           scalp_type: string | null
           skin_concerns: Json | null
           skin_type: Database["public"]["Enums"]["skin_type_enum"] | null
+          streak_count: number | null
+          stripe_customer_id: string | null
+          stripe_subscription_id: string | null
+          subscription_tier:
+            | Database["public"]["Enums"]["subscription_tier"]
+            | null
+          trial_ends_at: string | null
+          trial_started_at: string | null
           updated_at: string | null
         }
         Insert: {
           body_concerns?: Json | null
           created_at?: string | null
+          demo_mode_tier?:
+            | Database["public"]["Enums"]["subscription_tier"]
+            | null
           display_name?: string | null
           email?: string | null
           has_seen_walkthrough?: boolean | null
           id: string
           is_profile_complete?: boolean | null
+          last_activity_date?: string | null
           product_preferences?: Json | null
           scalp_type?: string | null
           skin_concerns?: Json | null
           skin_type?: Database["public"]["Enums"]["skin_type_enum"] | null
+          streak_count?: number | null
+          stripe_customer_id?: string | null
+          stripe_subscription_id?: string | null
+          subscription_tier?:
+            | Database["public"]["Enums"]["subscription_tier"]
+            | null
+          trial_ends_at?: string | null
+          trial_started_at?: string | null
           updated_at?: string | null
         }
         Update: {
           body_concerns?: Json | null
           created_at?: string | null
+          demo_mode_tier?:
+            | Database["public"]["Enums"]["subscription_tier"]
+            | null
           display_name?: string | null
           email?: string | null
           has_seen_walkthrough?: boolean | null
           id?: string
           is_profile_complete?: boolean | null
+          last_activity_date?: string | null
           product_preferences?: Json | null
           scalp_type?: string | null
           skin_concerns?: Json | null
           skin_type?: Database["public"]["Enums"]["skin_type_enum"] | null
+          streak_count?: number | null
+          stripe_customer_id?: string | null
+          stripe_subscription_id?: string | null
+          subscription_tier?:
+            | Database["public"]["Enums"]["subscription_tier"]
+            | null
+          trial_ends_at?: string | null
+          trial_started_at?: string | null
           updated_at?: string | null
         }
         Relationships: []
@@ -384,6 +420,42 @@ export type Database = {
         }
         Relationships: []
       }
+      usage_limits: {
+        Row: {
+          chat_messages_used: number | null
+          created_at: string | null
+          id: string
+          pdf_exports_used: number | null
+          period_start: string
+          product_comparisons_used: number | null
+          routine_optimizations_used: number | null
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          chat_messages_used?: number | null
+          created_at?: string | null
+          id?: string
+          pdf_exports_used?: number | null
+          period_start?: string
+          product_comparisons_used?: number | null
+          routine_optimizations_used?: number | null
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          chat_messages_used?: number | null
+          created_at?: string | null
+          id?: string
+          pdf_exports_used?: number | null
+          period_start?: string
+          product_comparisons_used?: number | null
+          routine_optimizations_used?: number | null
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       user_analyses: {
         Row: {
           analyzed_at: string | null
@@ -430,6 +502,30 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      user_badges: {
+        Row: {
+          badge_type: string
+          earned_at: string | null
+          id: string
+          metadata: Json | null
+          user_id: string
+        }
+        Insert: {
+          badge_type: string
+          earned_at?: string | null
+          id?: string
+          metadata?: Json | null
+          user_id: string
+        }
+        Update: {
+          badge_type?: string
+          earned_at?: string | null
+          id?: string
+          metadata?: Json | null
+          user_id?: string
+        }
+        Relationships: []
       }
       user_events: {
         Row: {
@@ -629,6 +725,7 @@ export type Database = {
     Enums: {
       app_role: "admin" | "moderator" | "user"
       skin_type_enum: "oily" | "dry" | "combination" | "sensitive" | "normal"
+      subscription_tier: "free" | "premium" | "pro"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -758,6 +855,7 @@ export const Constants = {
     Enums: {
       app_role: ["admin", "moderator", "user"],
       skin_type_enum: ["oily", "dry", "combination", "sensitive", "normal"],
+      subscription_tier: ["free", "premium", "pro"],
     },
   },
 } as const
