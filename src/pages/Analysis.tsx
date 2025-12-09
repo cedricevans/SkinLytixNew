@@ -5,7 +5,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { AlertCircle, CheckCircle2, Sparkles, Home, ScanLine, Plus, Info, HelpCircle, AlertTriangle } from "lucide-react";
+import { AlertCircle, CheckCircle2, Sparkles, Home, ScanLine, Plus, Info, HelpCircle, AlertTriangle, Download } from "lucide-react";
 import { IngredientCard } from "@/components/IngredientCard";
 import PostAnalysisFeedback from "@/components/PostAnalysisFeedback";
 import { PostAnalysisFeedbackCard } from "@/components/PostAnalysisFeedbackCard";
@@ -25,6 +25,7 @@ import { AIExplanationAccordion } from "@/components/AIExplanationAccordion";
 import { AIExplanationLoader } from "@/components/AIExplanationLoader";
 import { SkinLytixGPTChat } from "@/components/SkinLytixGPTChat";
 import { DemoModeToggle } from "@/components/DemoModeToggle";
+import { ExportAnalysisButton } from "@/components/ExportAnalysisButton";
 
 interface AnalysisData {
   id: string;
@@ -294,6 +295,11 @@ const Analysis = () => {
             <Home className="w-4 h-4 mr-2" />
             Back to Home
           </Button>
+          <ExportAnalysisButton
+            analysisId={analysis.id}
+            productName={analysis.product_name}
+            analysisData={analysis}
+          />
         </div>
 
         {/* Mobile-only Primary CTA */}

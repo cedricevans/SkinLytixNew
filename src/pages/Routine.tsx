@@ -74,6 +74,14 @@ export default function Routine() {
   const [manualPrice, setManualPrice] = useState("");
   const [manualFrequency, setManualFrequency] = useState("Both");
   const [routineCount, setRoutineCount] = useState(0);
+  const [allRoutines, setAllRoutines] = useState<any[]>([]);
+
+  // Tier-based limits
+  const ROUTINE_LIMITS = { free: 1, premium: 5, pro: Infinity };
+  const PRODUCT_LIMITS = { free: 3, premium: 10, pro: Infinity };
+  
+  const maxRoutines = ROUTINE_LIMITS[effectiveTier] || 1;
+  const maxProducts = PRODUCT_LIMITS[effectiveTier] || 3;
 
   useEffect(() => {
     loadRoutineAndAnalyses();
@@ -89,13 +97,16 @@ export default function Routine() {
       }
 
       // Load or create routine
+      // Load all routines for count check
       const { data: routines } = await supabase
         .from("routines")
         .select("*")
         .eq("user_id", user.id)
-        .order("created_at", { ascending: false })
-        .limit(1);
+        .order("created_at", { ascending: false });
 
+      setAllRoutines(routines || []);
+      setRoutineCount(routines?.length || 0);
+      
       let currentRoutineId: string;
 
       if (routines && routines.length > 0) {
@@ -108,6 +119,7 @@ export default function Routine() {
           .select()
           .single();
         currentRoutineId = newRoutine!.id;
+        setRoutineCount(1);
       }
 
       setRoutineId(currentRoutineId);
@@ -146,6 +158,13 @@ export default function Routine() {
   };
 
   const openPriceDialog = (analysisId: string) => {
+    // Check product limit before adding
+    if (routineProducts.length >= maxProducts) {
+      setPaywallFeature("Add More Products");
+      setShowPaywall(true);
+      return;
+    }
+    
     setSelectedAnalysisId(analysisId);
     setProductPrice("");
     setUsageFrequency("Both");
@@ -248,6 +267,14 @@ export default function Routine() {
   const handleAddManualProduct = async () => {
     if (!routineId || !manualProductName) {
       toast.error("Product name is required");
+      return;
+    }
+    
+    // Check product limit before adding
+    if (routineProducts.length >= maxProducts) {
+      setPaywallFeature("Add More Products");
+      setShowPaywall(true);
+      setShowManualEntryDialog(false);
       return;
     }
 
@@ -416,10 +443,43 @@ export default function Routine() {
         </div>
 
         <div className="mb-8">
-          <h1 className="text-4xl font-bold mb-2">{routineName}</h1>
-          <p className="text-muted-foreground">
-            Build and optimize your personal care routine (face, body, & hair)
-          </p>
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-4xl font-bold mb-2">{routineName}</h1>
+              <p className="text-muted-foreground">
+                Build and optimize your personal care routine (face, body, & hair)
+              </p>
+            </div>
+            {/* Routine & Product Limits Display */}
+            <div className="hidden md:flex flex-col gap-1 text-sm text-right">
+              <div className="flex items-center gap-2 justify-end">
+                <span className="text-muted-foreground">Products:</span>
+                <Badge variant={routineProducts.length >= maxProducts ? "destructive" : "secondary"}>
+                  {routineProducts.length} / {maxProducts === Infinity ? '∞' : maxProducts}
+                </Badge>
+              </div>
+              {effectiveTier === 'free' && (
+                <div className="flex items-center gap-2 justify-end">
+                  <span className="text-muted-foreground">Routines:</span>
+                  <Badge variant="secondary">
+                    {routineCount} / {maxRoutines}
+                  </Badge>
+                </div>
+              )}
+            </div>
+          </div>
+          
+          {/* Mobile limits display */}
+          <div className="md:hidden flex gap-2 mt-3">
+            <Badge variant={routineProducts.length >= maxProducts ? "destructive" : "secondary"}>
+              {routineProducts.length}/{maxProducts === Infinity ? '∞' : maxProducts} products
+            </Badge>
+            {effectiveTier === 'free' && (
+              <Badge variant="secondary">
+                {routineCount}/{maxRoutines} routines
+              </Badge>
+            )}
+          </div>
         </div>
 
         {/* Routine Summary */}
