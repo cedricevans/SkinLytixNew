@@ -1,5 +1,27 @@
 # SkinLytix Revenue Model & Monetization Strategy
 
+> **Status:** ✅ Stripe Integration Complete (Dec 2024)
+
+## Implementation Status
+
+| Component | Status | Notes |
+|-----------|--------|-------|
+| Stripe Products Created | ✅ | Premium + Pro, Monthly + Annual |
+| Checkout Edge Function | ✅ | `create-checkout` |
+| Subscription Sync | ✅ | `check-subscription` |
+| Customer Portal | ✅ | `customer-portal` |
+| PaywallModal | ✅ | Integrated with Stripe |
+| SubscriptionSection | ✅ | Profile page UI |
+| Trial System | ✅ | 7-day auto-start for new users |
+| Routine Optimization Gating | ✅ | Free: locked, Premium: 3/mo |
+| Score Breakdown Gating | ✅ | Premium+ only |
+| AI Explanation Gating | ✅ | Premium+ only |
+| Chat Limits | ✅ | Free: 3/mo, Premium: 30/mo |
+
+See [Stripe-Integration.md](../technical/Stripe-Integration.md) for technical details.
+
+---
+
 ## Executive Summary
 
 SkinLytix uses a **freemium model** with psychology-driven upsells designed to maximize conversion while maintaining user trust. This document outlines our tier structure, pricing, psychology tactics, and implementation approach.
