@@ -1,5 +1,8 @@
 project_id = "yflbjaetupvakadqjhfb"
 
+[functions.find-dupes]
+verify_jwt = false
+
 [functions.query-open-beauty-facts]
 verify_jwt = false
 
