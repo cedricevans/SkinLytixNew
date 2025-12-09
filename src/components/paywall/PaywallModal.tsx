@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { X, Crown, Sparkles, Check, Clock, Users } from 'lucide-react';
+import { X, Crown, Sparkles, Check, Clock, Users, Loader2 } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -9,6 +9,8 @@ import {
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
 
 interface PaywallModalProps {
   open: boolean;
@@ -47,6 +49,7 @@ export function PaywallModal({
   const [selectedPlan, setSelectedPlan] = useState<'premium' | 'pro'>('premium');
   const [billingCycle, setBillingCycle] = useState<'monthly' | 'annual'>('annual');
   const [socialProofCount, setSocialProofCount] = useState(847);
+  const [isLoading, setIsLoading] = useState(false);
 
   // Simulate real-time social proof updates
   useEffect(() => {
@@ -67,6 +70,45 @@ export function PaywallModal({
     return billingCycle === 'monthly'
       ? { price: '$14.99', period: '/month', savings: null }
       : { price: '$12.42', period: '/month', savings: 'Save $31/year' };
+  };
+
+  const handleCheckout = async () => {
+    setIsLoading(true);
+    
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      if (!session) {
+        toast.error('Please sign in to upgrade');
+        onOpenChange(false);
+        return;
+      }
+
+      const { data, error } = await supabase.functions.invoke('create-checkout', {
+        body: { 
+          plan: selectedPlan, 
+          billingCycle: billingCycle 
+        },
+      });
+
+      if (error) {
+        console.error('Checkout error:', error);
+        toast.error('Failed to start checkout. Please try again.');
+        return;
+      }
+
+      if (data?.url) {
+        // Open Stripe checkout in new tab
+        window.open(data.url, '_blank');
+        onOpenChange(false);
+        toast.success('Checkout opened in new tab');
+      }
+    } catch (err) {
+      console.error('Checkout error:', err);
+      toast.error('Something went wrong. Please try again.');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const pricing = getPricing();
@@ -190,8 +232,18 @@ export function PaywallModal({
 
           {/* CTA Button */}
           <div className="space-y-3">
-            <Button className="w-full h-12 text-base font-semibold gap-2" size="lg">
-              {showTrial ? (
+            <Button 
+              className="w-full h-12 text-base font-semibold gap-2" 
+              size="lg"
+              onClick={handleCheckout}
+              disabled={isLoading}
+            >
+              {isLoading ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Opening checkout...
+                </>
+              ) : showTrial ? (
                 <>
                   <Clock className="h-4 w-4" />
                   Start 7-Day Free Trial
