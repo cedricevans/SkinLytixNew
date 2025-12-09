@@ -143,6 +143,9 @@ const { data, error } = await supabase.functions.invoke('analyze-product', {
 | `chat-skinlytix` | SkinLytixGPT conversations |
 | `optimize-routine` | Routine recommendations |
 | `extract-ingredients` | OCR text extraction |
+| `find-dupes` | AI-powered dupe discovery |
+| `query-pubchem` | PubChem ingredient lookup |
+| `query-open-beauty-facts` | Product data lookup |
 
 ---
 
@@ -153,10 +156,13 @@ const { data, error } = await supabase.functions.invoke('analyze-product', {
 |-------|---------|
 | `profiles` | User data, subscription tier |
 | `user_roles` | Admin/moderator access |
-| `user_analyses` | Saved product analyses |
+| `user_analyses` | Saved product analyses (includes image_url) |
 | `routines` | User routines |
 | `usage_limits` | Free tier tracking |
 | `user_badges` | Gamification |
+| `saved_dupes` | User's saved dupe favorites |
+| `chat_conversations` | SkinLytixGPT chat history |
+| `chat_messages` | Individual chat messages |
 
 ### Key Queries
 ```typescript

@@ -510,6 +510,7 @@ export type Database = {
           category: string | null
           epiq_score: number | null
           id: string
+          image_url: string | null
           ingredients_list: string
           product_name: string
           product_price: number | null
@@ -522,6 +523,7 @@ export type Database = {
           category?: string | null
           epiq_score?: number | null
           id?: string
+          image_url?: string | null
           ingredients_list: string
           product_name: string
           product_price?: number | null
@@ -534,6 +536,7 @@ export type Database = {
           category?: string | null
           epiq_score?: number | null
           id?: string
+          image_url?: string | null
           ingredients_list?: string
           product_name?: string
           product_price?: number | null

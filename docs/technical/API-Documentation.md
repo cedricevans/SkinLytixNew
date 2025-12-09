@@ -500,6 +500,117 @@ interface OptimizeRoutineResponse {
 }
 ```
 
+---
+
+### 4. find-dupes
+
+**Purpose:** Discover affordable skincare alternatives ("dupes") for a given product using AI analysis.
+
+**Endpoint:** `POST /functions/v1/find-dupes`
+
+**Authentication:** Optional (recommended for personalized results)
+
+**Request Body:**
+
+```typescript
+interface FindDupesRequest {
+  productName: string;        // Required: Product name to find dupes for
+  brand?: string;            // Optional: Brand of original product
+  ingredients: string[];     // Required: Array of ingredient names
+  category?: string;         // Optional: "face" | "body" | "hair"
+  skinType?: string;         // Optional: User's skin type for profile matching
+  concerns?: string[];       // Optional: User's skin concerns
+}
+```
+
+**Response:**
+
+```typescript
+interface FindDupesResponse {
+  dupes: Array<{
+    name: string;                    // Dupe product name
+    brand: string;                   // Dupe brand
+    imageUrl: string;                // Product image URL
+    priceEstimate: string;           // Price string (e.g., "$12.99")
+    reasons: string[];               // Why it's a dupe
+    sharedIngredients: string[];     // Common ingredients
+    profileMatch: boolean;           // Matches user profile?
+    category: string;                // Product category
+    whereToBuy?: string;             // Retailer suggestions
+  }>;
+}
+```
+
+**Example Request:**
+
+```typescript
+const response = await fetch(`${SUPABASE_URL}/functions/v1/find-dupes`, {
+  method: 'POST',
+  headers: {
+    'Authorization': `Bearer ${jwt_token}`,
+    'Content-Type': 'application/json'
+  },
+  body: JSON.stringify({
+    productName: 'Drunk Elephant B-Hydra Intensive Hydration Serum',
+    brand: 'Drunk Elephant',
+    ingredients: ['Panthenol', 'Sodium Hyaluronate', 'Ceramides', 'Niacinamide'],
+    category: 'face',
+    skinType: 'dry',
+    concerns: ['dehydration', 'sensitivity']
+  })
+});
+```
+
+**Example Response:**
+
+```json
+{
+  "dupes": [
+    {
+      "name": "Hyaluronic Acid 2% + B5",
+      "brand": "The Ordinary",
+      "imageUrl": "https://images.unsplash.com/photo-1620916566398-39f1143ab7be?w=300",
+      "priceEstimate": "$7.90",
+      "reasons": [
+        "Contains Hyaluronic Acid for intense hydration",
+        "Includes Panthenol (Pro-Vitamin B5)",
+        "Budget-friendly alternative"
+      ],
+      "sharedIngredients": ["Sodium Hyaluronate", "Panthenol"],
+      "profileMatch": true,
+      "category": "face",
+      "whereToBuy": "Ulta, Sephora, The Ordinary website"
+    }
+  ]
+}
+```
+
+**Features:**
+- AI-powered product matching from trusted budget brands
+- Real product images from Open Beauty Facts API when available
+- Profile matching based on skin type and concerns
+- Returns up to 5 dupe suggestions per request
+
+**Error Responses:**
+
+```json
+// 400 Bad Request - Missing required fields
+{
+  "error": "Missing required field: ingredients"
+}
+
+// 429 Too Many Requests - Rate limit exceeded
+{
+  "error": "Rate limit exceeded. Please try again later."
+}
+
+// 500 Internal Server Error
+{
+  "error": "Failed to find dupes. Please try again."
+}
+```
+```
+
 **Example Request:**
 
 ```typescript

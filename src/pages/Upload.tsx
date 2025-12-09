@@ -240,7 +240,8 @@ const Upload = () => {
           category: category || null,
           ingredients_list: ingredientsList,
           product_price: productPrice ? parseFloat(productPrice) : null,
-          user_id: user.id
+          user_id: user.id,
+          image_url: productImage || null
         }
       });
 

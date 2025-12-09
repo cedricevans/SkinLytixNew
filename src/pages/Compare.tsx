@@ -23,6 +23,7 @@ interface Analysis {
   product_price: number | null;
   ingredients_list: string;
   category: string | null;
+  image_url: string | null;
 }
 
 interface MarketDupe {
@@ -74,7 +75,7 @@ export default function Compare() {
       const [analysesRes, savedRes, profileRes] = await Promise.all([
         supabase
           .from("user_analyses")
-          .select("id, product_name, brand, epiq_score, product_price, ingredients_list, category")
+          .select("id, product_name, brand, epiq_score, product_price, ingredients_list, category, image_url")
           .eq("user_id", user.id)
           .order("analyzed_at", { ascending: false }),
         supabase
@@ -529,6 +530,7 @@ export default function Compare() {
                             <DupeCard
                               name={match.product.product_name}
                               brand={match.product.brand || "Unknown Brand"}
+                              imageUrl={match.product.image_url || undefined}
                               priceEstimate={match.product.product_price ? `$${match.product.product_price}` : undefined}
                               reasons={match.whyDupe}
                               sharedIngredients={match.sharedIngredients}

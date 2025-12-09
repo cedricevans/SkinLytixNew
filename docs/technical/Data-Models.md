@@ -229,6 +229,7 @@ interface Profile {
 | `category` | TEXT | Yes | NULL | Product category |
 | `product_price` | NUMERIC | Yes | NULL | Product price (USD) |
 | `ingredients_list` | TEXT | No | - | Comma-separated ingredients |
+| `image_url` | TEXT | Yes | NULL | User-uploaded product image |
 | `analyzed_at` | TIMESTAMPTZ | Yes | now() | Analysis timestamp |
 
 **RLS Policies:**
@@ -539,7 +540,48 @@ interface RoutineOptimization {
 
 ---
 
-### user_events
+### saved_dupes
+
+**Purpose:** Store user's saved dupe favorites from Dupe Discovery feature.
+
+**Schema:**
+
+| Column | Type | Nullable | Default | Description |
+|--------|------|----------|---------|-------------|
+| `id` | UUID | No | gen_random_uuid() | Primary key |
+| `user_id` | UUID | No | - | Foreign key to auth.users |
+| `source_product_id` | UUID | Yes | NULL | Original product being compared |
+| `product_name` | TEXT | No | - | Dupe product name |
+| `brand` | TEXT | Yes | NULL | Dupe brand name |
+| `image_url` | TEXT | Yes | NULL | Product image URL |
+| `reasons` | TEXT[] | Yes | NULL | Array of dupe reasons |
+| `shared_ingredients` | TEXT[] | Yes | NULL | Shared ingredient names |
+| `price_estimate` | TEXT | Yes | NULL | Price string |
+| `saved_at` | TIMESTAMPTZ | Yes | now() | When saved |
+
+**RLS Policies:**
+- Users can view their own saved dupes
+- Users can save dupes
+- Users can unsave (delete) their dupes
+
+**TypeScript Interface:**
+
+```typescript
+interface SavedDupe {
+  id: string;
+  user_id: string;
+  source_product_id: string | null;
+  product_name: string;
+  brand: string | null;
+  image_url: string | null;
+  reasons: string[] | null;
+  shared_ingredients: string[] | null;
+  price_estimate: string | null;
+  saved_at: string;
+}
+```
+
+---
 
 **Purpose:** Track user actions for analytics.
 

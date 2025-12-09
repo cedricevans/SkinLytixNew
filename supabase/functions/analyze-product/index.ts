@@ -427,7 +427,7 @@ serve(async (req) => {
   }
 
   try {
-    const { product_name, barcode, brand, category, ingredients_list, product_price, user_id } = await req.json();
+    const { product_name, barcode, brand, category, ingredients_list, product_price, user_id, image_url } = await req.json();
     
     if (!product_name || !ingredients_list || !user_id) {
       return new Response(
@@ -1648,6 +1648,7 @@ serve(async (req) => {
         ingredients_list,
         epiq_score: epiqScore,
         product_price: product_price || null,
+        image_url,
         recommendations_json: {
           ...recommendations,
           safe_ingredients: finalSafeIngredients,
