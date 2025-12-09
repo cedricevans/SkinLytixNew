@@ -17,6 +17,7 @@ import InstagramLanding from "./pages/InstagramLanding";
 import Analytics from "./pages/Analytics";
 import BetaFeedback from "./pages/BetaFeedback";
 import Compare from "./pages/Compare";
+import Favorites from "./pages/Favorites";
 import NotFound from "./pages/NotFound";
 import FeedbackWidget from "@/components/FeedbackWidget";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
@@ -44,6 +45,7 @@ const App = () => (
           <Route path="/analytics" element={<ProtectedRoute><Analytics /></ProtectedRoute>} />
           <Route path="/beta-feedback" element={<BetaFeedback />} />
           <Route path="/compare" element={<Compare />} />
+          <Route path="/favorites" element={<Favorites />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>

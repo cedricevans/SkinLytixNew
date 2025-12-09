@@ -194,4 +194,19 @@ Added to store user-uploaded product images for display in "My Products" tab.
 2. **Price Comparison**: Real-time price checking across retailers
 3. **Ingredient Deep Dive**: Show exact concentration comparisons
 4. **Community Reviews**: User ratings for dupe accuracy
-5. **Barcode Scanning**: Scan dupes in-store to verify
+5. **Barcode Scanning**: Scan dupes in-store to verify - [See Roadmap](./Barcode-Scanning-Roadmap.md)
+
+---
+
+## Saved Favorites Page
+
+Users can access all their saved dupes at `/favorites` with:
+- **Sorting**: Recently saved, price low-to-high, price high-to-low, brand A-Z
+- **Filtering**: By price range (Under $15, $15-30, $30-50, $50+)
+- **Actions**: Unsave items, navigate to Compare for more dupes
+- **Empty State**: Prompt to find dupes when no favorites saved
+
+**Navigation Access:**
+- Bottom navigation "Favorites" icon (Heart)
+- Profile page link
+- Compare page "View All Saved" button
