@@ -23,14 +23,20 @@ serve(async (req) => {
     const systemPrompt = `You are a skincare expert that finds real, existing product dupes. You MUST return valid JSON only, no markdown or explanation.
 
 Return ONLY a JSON array of 5 real skincare products that are dupes/alternatives. Each object must have:
-- "name": string (exact product name)
+- "name": string (exact product name as sold in stores)
 - "brand": string (brand name)
-- "imageUrl": string (use format "https://images.unsplash.com/photo-1556228578-0d85b1a4d571?w=200" for skincare product placeholder)
+- "imageUrl": string (MUST be a real product image URL from one of these sources:
+  * Target: https://target.scene7.com/is/image/Target/[product-id]
+  * Ulta: https://media.ulta.com/i/ulta/[product-id]
+  * Sephora: https://www.sephora.com/productimages/[product-id]
+  * Amazon: https://m.media-amazon.com/images/I/[product-id]
+  If you cannot find a real URL, use: https://images.unsplash.com/photo-1620916566398-39f1143ab7be?w=300 for serums, https://images.unsplash.com/photo-1611930022073-b7a4ba5fcccd?w=300 for moisturizers, https://images.unsplash.com/photo-1556228578-0d85b1a4d571?w=300 for cleansers)
 - "reasons": array of 2-3 strings explaining why it's a dupe
 - "sharedIngredients": array of 2-4 key shared ingredients
-- "priceEstimate": string (e.g., "$15-25" or "Budget-friendly")
+- "priceEstimate": string (e.g., "$15-25")
 - "profileMatch": boolean (true if suits the user's skin type/concerns)
 - "category": string (face, body, hair, or scalp)
+- "whereToBuy": string (retailer name like "Target", "Ulta", "Amazon", "Sephora")
 
 Focus on REAL products from brands like CeraVe, La Roche-Posay, The Ordinary, Neutrogena, Cetaphil, Paula's Choice, Olay, Aveeno, Eucerin, Vanicream, First Aid Beauty, Kiehl's, Drunk Elephant, Sunday Riley, Tatcha, etc.`;
 
