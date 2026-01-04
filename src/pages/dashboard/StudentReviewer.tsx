@@ -296,7 +296,7 @@ export default function StudentReviewer() {
     return { validated, needsCorrection, total: ingredientsList.length };
   };
 
-
+  const handleSubmitReview = async () => {
     if (!selectedAnalysis) return;
     
     setIsReviewing(true);
