@@ -26,6 +26,7 @@ import { AIExplanationLoader } from "@/components/AIExplanationLoader";
 import { SkinLytixGPTChat } from "@/components/SkinLytixGPTChat";
 import { DemoModeToggle } from "@/components/DemoModeToggle";
 import { ExportAnalysisButton } from "@/components/ExportAnalysisButton";
+import { ExpertReviewBadge } from "@/components/ExpertReviewBadge";
 import ChatPromoCard from "@/components/ChatPromoCard";
 
 interface AnalysisData {
@@ -253,7 +254,10 @@ const Analysis = () => {
         <div className="bg-gradient-to-r from-primary/10 via-accent/10 to-secondary/10 rounded-xl p-4 md:p-6 mb-6 md:mb-8 animate-fade-in shadow-soft border border-border/50">
           <div className="flex flex-col gap-4">
             <div>
-              <h1 className="text-xl md:text-2xl lg:text-3xl font-bold mb-2">{analysis.product_name}</h1>
+              <div className="flex flex-wrap items-center gap-2 mb-2">
+                <h1 className="text-xl md:text-2xl lg:text-3xl font-bold">{analysis.product_name}</h1>
+                <ExpertReviewBadge analysisId={analysis.id} />
+              </div>
               <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
                 {analysis.brand && <span className="font-medium">{analysis.brand}</span>}
                 {analysis.brand && analysis.category && <span>•</span>}

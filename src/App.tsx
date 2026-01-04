@@ -20,8 +20,10 @@ import Compare from "./pages/Compare";
 import Favorites from "./pages/Favorites";
 import Pricing from "./pages/Pricing";
 import NotFound from "./pages/NotFound";
+import StudentReviewer from "./pages/dashboard/StudentReviewer";
 import FeedbackWidget from "@/components/FeedbackWidget";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
+import { TrialCountdown } from "@/components/subscription/TrialCountdown";
 
 const queryClient = new QueryClient();
 
@@ -30,6 +32,7 @@ const App = () => (
     <TooltipProvider>
       <Toaster />
       <Sonner />
+      <TrialCountdown />
       <BrowserRouter>
         <Routes>
           <Route path="/" element={<Index />} />
@@ -48,6 +51,7 @@ const App = () => (
           <Route path="/compare" element={<Compare />} />
           <Route path="/favorites" element={<Favorites />} />
           <Route path="/pricing" element={<Pricing />} />
+          <Route path="/dashboard/reviewer" element={<ProtectedRoute><StudentReviewer /></ProtectedRoute>} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>
