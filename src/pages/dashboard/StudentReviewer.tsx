@@ -2,35 +2,24 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Textarea } from '@/components/ui/textarea';
-import { Label } from '@/components/ui/label';
-import { Slider } from '@/components/ui/slider';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { 
   ClipboardList, 
   CheckCircle2, 
-  Clock, 
+  AlertTriangle,
   Award, 
-  Star,
-  ChevronRight,
-  FileText,
-  AlertCircle,
-  Trophy,
-  TrendingUp,
   Home,
-  FlaskConical,
-  ArrowLeft
+  ArrowLeft,
+  FlaskConical
 } from 'lucide-react';
 import { IngredientValidationPanel } from '@/components/reviewer/IngredientValidationPanel';
 import { IngredientSourcePanel } from '@/components/reviewer/IngredientSourcePanel';
 import { ValidationProgressBar } from '@/components/reviewer/ValidationProgressBar';
 
-interface PendingAnalysis {
+interface ProductAnalysis {
   id: string;
   product_name: string;
   brand: string | null;
@@ -38,24 +27,6 @@ interface PendingAnalysis {
   epiq_score: number | null;
   ingredients_list: string;
   analyzed_at: string;
-}
-
-interface ReviewStats {
-  total: number;
-  pending: number;
-  approved: number;
-  avgAccuracyScore: number;
-}
-
-interface ExpertReview {
-  id: string;
-  analysis_id: string;
-  review_status: string;
-  ingredient_accuracy_score: number | null;
-  recommendation_quality_score: number | null;
-  comments: string | null;
-  epiq_calibration_note: string | null;
-  reviewed_at: string;
 }
 
 interface IngredientValidation {
@@ -69,30 +40,31 @@ interface IngredientValidation {
   reference_sources: string[];
 }
 
+interface Stats {
+  productsToValidate: number;
+  ingredientsValidated: number;
+  flaggedForCorrection: number;
+}
+
 export default function StudentReviewer() {
   const navigate = useNavigate();
   const { toast } = useToast();
-  const [pendingAnalyses, setPendingAnalyses] = useState<PendingAnalysis[]>([]);
-  const [myReviews, setMyReviews] = useState<ExpertReview[]>([]);
-  const [stats, setStats] = useState<ReviewStats>({ total: 0, pending: 0, approved: 0, avgAccuracyScore: 0 });
+  
   const [loading, setLoading] = useState(true);
-  const [selectedAnalysis, setSelectedAnalysis] = useState<PendingAnalysis | null>(null);
-  const [isReviewing, setIsReviewing] = useState(false);
   const [hasAccess, setHasAccess] = useState(false);
   const [institution, setInstitution] = useState<string | null>(null);
+  const [userId, setUserId] = useState<string | null>(null);
   
-  // Ingredient validation state
-  const [validatingIngredients, setValidatingIngredients] = useState(false);
+  // Products list
+  const [products, setProducts] = useState<ProductAnalysis[]>([]);
+  const [stats, setStats] = useState<Stats>({ productsToValidate: 0, ingredientsValidated: 0, flaggedForCorrection: 0 });
+  
+  // Selected product for validation
+  const [selectedProduct, setSelectedProduct] = useState<ProductAnalysis | null>(null);
   const [ingredientsList, setIngredientsList] = useState<string[]>([]);
   const [ingredientValidations, setIngredientValidations] = useState<Map<string, IngredientValidation>>(new Map());
   const [ingredientCache, setIngredientCache] = useState<Map<string, any>>(new Map());
-
-  // Review form state
-  const [accuracyScore, setAccuracyScore] = useState(3);
-  const [qualityScore, setQualityScore] = useState(3);
-  const [calibrationNote, setCalibrationNote] = useState('');
-  const [comments, setComments] = useState('');
-  const [reviewStatus, setReviewStatus] = useState<'approved' | 'revision_needed'>('approved');
+  const [selectedIngredient, setSelectedIngredient] = useState<string | null>(null);
 
   useEffect(() => {
     checkAccessAndLoad();
@@ -106,7 +78,9 @@ export default function StudentReviewer() {
         return;
       }
 
-      // Check for student_reviewer or admin role
+      setUserId(user.id);
+
+      // Check for admin/moderator role
       const { data: roles } = await supabase
         .from('user_roles')
         .select('role')
@@ -116,7 +90,7 @@ export default function StudentReviewer() {
         r.role === 'admin' || r.role === 'moderator'
       );
 
-      // Also check for student certification
+      // Check for student certification
       const { data: certification } = await supabase
         .from('student_certifications')
         .select('institution, certification_level')
@@ -136,7 +110,7 @@ export default function StudentReviewer() {
       setHasAccess(true);
       setInstitution(certification?.institution || 'SkinLytix');
 
-      await loadDashboardData(user.id, certification?.institution || 'SkinLytix');
+      await loadProducts(user.id);
     } catch (error) {
       console.error('Error checking access:', error);
       toast({
@@ -149,76 +123,60 @@ export default function StudentReviewer() {
     }
   };
 
-  const loadDashboardData = async (userId: string, inst: string) => {
-    // Get analyses that need review (not yet reviewed by anyone)
+  const loadProducts = async (uid: string) => {
+    // Get recent analyses
     const { data: analyses } = await supabase
       .from('user_analyses')
       .select('id, product_name, brand, category, epiq_score, ingredients_list, analyzed_at')
       .order('analyzed_at', { ascending: false })
-      .limit(20);
+      .limit(50);
 
-    // Get existing reviews for these analyses
-    const { data: existingReviews } = await supabase
-      .from('expert_reviews')
-      .select('analysis_id');
+    setProducts(analyses || []);
 
-    const reviewedIds = new Set(existingReviews?.map(r => r.analysis_id) || []);
-    const pendingForReview = analyses?.filter(a => !reviewedIds.has(a.id)) || [];
-    setPendingAnalyses(pendingForReview);
+    // Get validation stats for this user
+    const { data: validations } = await supabase
+      .from('ingredient_validations')
+      .select('validation_status')
+      .eq('validator_id', uid);
 
-    // Get user's own reviews
-    const { data: userReviews } = await supabase
-      .from('expert_reviews')
-      .select('*')
-      .eq('reviewer_id', userId)
-      .order('reviewed_at', { ascending: false });
-
-    setMyReviews(userReviews || []);
-
-    // Calculate stats
-    const totalReviews = userReviews?.length || 0;
-    const pendingCount = userReviews?.filter(r => r.review_status === 'pending').length || 0;
-    const approvedCount = userReviews?.filter(r => r.review_status === 'approved').length || 0;
-    const avgAccuracy = userReviews?.length 
-      ? userReviews.reduce((sum, r) => sum + (r.ingredient_accuracy_score || 0), 0) / userReviews.length
-      : 0;
+    const validated = validations?.filter(v => v.validation_status === 'validated').length || 0;
+    const flagged = validations?.filter(v => v.validation_status === 'needs_correction').length || 0;
 
     setStats({
-      total: totalReviews,
-      pending: pendingForReview.length,
-      approved: approvedCount,
-      avgAccuracyScore: Math.round(avgAccuracy * 10) / 10
+      productsToValidate: analyses?.length || 0,
+      ingredientsValidated: validated,
+      flaggedForCorrection: flagged
     });
   };
 
-  // Parse ingredients from analysis and load validations
-  const startIngredientValidation = async (analysis: PendingAnalysis) => {
-    setValidatingIngredients(true);
-    setSelectedAnalysis(analysis);
+  const selectProduct = async (product: ProductAnalysis) => {
+    setSelectedProduct(product);
     
-    // Parse ingredients from comma-separated list
-    const ingredients = analysis.ingredients_list
+    // Parse ingredients
+    const ingredients = product.ingredients_list
       .split(',')
       .map(i => i.trim())
       .filter(i => i.length > 0);
     setIngredientsList(ingredients);
+    
+    // Select first ingredient by default
+    if (ingredients.length > 0) {
+      setSelectedIngredient(ingredients[0]);
+    }
 
-    // Load existing validations for this analysis
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-
+    // Load existing validations
+    if (userId) {
       const { data: validations } = await supabase
         .from('ingredient_validations')
         .select('*')
-        .eq('analysis_id', analysis.id)
-        .eq('validator_id', user.id);
+        .eq('analysis_id', product.id)
+        .eq('validator_id', userId);
 
       const validationMap = new Map<string, IngredientValidation>();
       validations?.forEach(v => {
         validationMap.set(v.ingredient_name, {
           ingredient_name: v.ingredient_name,
-          validation_status: v.validation_status,
+          validation_status: v.validation_status || 'pending',
           pubchem_data_correct: v.pubchem_data_correct,
           ai_explanation_accurate: v.ai_explanation_accurate,
           corrected_role: v.corrected_role,
@@ -229,7 +187,7 @@ export default function StudentReviewer() {
       });
       setIngredientValidations(validationMap);
 
-      // Load ingredient cache data
+      // Load ingredient cache
       const { data: cacheData } = await supabase
         .from('ingredient_cache')
         .select('*')
@@ -244,28 +202,23 @@ export default function StudentReviewer() {
         });
       });
       setIngredientCache(cacheMap);
-    } catch (error) {
-      console.error('Error loading validations:', error);
     }
   };
 
   const handleValidationComplete = async () => {
-    if (!selectedAnalysis) return;
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return;
+    if (!selectedProduct || !userId) return;
 
-    // Reload validations
     const { data: validations } = await supabase
       .from('ingredient_validations')
       .select('*')
-      .eq('analysis_id', selectedAnalysis.id)
-      .eq('validator_id', user.id);
+      .eq('analysis_id', selectedProduct.id)
+      .eq('validator_id', userId);
 
     const validationMap = new Map<string, IngredientValidation>();
     validations?.forEach(v => {
       validationMap.set(v.ingredient_name, {
         ingredient_name: v.ingredient_name,
-        validation_status: v.validation_status,
+        validation_status: v.validation_status || 'pending',
         pubchem_data_correct: v.pubchem_data_correct,
         ai_explanation_accurate: v.ai_explanation_accurate,
         corrected_role: v.corrected_role,
@@ -275,16 +228,20 @@ export default function StudentReviewer() {
       });
     });
     setIngredientValidations(validationMap);
+
+    // Update stats
+    await loadProducts(userId);
   };
 
-  const exitIngredientValidation = () => {
-    setValidatingIngredients(false);
-    setSelectedAnalysis(null);
+  const exitProductValidation = () => {
+    setSelectedProduct(null);
     setIngredientsList([]);
     setIngredientValidations(new Map());
+    setIngredientCache(new Map());
+    setSelectedIngredient(null);
   };
 
-  const getValidationStats = () => {
+  const getValidationProgress = () => {
     let validated = 0;
     let needsCorrection = 0;
     
@@ -296,53 +253,10 @@ export default function StudentReviewer() {
     return { validated, needsCorrection, total: ingredientsList.length };
   };
 
-  const handleSubmitReview = async () => {
-    if (!selectedAnalysis) return;
-    
-    setIsReviewing(true);
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-
-      const { error } = await supabase
-        .from('expert_reviews')
-        .insert({
-          analysis_id: selectedAnalysis.id,
-          reviewer_id: user.id,
-          reviewer_institution: institution || 'SkinLytix',
-          review_status: reviewStatus,
-          ingredient_accuracy_score: accuracyScore,
-          recommendation_quality_score: qualityScore,
-          epiq_calibration_note: calibrationNote || null,
-          comments: comments || null,
-        });
-
-      if (error) throw error;
-
-      toast({
-        title: "Review Submitted!",
-        description: "Your expert review has been recorded.",
-      });
-
-      // Reset form and reload
-      setSelectedAnalysis(null);
-      setAccuracyScore(3);
-      setQualityScore(3);
-      setCalibrationNote('');
-      setComments('');
-      setReviewStatus('approved');
-      
-      await loadDashboardData(user.id, institution || 'SkinLytix');
-    } catch (error: any) {
-      console.error('Error submitting review:', error);
-      toast({
-        title: "Failed to submit review",
-        description: error.message,
-        variant: "destructive",
-      });
-    } finally {
-      setIsReviewing(false);
-    }
+  const getIngredientStatus = (ingredient: string): 'pending' | 'validated' | 'needs_correction' => {
+    const validation = ingredientValidations.get(ingredient);
+    if (!validation) return 'pending';
+    return validation.validation_status as 'pending' | 'validated' | 'needs_correction';
   };
 
   if (loading) {
@@ -360,13 +274,120 @@ export default function StudentReviewer() {
     return null;
   }
 
+  // Ingredient validation view
+  if (selectedProduct) {
+    const progress = getValidationProgress();
+    const currentCache = selectedIngredient ? ingredientCache.get(selectedIngredient.toLowerCase()) : null;
+    const currentValidation = selectedIngredient ? ingredientValidations.get(selectedIngredient) : null;
+    
+    return (
+      <main className="min-h-screen bg-gradient-to-b from-background to-muted py-8 px-4">
+        <div className="container max-w-6xl mx-auto">
+          {/* Header with back button */}
+          <div className="flex items-center gap-4 mb-6">
+            <Button variant="ghost" size="icon" onClick={exitProductValidation}>
+              <ArrowLeft className="w-5 h-5" />
+            </Button>
+            <div className="flex-1">
+              <h1 className="text-2xl font-bold">{selectedProduct.product_name}</h1>
+              <div className="flex items-center gap-2 mt-1">
+                {selectedProduct.brand && (
+                  <Badge variant="secondary">{selectedProduct.brand}</Badge>
+                )}
+                {selectedProduct.category && (
+                  <Badge variant="outline">{selectedProduct.category}</Badge>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Progress bar */}
+          <ValidationProgressBar 
+            validated={progress.validated}
+            needsCorrection={progress.needsCorrection}
+            total={progress.total}
+          />
+
+          {/* Two-column layout: ingredient list + validation panel */}
+          <div className="grid lg:grid-cols-3 gap-6 mt-6">
+            {/* Ingredient list */}
+            <Card className="lg:col-span-1">
+              <CardContent className="p-4">
+                <h3 className="font-medium mb-3 flex items-center gap-2">
+                  <FlaskConical className="w-4 h-4" />
+                  Ingredients ({ingredientsList.length})
+                </h3>
+                <div className="space-y-1 max-h-[60vh] overflow-y-auto">
+                  {ingredientsList.map((ingredient, idx) => {
+                    const status = getIngredientStatus(ingredient);
+                    return (
+                      <button
+                        key={idx}
+                        onClick={() => setSelectedIngredient(ingredient)}
+                        className={`w-full text-left px-3 py-2 rounded-md text-sm flex items-center justify-between transition-colors ${
+                          selectedIngredient === ingredient 
+                            ? 'bg-primary text-primary-foreground' 
+                            : 'hover:bg-muted'
+                        }`}
+                      >
+                        <span className="truncate">{ingredient}</span>
+                        {status === 'validated' && (
+                          <CheckCircle2 className={`w-4 h-4 flex-shrink-0 ${selectedIngredient === ingredient ? 'text-primary-foreground' : 'text-green-600'}`} />
+                        )}
+                        {status === 'needs_correction' && (
+                          <AlertTriangle className={`w-4 h-4 flex-shrink-0 ${selectedIngredient === ingredient ? 'text-primary-foreground' : 'text-amber-600'}`} />
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Validation panel for selected ingredient */}
+            <div className="lg:col-span-2 space-y-4">
+              {selectedIngredient ? (
+                <>
+                  <IngredientValidationPanel
+                    analysisId={selectedProduct.id}
+                    ingredientName={selectedIngredient}
+                    pubchemCid={currentCache?.pubchem_cid}
+                    molecularWeight={currentCache?.molecular_weight}
+                    existingValidation={currentValidation || null}
+                    institution={institution || 'SkinLytix'}
+                    onValidationComplete={handleValidationComplete}
+                  />
+                  <IngredientSourcePanel
+                    ingredientName={selectedIngredient}
+                    pubchemData={currentCache ? {
+                      cid: currentCache.pubchem_cid,
+                      molecularWeight: currentCache.molecular_weight,
+                      molecularFormula: currentCache.properties?.molecular_formula,
+                      iupacName: currentCache.properties?.iupac_name,
+                      synonyms: currentCache.properties?.synonyms
+                    } : null}
+                  />
+                </>
+              ) : (
+                <Card className="p-8 text-center text-muted-foreground">
+                  Select an ingredient from the list to validate
+                </Card>
+              )}
+            </div>
+          </div>
+        </div>
+      </main>
+    );
+  }
+
+  // Products list view
   return (
     <main className="min-h-screen bg-gradient-to-b from-background to-muted py-8 px-4">
       <div className="container max-w-6xl mx-auto">
         {/* Header */}
         <div className="flex items-center justify-between mb-8">
           <div>
-            <h1 className="text-3xl font-bold mb-2">Expert Review Dashboard</h1>
+            <h1 className="text-3xl font-bold mb-2">Ingredient Validation Dashboard</h1>
             <p className="text-muted-foreground flex items-center gap-2">
               <Award className="w-4 h-4" />
               {institution} • Student Reviewer
@@ -379,7 +400,7 @@ export default function StudentReviewer() {
         </div>
 
         {/* Stats Cards */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
           <Card>
             <CardContent className="pt-6">
               <div className="flex items-center gap-3">
@@ -387,8 +408,8 @@ export default function StudentReviewer() {
                   <ClipboardList className="w-5 h-5 text-primary" />
                 </div>
                 <div>
-                  <p className="text-2xl font-bold">{stats.pending}</p>
-                  <p className="text-sm text-muted-foreground">Pending Review</p>
+                  <p className="text-2xl font-bold">{stats.productsToValidate}</p>
+                  <p className="text-sm text-muted-foreground">Products to Validate</p>
                 </div>
               </div>
             </CardContent>
@@ -400,8 +421,8 @@ export default function StudentReviewer() {
                   <CheckCircle2 className="w-5 h-5 text-green-600" />
                 </div>
                 <div>
-                  <p className="text-2xl font-bold">{stats.total}</p>
-                  <p className="text-sm text-muted-foreground">Reviews Done</p>
+                  <p className="text-2xl font-bold">{stats.ingredientsValidated}</p>
+                  <p className="text-sm text-muted-foreground">Ingredients Validated</p>
                 </div>
               </div>
             </CardContent>
@@ -410,404 +431,62 @@ export default function StudentReviewer() {
             <CardContent className="pt-6">
               <div className="flex items-center gap-3">
                 <div className="p-2 bg-amber-500/10 rounded-lg">
-                  <Star className="w-5 h-5 text-amber-600" />
+                  <AlertTriangle className="w-5 h-5 text-amber-600" />
                 </div>
                 <div>
-                  <p className="text-2xl font-bold">{stats.avgAccuracyScore}</p>
-                  <p className="text-sm text-muted-foreground">Avg Accuracy</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="pt-6">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-purple-500/10 rounded-lg">
-                  <Trophy className="w-5 h-5 text-purple-600" />
-                </div>
-                <div>
-                  <p className="text-2xl font-bold">{stats.approved}</p>
-                  <p className="text-sm text-muted-foreground">Approved</p>
+                  <p className="text-2xl font-bold">{stats.flaggedForCorrection}</p>
+                  <p className="text-sm text-muted-foreground">Flagged for Correction</p>
                 </div>
               </div>
             </CardContent>
           </Card>
         </div>
 
-        {/* Main Content */}
-        <Tabs defaultValue="queue" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-3 lg:w-auto lg:inline-grid">
-            <TabsTrigger value="queue" className="flex items-center gap-2">
-              <Clock className="w-4 h-4" />
-              Review Queue
-            </TabsTrigger>
-            <TabsTrigger value="ingredients" className="flex items-center gap-2">
-              <FlaskConical className="w-4 h-4" />
-              Ingredients
-            </TabsTrigger>
-            <TabsTrigger value="history" className="flex items-center gap-2">
-              <FileText className="w-4 h-4" />
-              My Reviews
-            </TabsTrigger>
-          </TabsList>
-
-          {/* Review Queue Tab */}
-          <TabsContent value="queue" className="space-y-6">
-            {selectedAnalysis ? (
-              <Card className="p-6">
-                <div className="flex items-center justify-between mb-6">
-                  <div>
-                    <h3 className="text-xl font-semibold">{selectedAnalysis.product_name}</h3>
-                    <div className="flex items-center gap-2 mt-1">
-                      {selectedAnalysis.brand && (
-                        <Badge variant="secondary">{selectedAnalysis.brand}</Badge>
-                      )}
-                      {selectedAnalysis.category && (
-                        <Badge variant="outline">{selectedAnalysis.category}</Badge>
-                      )}
-                      {selectedAnalysis.epiq_score && (
-                        <Badge className="bg-primary/10 text-primary">
-                          EpiQ: {selectedAnalysis.epiq_score}
-                        </Badge>
-                      )}
-                    </div>
-                  </div>
-                  <Button variant="outline" onClick={() => setSelectedAnalysis(null)}>
-                    Cancel
-                  </Button>
-                </div>
-
-                {/* Ingredients Preview */}
-                <div className="mb-6 p-4 bg-muted/50 rounded-lg">
-                  <Label className="text-sm font-medium mb-2 block">Ingredients List</Label>
-                  <p className="text-sm text-muted-foreground max-h-32 overflow-y-auto">
-                    {selectedAnalysis.ingredients_list}
-                  </p>
-                </div>
-
-                {/* Review Form */}
-                <div className="space-y-6">
-                  <div className="grid md:grid-cols-2 gap-6">
-                    <div className="space-y-3">
-                      <Label>Ingredient Accuracy Score: {accuracyScore}/5</Label>
-                      <Slider
-                        value={[accuracyScore]}
-                        onValueChange={([v]) => setAccuracyScore(v)}
-                        min={1}
-                        max={5}
-                        step={1}
-                        className="w-full"
-                      />
-                      <p className="text-xs text-muted-foreground">
-                        How accurately were the ingredients identified and categorized?
-                      </p>
-                    </div>
-                    <div className="space-y-3">
-                      <Label>Recommendation Quality Score: {qualityScore}/5</Label>
-                      <Slider
-                        value={[qualityScore]}
-                        onValueChange={([v]) => setQualityScore(v)}
-                        min={1}
-                        max={5}
-                        step={1}
-                        className="w-full"
-                      />
-                      <p className="text-xs text-muted-foreground">
-                        How useful and accurate are the AI recommendations?
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label>Review Status</Label>
-                    <Select value={reviewStatus} onValueChange={(v: any) => setReviewStatus(v)}>
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="approved">
-                          <span className="flex items-center gap-2">
-                            <CheckCircle2 className="w-4 h-4 text-green-600" />
-                            Approved - EpiQ score is accurate
-                          </span>
-                        </SelectItem>
-                        <SelectItem value="revision_needed">
-                          <span className="flex items-center gap-2">
-                            <AlertCircle className="w-4 h-4 text-amber-600" />
-                            Revision Needed - Calibration required
-                          </span>
-                        </SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label>EpiQ Calibration Note (Optional)</Label>
-                    <Textarea
-                      placeholder="If the EpiQ score seems off, explain why and suggest adjustment..."
-                      value={calibrationNote}
-                      onChange={(e) => setCalibrationNote(e.target.value)}
-                      rows={3}
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label>Additional Comments (Optional)</Label>
-                    <Textarea
-                      placeholder="Any additional observations about the analysis..."
-                      value={comments}
-                      onChange={(e) => setComments(e.target.value)}
-                      rows={3}
-                    />
-                  </div>
-
-                  <Button 
-                    onClick={handleSubmitReview} 
-                    disabled={isReviewing}
-                    className="w-full"
-                    size="lg"
-                  >
-                    {isReviewing ? 'Submitting...' : 'Submit Review'}
-                  </Button>
-                </div>
-              </Card>
+        {/* Products List */}
+        <Card>
+          <CardContent className="p-6">
+            <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
+              <FlaskConical className="w-5 h-5" />
+              Select a Product to Validate
+            </h2>
+            
+            {products.length === 0 ? (
+              <p className="text-muted-foreground text-center py-8">
+                No products available for validation yet.
+              </p>
             ) : (
-              <div className="grid gap-4">
-                {pendingAnalyses.length === 0 ? (
-                  <Card className="p-8 text-center">
-                    <CheckCircle2 className="w-12 h-12 text-green-600 mx-auto mb-4" />
-                    <h3 className="text-lg font-semibold mb-2">All caught up!</h3>
-                    <p className="text-muted-foreground">No analyses pending review right now.</p>
-                  </Card>
-                ) : (
-                  pendingAnalyses.map((analysis) => (
-                    <Card 
-                      key={analysis.id} 
-                      className="p-4 hover:border-primary/50 cursor-pointer transition-colors"
-                      onClick={() => setSelectedAnalysis(analysis)}
+              <div className="space-y-2">
+                {products.map(product => {
+                  const ingredientCount = product.ingredients_list.split(',').filter(i => i.trim()).length;
+                  return (
+                    <button
+                      key={product.id}
+                      onClick={() => selectProduct(product)}
+                      className="w-full flex items-center justify-between p-4 rounded-lg border border-border hover:bg-muted/50 transition-colors text-left"
                     >
-                      <div className="flex items-center justify-between">
-                        <div className="flex-1">
-                          <h3 className="font-semibold">{analysis.product_name}</h3>
-                          <div className="flex items-center gap-2 mt-1">
-                            {analysis.brand && (
-                              <Badge variant="secondary" className="text-xs">{analysis.brand}</Badge>
-                            )}
-                            {analysis.epiq_score && (
-                              <Badge variant="outline" className="text-xs">
-                                EpiQ: {analysis.epiq_score}
-                              </Badge>
-                            )}
-                            <span className="text-xs text-muted-foreground">
-                              {new Date(analysis.analyzed_at).toLocaleDateString()}
-                            </span>
-                          </div>
-                        </div>
-                        <ChevronRight className="w-5 h-5 text-muted-foreground" />
-                      </div>
-                    </Card>
-                  ))
-                )}
-              </div>
-            )}
-          </TabsContent>
-
-          {/* Ingredient Validation Tab */}
-          <TabsContent value="ingredients" className="space-y-6">
-            {validatingIngredients && selectedAnalysis ? (
-              <div className="space-y-6">
-                {/* Header */}
-                <div className="flex items-center justify-between">
-                  <div>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={exitIngredientValidation}
-                      className="mb-2"
-                    >
-                      <ArrowLeft className="w-4 h-4 mr-2" />
-                      Back to List
-                    </Button>
-                    <h3 className="text-xl font-semibold">{selectedAnalysis.product_name}</h3>
-                    <p className="text-sm text-muted-foreground">
-                      Validate each ingredient's data from PubChem and AI
-                    </p>
-                  </div>
-                </div>
-
-                {/* Progress Bar */}
-                <ValidationProgressBar {...getValidationStats()} />
-
-                {/* Ingredients Accordion */}
-                <Accordion type="single" collapsible className="space-y-3">
-                  {ingredientsList.map((ingredient, index) => {
-                    const cacheData = ingredientCache.get(ingredient.toLowerCase());
-                    const validation = ingredientValidations.get(ingredient);
-                    
-                    return (
-                      <AccordionItem 
-                        key={ingredient} 
-                        value={ingredient}
-                        className="border rounded-lg px-0 overflow-hidden"
-                      >
-                        <AccordionTrigger className="px-4 hover:no-underline hover:bg-muted/50">
-                          <div className="flex items-center gap-3 w-full">
-                            <span className="w-6 h-6 rounded-full bg-primary/10 text-primary text-xs flex items-center justify-center font-medium">
-                              {index + 1}
-                            </span>
-                            <span className="font-medium flex-1 text-left">{ingredient}</span>
-                            {validation ? (
-                              <Badge 
-                                variant="outline"
-                                className={
-                                  validation.validation_status === 'validated' 
-                                    ? 'bg-green-500/10 text-green-600 border-green-500/20'
-                                    : 'bg-amber-500/10 text-amber-600 border-amber-500/20'
-                                }
-                              >
-                                {validation.validation_status === 'validated' ? 'Validated' : 'Needs Correction'}
-                              </Badge>
-                            ) : (
-                              <Badge variant="outline" className="text-muted-foreground">
-                                Pending
-                              </Badge>
-                            )}
-                          </div>
-                        </AccordionTrigger>
-                        <AccordionContent className="px-0 pb-0">
-                          <div className="grid lg:grid-cols-3 gap-4 p-4 bg-muted/30">
-                            <div className="lg:col-span-2">
-                              <IngredientValidationPanel
-                                analysisId={selectedAnalysis.id}
-                                ingredientName={ingredient}
-                                pubchemCid={cacheData?.pubchem_cid}
-                                molecularWeight={cacheData?.molecular_weight}
-                                existingValidation={validation || null}
-                                institution={institution || 'SkinLytix'}
-                                onValidationComplete={handleValidationComplete}
-                              />
-                            </div>
-                            <div className="hidden lg:block">
-                              <IngredientSourcePanel
-                                ingredientName={ingredient}
-                                pubchemData={cacheData ? {
-                                  cid: cacheData.pubchem_cid,
-                                  molecularWeight: cacheData.molecular_weight
-                                } : null}
-                              />
-                            </div>
-                          </div>
-                        </AccordionContent>
-                      </AccordionItem>
-                    );
-                  })}
-                </Accordion>
-              </div>
-            ) : (
-              <div className="grid gap-4">
-                <Card className="p-6 bg-primary/5 border-primary/20">
-                  <div className="flex items-start gap-4">
-                    <div className="p-3 bg-primary/10 rounded-lg">
-                      <FlaskConical className="w-6 h-6 text-primary" />
-                    </div>
-                    <div>
-                      <h3 className="font-semibold mb-1">Ingredient Validation</h3>
-                      <p className="text-sm text-muted-foreground">
-                        Select a product below to validate its ingredients. Verify if PubChem data 
-                        and AI explanations are correct, and make corrections where needed.
-                      </p>
-                    </div>
-                  </div>
-                </Card>
-
-                {pendingAnalyses.length === 0 ? (
-                  <Card className="p-8 text-center">
-                    <CheckCircle2 className="w-12 h-12 text-green-600 mx-auto mb-4" />
-                    <h3 className="text-lg font-semibold mb-2">No products to validate</h3>
-                    <p className="text-muted-foreground">Check back later for new analyses.</p>
-                  </Card>
-                ) : (
-                  pendingAnalyses.map((analysis) => (
-                    <Card 
-                      key={analysis.id} 
-                      className="p-4 hover:border-primary/50 cursor-pointer transition-colors"
-                      onClick={() => startIngredientValidation(analysis)}
-                    >
-                      <div className="flex items-center justify-between">
-                        <div className="flex-1">
-                          <h3 className="font-semibold">{analysis.product_name}</h3>
-                          <div className="flex items-center gap-2 mt-1">
-                            {analysis.brand && (
-                              <Badge variant="secondary" className="text-xs">{analysis.brand}</Badge>
-                            )}
-                            <Badge variant="outline" className="text-xs">
-                              {analysis.ingredients_list.split(',').length} ingredients
+                      <div className="flex-1">
+                        <p className="font-medium">{product.product_name}</p>
+                        <div className="flex items-center gap-2 mt-1">
+                          {product.brand && (
+                            <span className="text-sm text-muted-foreground">{product.brand}</span>
+                          )}
+                          {product.epiq_score && (
+                            <Badge variant="secondary" className="text-xs">
+                              EpiQ: {product.epiq_score}
                             </Badge>
-                            <span className="text-xs text-muted-foreground">
-                              {new Date(analysis.analyzed_at).toLocaleDateString()}
-                            </span>
-                          </div>
+                          )}
                         </div>
-                        <ChevronRight className="w-5 h-5 text-muted-foreground" />
                       </div>
-                    </Card>
-                  ))
-                )}
+                      <Badge variant="outline" className="ml-4">
+                        {ingredientCount} ingredients
+                      </Badge>
+                    </button>
+                  );
+                })}
               </div>
             )}
-          </TabsContent>
-
-          {/* Review History Tab */}
-          <TabsContent value="history">
-            <div className="grid gap-4">
-              {myReviews.length === 0 ? (
-                <Card className="p-8 text-center">
-                  <FileText className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-                  <h3 className="text-lg font-semibold mb-2">No reviews yet</h3>
-                  <p className="text-muted-foreground">Start reviewing analyses to build your history.</p>
-                </Card>
-              ) : (
-                myReviews.map((review) => (
-                  <Card key={review.id} className="p-4">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <div className="flex items-center gap-2 mb-1">
-                          <Badge 
-                            variant={review.review_status === 'approved' ? 'default' : 'secondary'}
-                            className={review.review_status === 'approved' 
-                              ? 'bg-green-500/10 text-green-600 border-green-500/20' 
-                              : 'bg-amber-500/10 text-amber-600 border-amber-500/20'
-                            }
-                          >
-                            {review.review_status === 'approved' ? 'Approved' : 'Revision Needed'}
-                          </Badge>
-                          <span className="text-sm text-muted-foreground">
-                            {new Date(review.reviewed_at).toLocaleDateString()}
-                          </span>
-                        </div>
-                        <div className="flex items-center gap-4 text-sm">
-                          <span className="flex items-center gap-1">
-                            <TrendingUp className="w-4 h-4" />
-                            Accuracy: {review.ingredient_accuracy_score}/5
-                          </span>
-                          <span className="flex items-center gap-1">
-                            <Star className="w-4 h-4" />
-                            Quality: {review.recommendation_quality_score}/5
-                          </span>
-                        </div>
-                        {review.comments && (
-                          <p className="text-sm text-muted-foreground mt-2 line-clamp-2">
-                            {review.comments}
-                          </p>
-                        )}
-                      </div>
-                    </div>
-                  </Card>
-                ))
-              )}
-            </div>
-          </TabsContent>
-        </Tabs>
+          </CardContent>
+        </Card>
       </div>
     </main>
   );
