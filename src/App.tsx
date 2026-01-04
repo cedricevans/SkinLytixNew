@@ -18,6 +18,7 @@ import Analytics from "./pages/Analytics";
 import BetaFeedback from "./pages/BetaFeedback";
 import Compare from "./pages/Compare";
 import Favorites from "./pages/Favorites";
+import Pricing from "./pages/Pricing";
 import NotFound from "./pages/NotFound";
 import FeedbackWidget from "@/components/FeedbackWidget";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
@@ -46,6 +47,7 @@ const App = () => (
           <Route path="/beta-feedback" element={<BetaFeedback />} />
           <Route path="/compare" element={<Compare />} />
           <Route path="/favorites" element={<Favorites />} />
+          <Route path="/pricing" element={<Pricing />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>

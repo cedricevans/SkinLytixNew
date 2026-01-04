@@ -9,7 +9,7 @@ const navigationItems = [
   { label: "Home", href: "#home" },
   { label: "Features", href: "#features" },
   { label: "How It Works", href: "#how-it-works" },
-  { label: "Get Started", href: "#cta-section" },
+  { label: "Pricing", href: "/pricing", isRoute: true },
 ];
 
 const Navigation = () => {
@@ -17,7 +17,12 @@ const Navigation = () => {
   const navigate = useNavigate();
   const isMobile = useIsMobile();
 
-  const scrollToSection = (href: string) => {
+  const scrollToSection = (href: string, isRoute?: boolean) => {
+    if (isRoute) {
+      navigate(href);
+      setOpen(false);
+      return;
+    }
     if (href.startsWith("#")) {
       const element = document.querySelector(href);
       if (element) {
@@ -56,7 +61,7 @@ const Navigation = () => {
             {navigationItems.map((item) => (
               <button
                 key={item.label}
-                onClick={() => scrollToSection(item.href)}
+                onClick={() => scrollToSection(item.href, (item as any).isRoute)}
                 className="text-left px-4 py-3 text-lg font-subheading hover:bg-accent/10 rounded-lg transition-colors"
               >
                 {item.label}
@@ -90,7 +95,7 @@ const Navigation = () => {
       {navigationItems.map((item) => (
         <button
           key={item.label}
-          onClick={() => scrollToSection(item.href)}
+          onClick={() => scrollToSection(item.href, (item as any).isRoute)}
           className="text-sm font-subheading text-primary-foreground hover:text-primary-foreground/80 transition-colors relative after:absolute after:bottom-0 after:left-0 after:h-0.5 after:w-0 hover:after:w-full after:bg-primary-foreground after:transition-all after:duration-300"
         >
           {item.label}

@@ -26,6 +26,7 @@ import { AIExplanationLoader } from "@/components/AIExplanationLoader";
 import { SkinLytixGPTChat } from "@/components/SkinLytixGPTChat";
 import { DemoModeToggle } from "@/components/DemoModeToggle";
 import { ExportAnalysisButton } from "@/components/ExportAnalysisButton";
+import ChatPromoCard from "@/components/ChatPromoCard";
 
 interface AnalysisData {
   id: string;
@@ -413,6 +414,19 @@ const Analysis = () => {
         {analysis.recommendations_json.ai_explanation && (
           <AIExplanationAccordion aiExplanation={analysis.recommendations_json.ai_explanation} />
         )}
+
+        {/* Chat Promo Card */}
+        <ChatPromoCard 
+          onOpenChat={() => {
+            setIsChatOpen(true);
+            trackEvent({
+              eventName: 'chat_opened',
+              eventCategory: 'chat',
+              eventProperties: { analysisId: analysis.id, source: 'promo_card' }
+            });
+          }}
+          className="mb-6 md:mb-8"
+        />
 
         {/* Ingredient Risk Heatmap */}
         {(() => {

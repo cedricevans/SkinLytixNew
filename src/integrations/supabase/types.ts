@@ -14,6 +14,39 @@ export type Database = {
   }
   public: {
     Tables: {
+      academic_institutions: {
+        Row: {
+          active: boolean | null
+          contact_email: string | null
+          created_at: string | null
+          id: string
+          logo_url: string | null
+          name: string
+          partnership_tier: string
+          short_code: string
+        }
+        Insert: {
+          active?: boolean | null
+          contact_email?: string | null
+          created_at?: string | null
+          id?: string
+          logo_url?: string | null
+          name: string
+          partnership_tier?: string
+          short_code: string
+        }
+        Update: {
+          active?: boolean | null
+          contact_email?: string | null
+          created_at?: string | null
+          id?: string
+          logo_url?: string | null
+          name?: string
+          partnership_tier?: string
+          short_code?: string
+        }
+        Relationships: []
+      }
       beta_feedback: {
         Row: {
           created_at: string | null
@@ -133,6 +166,56 @@ export type Database = {
           },
         ]
       }
+      expert_reviews: {
+        Row: {
+          analysis_id: string | null
+          comments: string | null
+          created_at: string | null
+          epiq_calibration_note: string | null
+          id: string
+          ingredient_accuracy_score: number | null
+          recommendation_quality_score: number | null
+          review_status: string
+          reviewed_at: string | null
+          reviewer_id: string
+          reviewer_institution: string
+        }
+        Insert: {
+          analysis_id?: string | null
+          comments?: string | null
+          created_at?: string | null
+          epiq_calibration_note?: string | null
+          id?: string
+          ingredient_accuracy_score?: number | null
+          recommendation_quality_score?: number | null
+          review_status?: string
+          reviewed_at?: string | null
+          reviewer_id: string
+          reviewer_institution: string
+        }
+        Update: {
+          analysis_id?: string | null
+          comments?: string | null
+          created_at?: string | null
+          epiq_calibration_note?: string | null
+          id?: string
+          ingredient_accuracy_score?: number | null
+          recommendation_quality_score?: number | null
+          review_status?: string
+          reviewed_at?: string | null
+          reviewer_id?: string
+          reviewer_institution?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "expert_reviews_analysis_id_fkey"
+            columns: ["analysis_id"]
+            isOneToOne: false
+            referencedRelation: "user_analyses"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       feedback: {
         Row: {
           context_id: string | null
@@ -166,6 +249,57 @@ export type Database = {
           page_url?: string | null
           rating?: number | null
           user_id?: string | null
+        }
+        Relationships: []
+      }
+      ingredient_articles: {
+        Row: {
+          author_id: string
+          author_institution: string | null
+          author_name: string | null
+          content_markdown: string
+          created_at: string | null
+          featured_image_url: string | null
+          id: string
+          ingredient_name: string
+          published_at: string | null
+          slug: string
+          status: string
+          summary: string | null
+          title: string
+          updated_at: string | null
+        }
+        Insert: {
+          author_id: string
+          author_institution?: string | null
+          author_name?: string | null
+          content_markdown: string
+          created_at?: string | null
+          featured_image_url?: string | null
+          id?: string
+          ingredient_name: string
+          published_at?: string | null
+          slug: string
+          status?: string
+          summary?: string | null
+          title: string
+          updated_at?: string | null
+        }
+        Update: {
+          author_id?: string
+          author_institution?: string | null
+          author_name?: string | null
+          content_markdown?: string
+          created_at?: string | null
+          featured_image_url?: string | null
+          id?: string
+          ingredient_name?: string
+          published_at?: string | null
+          slug?: string
+          status?: string
+          summary?: string | null
+          title?: string
+          updated_at?: string | null
         }
         Relationships: []
       }
@@ -466,6 +600,45 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      student_certifications: {
+        Row: {
+          articles_published: number | null
+          certification_level: string
+          certified_at: string | null
+          courses_completed: Json | null
+          created_at: string | null
+          expires_at: string | null
+          id: string
+          institution: string
+          reviews_completed: number | null
+          user_id: string
+        }
+        Insert: {
+          articles_published?: number | null
+          certification_level?: string
+          certified_at?: string | null
+          courses_completed?: Json | null
+          created_at?: string | null
+          expires_at?: string | null
+          id?: string
+          institution: string
+          reviews_completed?: number | null
+          user_id: string
+        }
+        Update: {
+          articles_published?: number | null
+          certification_level?: string
+          certified_at?: string | null
+          courses_completed?: Json | null
+          created_at?: string | null
+          expires_at?: string | null
+          id?: string
+          institution?: string
+          reviews_completed?: number | null
+          user_id?: string
+        }
+        Relationships: []
       }
       usage_limits: {
         Row: {

@@ -33,16 +33,19 @@ const Hero = () => {
       {/* Content */}
       <div className="relative z-10 flex-1 flex items-center justify-center">
       <div className="max-w-6xl mx-auto px-4 md:px-6 py-12 md:py-20 text-center">
-        {/* Trust Badge */}
+        {/* Trust Badge - Dynamic */}
         <button 
           onClick={() => {
             document.getElementById('cta-section')?.scrollIntoView({ behavior: 'smooth' });
           }}
           className="inline-flex items-center gap-2 px-4 py-2 bg-success/20 rounded-full mb-8 animate-fade-in-up border border-success/30 hover:bg-success/30 transition-colors cursor-pointer"
         >
-          <Sparkles className="w-4 h-4 text-success-foreground" />
+          <span className="relative flex h-2 w-2">
+            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-success-foreground opacity-75"></span>
+            <span className="relative inline-flex rounded-full h-2 w-2 bg-success-foreground"></span>
+          </span>
           <span className="text-sm font-subheading font-medium text-success-foreground">
-            Now Open - Free Beta Access
+            Expert Validated • Human + AI
           </span>
         </button>
 
