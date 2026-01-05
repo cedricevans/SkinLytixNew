@@ -830,7 +830,7 @@ const Profile = () => {
             <SubscriptionSection />
 
             {/* Quick Actions */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <Button 
                 variant="outline" 
                 className="h-auto py-6 flex flex-col items-center gap-2"
@@ -838,6 +838,14 @@ const Profile = () => {
               >
                 <ScanLine className="w-8 h-8" />
                 <span className="font-semibold">Scan New Product</span>
+              </Button>
+              <Button 
+                variant="outline" 
+                className="h-auto py-6 flex flex-col items-center gap-2"
+                onClick={() => navigate('/compare')}
+              >
+                <Search className="w-8 h-8" />
+                <span className="font-semibold">Find Dupes</span>
               </Button>
               <Button 
                 variant="outline" 
