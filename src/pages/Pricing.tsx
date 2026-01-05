@@ -13,7 +13,7 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from '@/components/ui/accordion';
-import stepAnalyze from '@/assets/diverse/step-analyze.jpg';
+import eczemaCareRoutine from '@/assets/diverse/eczema-care-routine.jpg';
 
 const FREE_FEATURES = [
   'Unlimited product analyses',
@@ -323,8 +323,8 @@ const Pricing = () => {
               <div className="flex flex-col md:flex-row items-center gap-6">
                 <div className="w-32 h-32 md:w-40 md:h-40 rounded-xl overflow-hidden flex-shrink-0">
                   <img 
-                    src={stepAnalyze} 
-                    alt="Diverse cosmetic science students analyzing products"
+                    src={eczemaCareRoutine} 
+                    alt="Caring for skin with eczema - gentle skincare routine"
                     className="w-full h-full object-cover"
                   />
                 </div>

@@ -1,7 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { ArrowRight, Sparkles } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-import problemTrialError from "@/assets/diverse/problem-trial-error.jpg";
+import diverseFriendsGroup from "@/assets/diverse/diverse-friends-group.jpg";
 
 const CTASection = () => {
   const navigate = useNavigate();
@@ -20,8 +20,8 @@ const CTASection = () => {
           <div className="hidden lg:block animate-fade-in-up order-1">
             <div className="rounded-2xl overflow-hidden shadow-strong border-4 border-primary-foreground/20">
               <img 
-                src={problemTrialError} 
-                alt="Diverse group of friends comparing skincare products"
+                src={diverseFriendsGroup} 
+                alt="Diverse group of friends shopping for skincare products together"
                 className="w-full h-auto object-cover"
               />
             </div>
