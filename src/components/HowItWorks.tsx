@@ -1,7 +1,7 @@
 import stepScan from "@/assets/diverse/step-scan.jpg";
-import stepAnalyze from "@/assets/diverse/step-analyze.jpg";
+import latinoManSkincare from "@/assets/diverse/latino-man-skincare.jpg";
 import stepScore from "@/assets/diverse/step-score.jpg";
-import stepOptimize from "@/assets/diverse/step-optimize.jpg";
+import blackManRoutine from "@/assets/diverse/black-man-routine.jpg";
 
 const steps = [
   {
@@ -11,7 +11,7 @@ const steps = [
     time: "30 seconds"
   },
   {
-    image: stepAnalyze,
+    image: latinoManSkincare,
     title: "Community Database",
     description: "Check if someone already analyzed this product. If not, you're helping build our knowledge base for others.",
     time: "5 seconds"
@@ -23,7 +23,7 @@ const steps = [
     time: "10 seconds"
   },
   {
-    image: stepOptimize,
+    image: blackManRoutine,
     title: "Get Your EpiQ Score",
     description: "Receive personalized routine recommendations, ingredient insights, and cost-effectiveness analysis.",
     time: "Instant"

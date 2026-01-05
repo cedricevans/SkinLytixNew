@@ -9,7 +9,7 @@ import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { AlertCircle } from "lucide-react";
-import problemEndlessSearch from "@/assets/diverse/problem-endless-search.jpg";
+import latinaWomanGlowing from "@/assets/diverse/latina-woman-glowing.jpg";
 
 const Auth = () => {
   const navigate = useNavigate();
@@ -107,8 +107,8 @@ const Auth = () => {
         <div className="hidden lg:block">
           <div className="rounded-2xl overflow-hidden shadow-strong">
             <img 
-              src={problemEndlessSearch} 
-              alt="Diverse women and men exploring skincare products together"
+              src={latinaWomanGlowing} 
+              alt="Latina woman with healthy glowing skin"
               className="w-full h-auto object-cover"
             />
           </div>

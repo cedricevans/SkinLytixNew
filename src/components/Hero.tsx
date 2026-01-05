@@ -1,7 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { Sparkles, ArrowRight, Hexagon } from "lucide-react";
 import heroBackground from "@/assets/hero-background.jpg";
-import problemEndlessSearch from "@/assets/diverse/problem-endless-search.jpg";
+import heroVitiligoWoman from "@/assets/diverse/hero-vitiligo-woman.jpg";
 import { useNavigate } from "react-router-dom";
 import Navigation from "@/components/Navigation";
 import { trackEvent } from "@/hooks/useTracking";
@@ -99,8 +99,8 @@ const Hero = () => {
           <div className="hidden lg:block relative animate-fade-in-up" style={{ animationDelay: "0.5s" }}>
             <div className="relative rounded-2xl overflow-hidden shadow-strong">
               <img
-                src={problemEndlessSearch}
-                alt="Diverse women and men shopping for skincare products together"
+                src={heroVitiligoWoman}
+                alt="Black woman with vitiligo confidently examining skincare product"
                 className="w-full h-auto object-cover"
               />
               <div className="absolute inset-0 bg-gradient-to-t from-background/40 to-transparent" />
