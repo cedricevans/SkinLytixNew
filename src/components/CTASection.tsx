@@ -1,7 +1,6 @@
 import { Button } from "@/components/ui/button";
 import { ArrowRight, Sparkles } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-import diverseFriendsGroup from "@/assets/diverse/diverse-friends-group.jpg";
 
 const CTASection = () => {
   const navigate = useNavigate();
@@ -14,53 +13,37 @@ const CTASection = () => {
         <div className="absolute bottom-10 right-10 w-56 h-56 bg-primary-foreground rounded-full blur-3xl animate-pulse-glow" style={{ animationDelay: "1s" }} />
       </div>
 
-      <div className="max-w-6xl mx-auto relative z-10">
-        <div className="grid lg:grid-cols-2 gap-8 lg:gap-12 items-center">
-          {/* Left: Image */}
-          <div className="hidden lg:block animate-fade-in-up order-1">
-            <div className="rounded-2xl overflow-hidden shadow-strong border-4 border-primary-foreground/20">
-              <img 
-                src={diverseFriendsGroup} 
-                alt="Diverse group of friends shopping for skincare products together"
-                className="w-full h-auto object-cover"
-              />
-            </div>
-          </div>
-
-          {/* Right: Content */}
-          <div className="text-center lg:text-left order-2">
-            <div className="inline-flex items-center gap-2 px-4 py-2 bg-primary-foreground/20 rounded-full mb-6 animate-fade-in-up">
-              <Sparkles className="w-4 h-4 text-primary-foreground" />
-              <span className="text-sm font-subheading font-medium text-primary-foreground">
-                Free Beta - Sign Up Today
-              </span>
-            </div>
-
-            <h2 className="text-3xl md:text-5xl font-heading font-bold text-primary-foreground mb-4 md:mb-6 animate-fade-in-up" style={{ animationDelay: "0.1s" }}>
-              Ready to Stop Wasting Money on Skincare?
-            </h2>
-
-            <p className="text-lg md:text-xl font-subheading text-primary-foreground/90 mb-8 md:mb-10 animate-fade-in-up" style={{ animationDelay: "0.2s" }}>
-              Join beauty enthusiasts who analyze before they buy. Start analyzing your products for free—no waiting, no credit card required.
-            </p>
-
-            <div className="flex justify-center lg:justify-start items-center animate-fade-in-up" style={{ animationDelay: "0.3s" }}>
-              <Button 
-                variant="cta" 
-                size="lg" 
-                className="touch-target text-base px-8 py-5 md:py-6 h-auto w-full sm:w-auto bg-cta hover:bg-cta/90"
-                onClick={() => navigate('/auth')}
-              >
-                Get Started Free
-                <ArrowRight className="ml-2 w-5 h-5" />
-              </Button>
-            </div>
-
-            <p className="mt-8 text-sm font-body text-primary-foreground/70 animate-fade-in-up" style={{ animationDelay: "0.4s" }}>
-              No credit card required • Instant access • Free during beta
-            </p>
-          </div>
+      <div className="max-w-4xl mx-auto text-center relative z-10">
+        <div className="inline-flex items-center gap-2 px-4 py-2 bg-primary-foreground/20 rounded-full mb-6 animate-fade-in-up">
+          <Sparkles className="w-4 h-4 text-primary-foreground" />
+          <span className="text-sm font-subheading font-medium text-primary-foreground">
+            Free Beta - Sign Up Today
+          </span>
         </div>
+
+        <h2 className="text-3xl md:text-5xl font-heading font-bold text-primary-foreground mb-4 md:mb-6 animate-fade-in-up" style={{ animationDelay: "0.1s" }}>
+          Ready to Stop Wasting Money on Skincare?
+        </h2>
+
+        <p className="text-lg md:text-xl font-subheading text-primary-foreground/90 mb-8 md:mb-10 animate-fade-in-up" style={{ animationDelay: "0.2s" }}>
+          Join beauty enthusiasts who analyze before they buy. Start analyzing your products for free—no waiting, no credit card required.
+        </p>
+
+        <div className="flex justify-center items-center animate-fade-in-up" style={{ animationDelay: "0.3s" }}>
+          <Button 
+            variant="cta" 
+            size="lg" 
+            className="touch-target text-base px-8 py-5 md:py-6 h-auto w-full sm:w-auto bg-cta hover:bg-cta/90"
+            onClick={() => navigate('/auth')}
+          >
+            Get Started Free
+            <ArrowRight className="ml-2 w-5 h-5" />
+          </Button>
+        </div>
+
+        <p className="mt-8 text-sm font-body text-primary-foreground/70 animate-fade-in-up" style={{ animationDelay: "0.4s" }}>
+          No credit card required • Instant access • Free during beta
+        </p>
       </div>
     </section>
   );

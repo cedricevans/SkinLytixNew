@@ -12,32 +12,24 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Camera, CalendarCheck, User, Sparkles, Target, BarChart3, Shield } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
-import indianWomanRoutine from "@/assets/diverse/indian-woman-routine.jpg";
-import stepScore from "@/assets/diverse/step-score.jpg";
-import asianWomanAnalyzing from "@/assets/diverse/asian-woman-analyzing.jpg";
-import vitiligoHandsApplying from "@/assets/diverse/vitiligo-hands-applying.jpg";
-import diverseFriendsGroup from "@/assets/diverse/diverse-friends-group.jpg";
-import hyperpigmentationCare from "@/assets/diverse/hyperpigmentation-care.jpg";
 
 interface WalkthroughStep {
   title: string;
   description: string;
   details?: string[];
   icon: React.ElementType;
-  image?: string;
 }
 
 const steps: WalkthroughStep[] = [
   {
     title: "Welcome to SkinLytix! 🎉",
-    description: "Your personal skincare guide, reviewed by real experts who care about your skin.",
+    description: "Your personal ingredient expert powered by science.",
     details: [
       "We analyze 2,000+ ingredients against YOUR unique skin profile",
       "Every product gets a personalized 0-100 EpiQ Score",
       "Make confident choices backed by dermatological research"
     ],
     icon: Sparkles,
-    image: indianWomanRoutine,
   },
   {
     title: "Understanding EpiQ Scores",
@@ -48,7 +40,6 @@ const steps: WalkthroughStep[] = [
       "71-100 (Green): Excellent match for your needs"
     ],
     icon: Target,
-    image: stepScore,
   },
   {
     title: "Two Ways to Analyze",
@@ -59,7 +50,6 @@ const steps: WalkthroughStep[] = [
       "Works with face, body, and hair care products"
     ],
     icon: Camera,
-    image: asianWomanAnalyzing,
   },
   {
     title: "Understanding Your Results",
@@ -70,7 +60,6 @@ const steps: WalkthroughStep[] = [
       "Learn about potential ingredient conflicts"
     ],
     icon: BarChart3,
-    image: vitiligoHandsApplying,
   },
   {
     title: "Build Your Routine",
@@ -81,7 +70,6 @@ const steps: WalkthroughStep[] = [
       "Get layering order recommendations"
     ],
     icon: CalendarCheck,
-    image: diverseFriendsGroup,
   },
   {
     title: "Your Profile Evolves With You",
@@ -92,7 +80,6 @@ const steps: WalkthroughStep[] = [
       "Track how seasons affect your skin needs"
     ],
     icon: User,
-    image: hyperpigmentationCare,
   },
 ];
 
@@ -143,19 +130,9 @@ export const AppWalkthrough = () => {
     <Dialog open={open} onOpenChange={(isOpen) => !isOpen && handleSkip()}>
       <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          {/* Step Image */}
-          {currentStepData.image && (
-            <div className="w-full h-32 rounded-xl overflow-hidden mb-4">
-              <img 
-                src={currentStepData.image} 
-                alt={currentStepData.title}
-                className="w-full h-full object-cover"
-              />
-            </div>
-          )}
-          <div className="flex items-center justify-center mb-2">
-            <div className="w-12 h-12 rounded-full bg-gradient-to-br from-primary/20 to-accent/20 flex items-center justify-center">
-              <Icon className="w-6 h-6 text-primary" />
+          <div className="flex items-center justify-center mb-4">
+            <div className="w-20 h-20 rounded-full bg-gradient-to-br from-primary/20 to-accent/20 flex items-center justify-center">
+              <Icon className="w-10 h-10 text-primary" />
             </div>
           </div>
           <DialogTitle className="text-center text-2xl">

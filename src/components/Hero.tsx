@@ -1,7 +1,6 @@
 import { Button } from "@/components/ui/button";
 import { Sparkles, ArrowRight, Hexagon } from "lucide-react";
 import heroBackground from "@/assets/hero-background.jpg";
-import heroVitiligoWoman from "@/assets/diverse/hero-vitiligo-woman.jpg";
 import { useNavigate } from "react-router-dom";
 import Navigation from "@/components/Navigation";
 import { trackEvent } from "@/hooks/useTracking";
@@ -33,10 +32,7 @@ const Hero = () => {
 
       {/* Content */}
       <div className="relative z-10 flex-1 flex items-center justify-center">
-      <div className="max-w-6xl mx-auto px-4 md:px-6 py-12 md:py-20">
-        <div className="grid lg:grid-cols-2 gap-8 lg:gap-12 items-center">
-          {/* Left: Text Content */}
-          <div className="text-center lg:text-left">
+      <div className="max-w-6xl mx-auto px-4 md:px-6 py-12 md:py-20 text-center">
         {/* Trust Badge - Dynamic */}
         <button 
           onClick={() => {
@@ -49,7 +45,7 @@ const Hero = () => {
             <span className="relative inline-flex rounded-full h-2 w-2 bg-success-foreground"></span>
           </span>
           <span className="text-sm font-subheading font-medium text-success-foreground">
-            Reviewed by Real Experts
+            Expert Validated • Human + AI
           </span>
         </button>
 
@@ -93,32 +89,6 @@ const Hero = () => {
         <p className="mt-12 text-sm font-body text-muted-foreground animate-fade-in-up" style={{ animationDelay: "0.4s" }}>
           Join hundreds of beauty enthusiasts analyzing their entire personal care routine
         </p>
-          </div>
-
-          {/* Right: Community Image */}
-          <div className="hidden lg:block relative animate-fade-in-up" style={{ animationDelay: "0.5s" }}>
-            <div className="relative rounded-2xl overflow-hidden shadow-strong">
-              <img
-                src={heroVitiligoWoman}
-                alt="Black woman with vitiligo confidently examining skincare product"
-                className="w-full h-auto object-cover"
-              />
-              <div className="absolute inset-0 bg-gradient-to-t from-background/40 to-transparent" />
-            </div>
-            {/* Floating Stats Card */}
-            <div className="absolute -bottom-4 -left-4 bg-card/95 backdrop-blur-sm rounded-xl p-4 shadow-medium border border-border/50">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-full bg-success/20 flex items-center justify-center">
-                  <Sparkles className="w-5 h-5 text-success-foreground" />
-                </div>
-                <div>
-                  <p className="text-sm font-semibold">Reviewed by Real Experts</p>
-                  <p className="text-xs text-muted-foreground">Students who care about your skin</p>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
         </div>
       </div>
 

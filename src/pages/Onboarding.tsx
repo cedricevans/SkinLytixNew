@@ -8,8 +8,6 @@ import { supabase } from "@/integrations/supabase/client";
 import { Droplets, Wind, Flame, Shield, Sparkles, User, Shirt, Scissors, HelpCircle } from "lucide-react";
 import { useTracking, trackEvent } from "@/hooks/useTracking";
 import { SkinTypeQuiz } from "@/components/SkinTypeQuiz";
-import indianManProfessional from "@/assets/diverse/indian-man-professional.jpg";
-import hyperpigmentationCare from "@/assets/diverse/hyperpigmentation-care.jpg";
 
 const faceSkinTypes = [
   { value: "oily", label: "Oily", icon: Droplets, description: "Shiny, prone to breakouts" },
@@ -177,29 +175,7 @@ const Onboarding = () => {
 
   return (
     <main className="min-h-screen bg-gradient-to-b from-background to-muted flex items-center justify-center py-12 px-4">
-      <div className="w-full max-w-5xl grid lg:grid-cols-5 gap-8 items-start">
-        {/* Left: Decorative Image (Desktop only) */}
-        <div className="hidden lg:block lg:col-span-2">
-          <div className="sticky top-12 space-y-6">
-            <div className="rounded-2xl overflow-hidden shadow-strong">
-              <img 
-                src={step < 2 ? indianManProfessional : hyperpigmentationCare} 
-                alt={step < 2 ? "South Asian man reviewing skincare data" : "Black woman caring for her skin"}
-                className="w-full h-auto object-cover"
-              />
-            </div>
-            <div className="text-center">
-              <p className="text-sm text-muted-foreground">
-                {step === 0 && "Personalized for every skin tone and type"}
-                {step === 1 && "Understanding your unique skin needs"}
-                {step === 2 && "Your concerns matter to us"}
-              </p>
-            </div>
-          </div>
-        </div>
-        
-        {/* Right: Form Card */}
-        <Card className="w-full lg:col-span-3 p-8">
+      <Card className="w-full max-w-3xl p-8">
         <div className="mb-8">
           <div className="flex justify-between items-center mb-4">
             <h1 className="text-3xl font-bold">Complete Your Profile</h1>
@@ -555,8 +531,7 @@ const Onboarding = () => {
             </div>
           </div>
         )}
-        </Card>
-      </div>
+      </Card>
     </main>
   );
 };

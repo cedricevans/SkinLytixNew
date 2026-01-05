@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Award, Users, FlaskConical, Shield, TrendingUp } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
-import diverseExpertsLab from '@/assets/diverse/diverse-experts-lab.jpg';
 
 interface LiveMetrics {
   totalAnalyses: number;
@@ -141,7 +140,7 @@ const LiveTrustSignals = () => {
           </div>
         </div>
 
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-6 md:gap-8 mb-10">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-6 md:gap-8">
           {signals.map((signal, index) => {
             const Icon = signal.icon;
             return (
@@ -167,30 +166,6 @@ const LiveTrustSignals = () => {
               </div>
             );
           })}
-        </div>
-
-        {/* Expert Validation Banner */}
-        <div className="bg-card/80 backdrop-blur-sm rounded-2xl p-4 md:p-6 border border-border/50 shadow-soft">
-          <div className="flex flex-col md:flex-row items-center gap-4 md:gap-6">
-            <div className="w-20 h-20 md:w-24 md:h-24 rounded-xl overflow-hidden flex-shrink-0">
-              <img 
-                src={diverseExpertsLab} 
-                alt="Diverse cosmetic science students analyzing skincare formulations in lab"
-                className="w-full h-full object-cover"
-              />
-            </div>
-            <div className="text-center md:text-left flex-1">
-          <h4 className="font-heading font-bold text-lg mb-1">Reviewed by Real Experts</h4>
-              <p className="text-sm text-muted-foreground">
-                Real people, real expertise. Our recommendations are double-checked by trained cosmetic science students 
-                who care about your skin's safety as much as you do.
-              </p>
-            </div>
-            <div className="flex items-center gap-2 px-4 py-2 bg-success/20 rounded-full">
-              <Shield className="w-4 h-4 text-success-foreground" />
-              <span className="text-sm font-medium text-success-foreground">Safe & Verified</span>
-            </div>
-          </div>
         </div>
       </div>
     </section>

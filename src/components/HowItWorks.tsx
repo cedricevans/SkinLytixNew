@@ -1,29 +1,26 @@
-import stepScan from "@/assets/diverse/step-scan.jpg";
-import latinoManSkincare from "@/assets/diverse/latino-man-skincare.jpg";
-import stepScore from "@/assets/diverse/step-score.jpg";
-import blackManRoutine from "@/assets/diverse/black-man-routine.jpg";
+import { Scan, Database, Brain, CheckCircle2 } from "lucide-react";
 
 const steps = [
   {
-    image: stepScan,
+    icon: Scan,
     title: "Scan Your Products",
     description: "Upload a photo of any skincare product. Our OCR extracts ingredients automatically—or add manually if needed.",
     time: "30 seconds"
   },
   {
-    image: latinoManSkincare,
+    icon: Database,
     title: "Community Database",
     description: "Check if someone already analyzed this product. If not, you're helping build our knowledge base for others.",
     time: "5 seconds"
   },
   {
-    image: stepScore,
+    icon: Brain,
     title: "AI Analysis",
     description: "We query molecular data, validate against research, and analyze interactions using evidence-based logic.",
     time: "10 seconds"
   },
   {
-    image: blackManRoutine,
+    icon: CheckCircle2,
     title: "Get Your EpiQ Score",
     description: "Receive personalized routine recommendations, ingredient insights, and cost-effectiveness analysis.",
     time: "Instant"
@@ -52,21 +49,18 @@ const HowItWorks = () => {
           {/* Steps Grid */}
           <div className="grid md:grid-cols-4 gap-8 md:gap-8 relative">
             {steps.map((step, index) => {
+              const Icon = step.icon;
               return (
                 <div
                   key={step.title}
                   className="relative animate-fade-in-up"
                   style={{ animationDelay: `${index * 0.15}s` }}
                 >
-                  {/* Image with Number Badge */}
+                  {/* Number Badge */}
                   <div className="flex justify-center mb-4 md:mb-6">
                     <div className="relative">
-                      <div className="w-24 h-24 md:w-28 md:h-28 rounded-2xl overflow-hidden shadow-medium border-2 border-primary/20">
-                        <img 
-                          src={step.image} 
-                          alt={step.title}
-                          className="w-full h-full object-cover"
-                        />
+                      <div className="w-20 h-20 md:w-24 md:h-24 rounded-full bg-gradient-hero flex items-center justify-center shadow-medium">
+                        <Icon className="w-8 h-8 md:w-10 md:h-10 text-primary-foreground" />
                       </div>
                       <div className="absolute -top-2 -right-2 w-7 h-7 md:w-8 md:h-8 bg-cta rounded-full flex items-center justify-center text-cta-foreground font-cta font-bold text-xs md:text-sm shadow-soft">
                         {index + 1}
