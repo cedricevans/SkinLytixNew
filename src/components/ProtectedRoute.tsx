@@ -4,35 +4,45 @@ import { supabase } from '@/integrations/supabase/client';
 import { Loader2 } from 'lucide-react';
 
 export const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
-  const [isAdmin, setIsAdmin] = useState<boolean | null>(null);
+  const [hasAccess, setHasAccess] = useState<boolean | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    checkAdminStatus();
+    checkReviewerAccess();
   }, []);
 
-  const checkAdminStatus = async () => {
+  const checkReviewerAccess = async () => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       
       if (!user) {
-        setIsAdmin(false);
+        setHasAccess(false);
         setLoading(false);
         return;
       }
 
+      // Check user_roles for admin or moderator
       const { data: roles } = await supabase
         .from('user_roles')
         .select('role')
+        .eq('user_id', user.id);
+
+      const hasRole = roles?.some(r => 
+        r.role === 'admin' || r.role === 'moderator'
+      );
+
+      // Check student_certifications
+      const { data: certification } = await supabase
+        .from('student_certifications')
+        .select('id')
         .eq('user_id', user.id)
-        .eq('role', 'admin')
         .maybeSingle();
 
-      setIsAdmin(!!roles);
+      setHasAccess(hasRole || !!certification);
       setLoading(false);
     } catch (error) {
-      console.error('Error checking admin status:', error);
-      setIsAdmin(false);
+      console.error('Error checking reviewer access:', error);
+      setHasAccess(false);
       setLoading(false);
     }
   };
@@ -45,7 +55,7 @@ export const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
     );
   }
   
-  if (!isAdmin) {
+  if (!hasAccess) {
     return <Navigate to="/" replace />;
   }
   
