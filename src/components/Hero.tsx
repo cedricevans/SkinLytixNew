@@ -1,6 +1,6 @@
 import { Button } from "@/components/ui/button";
 import { Sparkles, ArrowRight, Hexagon } from "lucide-react";
-import heroBackground from "@/assets/hero-background.jpg";
+import heroBackground from "@/assets/hero-community.jpg";
 import { useNavigate } from "react-router-dom";
 import Navigation from "@/components/Navigation";
 import { trackEvent } from "@/hooks/useTracking";
@@ -14,10 +14,10 @@ const Hero = () => {
       <div className="absolute inset-0 z-0">
         <img
           src={heroBackground}
-          alt="Scientific molecular structures representing skincare ingredients"
-          className="w-full h-full object-cover opacity-20"
+          alt="Diverse group of people enjoying skincare products together"
+          className="w-full h-full object-cover object-center opacity-30"
         />
-        <div className="absolute inset-0 bg-gradient-to-br from-background via-background/95 to-accent/10" />
+        <div className="absolute inset-0 bg-gradient-to-br from-background/90 via-background/80 to-accent/20" />
       </div>
 
       {/* Header Bar */}
