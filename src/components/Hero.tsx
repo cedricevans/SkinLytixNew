@@ -49,7 +49,7 @@ const Hero = () => {
             <span className="relative inline-flex rounded-full h-2 w-2 bg-success-foreground"></span>
           </span>
           <span className="text-sm font-subheading font-medium text-success-foreground">
-            Expert Validated • Human + AI
+            Reviewed by Real Experts
           </span>
         </button>
 
@@ -112,8 +112,8 @@ const Hero = () => {
                   <Sparkles className="w-5 h-5 text-success-foreground" />
                 </div>
                 <div>
-                  <p className="text-sm font-semibold">Expert Validated</p>
-                  <p className="text-xs text-muted-foreground">By Cosmetic Scientists</p>
+                  <p className="text-sm font-semibold">Reviewed by Real Experts</p>
+                  <p className="text-xs text-muted-foreground">Students who care about your skin</p>
                 </div>
               </div>
             </div>

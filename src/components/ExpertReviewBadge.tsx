@@ -71,7 +71,7 @@ export function ExpertReviewBadge({
           <div className="space-y-2">
             <p className="font-semibold flex items-center gap-2">
               <GraduationCap className="w-4 h-4" />
-              Validated by {review.reviewer_institution}
+              Reviewed by {review.reviewer_institution} students
             </p>
             {avgScore && (
               <p className="text-sm">
@@ -102,7 +102,7 @@ export function ExpertReviewBadge({
             <Sparkles className="w-4 h-4 text-amber-500" />
           </div>
           <p className="text-sm text-muted-foreground mb-2">
-            This analysis has been reviewed and validated by a certified expert from {review.reviewer_institution}.
+            Real people, real expertise. This was double-checked by a trained cosmetic science student from {review.reviewer_institution} who cares about your skin's safety.
           </p>
           <div className="flex items-center gap-4 text-sm">
             {review.ingredient_accuracy_score && (
