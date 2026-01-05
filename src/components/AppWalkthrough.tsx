@@ -30,7 +30,7 @@ interface WalkthroughStep {
 const steps: WalkthroughStep[] = [
   {
     title: "Welcome to SkinLytix! 🎉",
-    description: "Your personal ingredient expert powered by science.",
+    description: "Your personal skincare guide, reviewed by real experts who care about your skin.",
     details: [
       "We analyze 2,000+ ingredients against YOUR unique skin profile",
       "Every product gets a personalized 0-100 EpiQ Score",

@@ -180,15 +180,15 @@ const LiveTrustSignals = () => {
               />
             </div>
             <div className="text-center md:text-left flex-1">
-              <h4 className="font-heading font-bold text-lg mb-1">Validated by Cosmetic Scientists</h4>
+          <h4 className="font-heading font-bold text-lg mb-1">Reviewed by Real Experts</h4>
               <p className="text-sm text-muted-foreground">
-                Our EpiQ scores are calibrated by students from partner universities like Spelman College, 
-                ensuring human expertise backs every AI recommendation.
+                Real people, real expertise. Our recommendations are double-checked by trained cosmetic science students 
+                who care about your skin's safety as much as you do.
               </p>
             </div>
             <div className="flex items-center gap-2 px-4 py-2 bg-success/20 rounded-full">
               <Shield className="w-4 h-4 text-success-foreground" />
-              <span className="text-sm font-medium text-success-foreground">Human + AI</span>
+              <span className="text-sm font-medium text-success-foreground">Safe & Verified</span>
             </div>
           </div>
         </div>
