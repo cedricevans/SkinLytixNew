@@ -61,7 +61,10 @@ export const ResponsiveBottomNav = ({ onAddToRoutine, showAddToRoutine = true, o
       className="lg:hidden fixed bottom-0 left-0 right-0 z-50 bg-card/95 backdrop-blur-lg border-t border-border shadow-lg"
       style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}
     >
-      <div className={`grid grid-cols-${navItems.length} gap-1 px-2 py-3`}>
+      <div
+        className="grid grid-flow-col auto-cols-fr gap-1 px-2 py-3"
+        style={{ gridTemplateColumns: `repeat(${navItems.length}, minmax(0, 1fr))` }}
+      >
         {navItems.map((item, index) => {
           const Icon = item.icon;
           return (
