@@ -18,6 +18,7 @@ import {
 import { IngredientValidationPanel } from '@/components/reviewer/IngredientValidationPanel';
 import { IngredientSourcePanel } from '@/components/reviewer/IngredientSourcePanel';
 import { ValidationProgressBar } from '@/components/reviewer/ValidationProgressBar';
+import AppShell from '@/components/AppShell';
 
 interface ProductAnalysis {
   id: string;
@@ -103,7 +104,7 @@ export default function StudentReviewer() {
           description: "You need student reviewer certification to access this dashboard.",
           variant: "destructive",
         });
-        navigate('/');
+        navigate('/home');
         return;
       }
 
@@ -261,12 +262,14 @@ export default function StudentReviewer() {
 
   if (loading) {
     return (
-      <main className="min-h-screen flex items-center justify-center bg-gradient-to-b from-background to-muted">
-        <div className="text-center">
-          <div className="w-16 h-16 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-4" />
-          <p className="text-muted-foreground">Loading reviewer dashboard...</p>
+      <AppShell showNavigation showBottomNav contentClassName="px-4 py-8">
+        <div className="flex items-center justify-center min-h-[50vh]">
+          <div className="text-center">
+            <div className="w-16 h-16 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+            <p className="text-muted-foreground">Loading reviewer dashboard...</p>
+          </div>
         </div>
-      </main>
+      </AppShell>
     );
   }
 
@@ -281,7 +284,7 @@ export default function StudentReviewer() {
     const currentValidation = selectedIngredient ? ingredientValidations.get(selectedIngredient) : null;
     
     return (
-      <main className="min-h-screen bg-gradient-to-b from-background to-muted py-8 px-4">
+      <AppShell showNavigation showBottomNav contentClassName="px-4 py-8">
         <div className="container max-w-6xl mx-auto">
           {/* Header with back button */}
           <div className="flex items-center gap-4 mb-6">
@@ -376,13 +379,13 @@ export default function StudentReviewer() {
             </div>
           </div>
         </div>
-      </main>
+      </AppShell>
     );
   }
 
   // Products list view
   return (
-    <main className="min-h-screen bg-gradient-to-b from-background to-muted py-8 px-4">
+    <AppShell showNavigation showBottomNav contentClassName="px-4 py-8">
       <div className="container max-w-6xl mx-auto">
         {/* Header */}
         <div className="flex items-center justify-between mb-8">
@@ -393,7 +396,7 @@ export default function StudentReviewer() {
               {institution} • Student Reviewer
             </p>
           </div>
-          <Button variant="ghost" onClick={() => navigate('/')}>
+          <Button variant="ghost" onClick={() => navigate('/home')}>
             <Home className="w-4 h-4 mr-2" />
             Back to Home
           </Button>
@@ -488,6 +491,6 @@ export default function StudentReviewer() {
           </CardContent>
         </Card>
       </div>
-    </main>
+    </AppShell>
   );
 }

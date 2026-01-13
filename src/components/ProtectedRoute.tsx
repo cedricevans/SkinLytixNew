@@ -56,7 +56,7 @@ export const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   }
   
   if (!hasAccess) {
-    return <Navigate to="/" replace />;
+    return <Navigate to="/home" replace />;
   }
   
   return <>{children}</>;

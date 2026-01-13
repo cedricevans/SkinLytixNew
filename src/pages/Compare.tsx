@@ -2,7 +2,6 @@ import { useState, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import AppShell from "@/components/AppShell";
-import { ResponsiveBottomNav } from "@/components/ResponsiveBottomNav";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -312,7 +311,7 @@ export default function Compare() {
 
   if (loading) {
     return (
-      <AppShell showNavigation contentClassName="px-4 py-8">
+      <AppShell showNavigation showBottomNav contentClassName="px-4 py-8">
         <div className="container mx-auto pb-24 lg:pb-8">
           <Skeleton className="h-10 w-48 mb-6" />
           <Skeleton className="h-12 w-full mb-8" />
@@ -320,13 +319,12 @@ export default function Compare() {
             {[1, 2, 3, 4].map(i => <Skeleton key={i} className="aspect-[3/4] w-full" />)}
           </div>
         </div>
-        <ResponsiveBottomNav />
       </AppShell>
     );
   }
 
   return (
-    <AppShell showNavigation contentClassName="px-4 py-6">
+    <AppShell showNavigation showBottomNav contentClassName="px-4 py-6">
       <main className="container mx-auto pb-24 lg:pb-8">
         <Button 
           variant="ghost" 
@@ -559,8 +557,6 @@ export default function Compare() {
         )}
       </main>
 
-      <ResponsiveBottomNav />
-      
       <PaywallModal 
         open={showPaywall} 
         onOpenChange={setShowPaywall}

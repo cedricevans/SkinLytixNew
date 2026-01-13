@@ -8,6 +8,7 @@ import { ConversionFunnelChart } from '@/components/analytics/ConversionFunnelCh
 import { Button } from '@/components/ui/button';
 import { useNavigate } from 'react-router-dom';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import AppShell from '@/components/AppShell';
 
 const Analytics = () => {
   const navigate = useNavigate();
@@ -24,10 +25,10 @@ const Analytics = () => {
   const avgSignupCTR = totalHomepageViews > 0 ? ((totalSignupClicks / totalHomepageViews) * 100).toFixed(2) : '0';
 
   return (
-    <div className="min-h-screen bg-background">
-      <div className="container mx-auto px-4 py-8">
+    <AppShell showNavigation showBottomNav contentClassName="px-4 py-8">
+      <div className="container mx-auto">
         <div className="flex items-center gap-4 mb-8">
-          <Button variant="ghost" size="icon" onClick={() => navigate('/')}>
+          <Button variant="ghost" size="icon" onClick={() => navigate('/home')}>
             <ArrowLeft className="h-5 w-5" />
           </Button>
           <div>
@@ -235,7 +236,7 @@ const Analytics = () => {
           </TabsContent>
         </Tabs>
       </div>
-    </div>
+    </AppShell>
   );
 };
 

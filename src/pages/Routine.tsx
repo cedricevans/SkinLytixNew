@@ -421,11 +421,13 @@ export default function Routine() {
   return (
     <TooltipProvider>
       <AppShell
+        showNavigation
+        showBottomNav
         header={
           <PageHeader>
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div className="flex flex-wrap gap-2">
-                <Button variant="ghost" onClick={() => navigate('/')}>
+                <Button variant="ghost" onClick={() => navigate('/home')}>
                   <Home className="w-4 h-4 mr-2" />
                   Home
                 </Button>

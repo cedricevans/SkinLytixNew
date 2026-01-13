@@ -15,6 +15,7 @@ import { useTracking, trackEvent } from "@/hooks/useTracking";
 import { DemoModeToggle } from "@/components/DemoModeToggle";
 import { useSubscription } from "@/hooks/useSubscription";
 import { SubscriptionSection, TrialBanner } from "@/components/subscription";
+import AppShell from "@/components/AppShell";
 
 const skinTypes = [
   { value: "oily", label: "Oily", icon: Droplets, description: "Shiny, prone to breakouts" },
@@ -489,22 +490,24 @@ const Profile = () => {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
-          <p className="text-muted-foreground">Loading profile...</p>
+      <AppShell showNavigation showBottomNav contentClassName="px-4 py-8">
+        <div className="flex items-center justify-center min-h-[50vh]">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+            <p className="text-muted-foreground">Loading profile...</p>
+          </div>
         </div>
-      </div>
+      </AppShell>
     );
   }
 
   return (
-    <main className="min-h-screen bg-background">
-      <div className="container mx-auto px-4 py-8 max-w-6xl">
+    <AppShell showNavigation showBottomNav contentClassName="px-4 py-8">
+      <div className="container mx-auto max-w-6xl">
         {/* Navigation Header */}
         <div className="flex items-center justify-between mb-8">
           <div className="flex gap-2">
-            <Button variant="ghost" onClick={() => navigate('/')}>
+            <Button variant="ghost" onClick={() => navigate('/home')}>
               <Home className="w-4 h-4 mr-2" />
               Home
             </Button>
@@ -1222,7 +1225,7 @@ const Profile = () => {
 
       {/* Demo Mode Toggle - Admin Only */}
       <DemoModeToggle />
-    </main>
+    </AppShell>
   );
 };
 

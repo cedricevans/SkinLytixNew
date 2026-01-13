@@ -2,7 +2,6 @@ import { useState, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import AppShell from "@/components/AppShell";
-import { ResponsiveBottomNav } from "@/components/ResponsiveBottomNav";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -123,20 +122,19 @@ export default function Favorites() {
 
   if (loading) {
     return (
-      <AppShell showNavigation contentClassName="px-4 py-8">
+      <AppShell showNavigation showBottomNav contentClassName="px-4 py-8">
         <div className="container mx-auto pb-24 lg:pb-8">
           <Skeleton className="h-10 w-48 mb-6" />
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
             {[1, 2, 3, 4].map(i => <Skeleton key={i} className="aspect-[3/4] w-full" />)}
           </div>
         </div>
-        <ResponsiveBottomNav />
       </AppShell>
     );
   }
 
   return (
-    <AppShell showNavigation contentClassName="px-4 py-6">
+    <AppShell showNavigation showBottomNav contentClassName="px-4 py-6">
       <main className="container mx-auto pb-24 lg:pb-8">
         <Button 
           variant="ghost" 
@@ -252,8 +250,6 @@ export default function Favorites() {
           </>
         )}
       </main>
-
-      <ResponsiveBottomNav />
     </AppShell>
   );
 }

@@ -18,7 +18,7 @@ You are not a doctor, esthetician, dermatologist, or pharmacist, and you must ne
 You will receive ONE input object that represents the analysis output from SkinLytix. It may include fields such as (names may vary):
 
 - productName: string
-- brand: string | null
+- brand: string | nullxl
 - ingredients: array of ingredient objects (e.g., name, role, category, comedogenic_rating, irritation_flag, notes)
 - score or epiqScore: number | string (an overall SkinLytix-style score)
 - scoreLabel: string (e.g., "low risk", "moderate risk", "high risk", etc.)
@@ -218,7 +218,9 @@ async function generateIngredientExplanation(
 Focus on: what it does (role/function), why it's used, and any key safety notes.
 Keep it conversational and non-technical. No medical claims.`;
 
-    const context = pubchemData ? `Molecular weight: ${pubchemData.molecular_weight || 'unknown'}` : 'Limited scientific data available';
+    const context = pubchemData?.data
+      ? `Molecular weight: ${pubchemData.data.molecular_weight || 'unknown'}`
+      : 'Limited scientific data available';
     const userMessage = `Explain ${ingredientName} (category: ${category}) for a consumer. ${context}`;
 
     const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
@@ -427,7 +429,19 @@ serve(async (req) => {
   }
 
   try {
-    const { product_name, barcode, brand, category, ingredients_list, product_price, user_id, image_url } = await req.json();
+    const {
+      product_name,
+      barcode,
+      brand,
+      category,
+      ingredients_list,
+      product_price,
+      user_id,
+      image_url,
+      skip_ingredient_ai_explanations,
+      scan_mode,
+      skip_ai_explanation,
+    } = await req.json();
     
     if (!product_name || !ingredients_list || !user_id) {
       return new Response(
@@ -584,6 +598,8 @@ serve(async (req) => {
     }
 
     const productType = getProductType(extractedCategory || 'unknown');
+    const isQuickScan = scan_mode === 'quick';
+    const treatCommonAsSafe = isQuickScan;
     const detectionSource = category ? 'user-provided' : cachedProductData ? 'OBF-cache' : 'auto-detected';
     console.log(`Product categorization: "${extractedCategory}" (${extractedBrand}) → productType: "${productType}" | Source: ${detectionSource}`);
 
@@ -593,21 +609,26 @@ serve(async (req) => {
       .map((i: string) => i.trim())
       .filter((i: string) => i.length > 0);
 
-    // Query PubChem for ingredient data
-    const pubchemResponse = await fetch(
-      `${supabaseUrl}/functions/v1/query-pubchem`,
-      {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${supabaseKey}`
-        },
-        body: JSON.stringify({ ingredients: ingredientsArray })
-      }
-    );
+    // Query PubChem for ingredient data (skip in quick scan)
+    let ingredientResults: Array<{ name: string; data: any }> = [];
+    if (!isQuickScan) {
+      const pubchemResponse = await fetch(
+        `${supabaseUrl}/functions/v1/query-pubchem`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${supabaseKey}`
+          },
+          body: JSON.stringify({ ingredients: ingredientsArray, force_pubchem: true })
+        }
+      );
 
-    const pubchemData = await pubchemResponse.json();
-    const ingredientResults = pubchemData.results || [];
+      const pubchemData = await pubchemResponse.json();
+      ingredientResults = pubchemData.results || [];
+    } else {
+      ingredientResults = ingredientsArray.map((name: string) => ({ name, data: null }));
+    }
 
     // Expanded ingredient classifications for face, body, and hair
     const beneficialIngredients: Record<string, string[]> = {
@@ -677,9 +698,86 @@ serve(async (req) => {
     const warnings = [];          // Personalized warning messages
     const beneficial = [];        // Ingredients that target user's specific concerns
 
-    for (const result of ingredientResults) {
+    for (const result of ingredientResults as Array<{ name: string; data: any; source?: string }>) {
       const ingredientLower = result.name.toLowerCase();
       
+      if (result.source === 'local' && !isQuickScan) {
+        concerns.push(result.name);
+        continue;
+      }
+
+      if (isQuickScan) {
+        let isProblematic = false;
+        let isBeneficial = false;
+
+        if (profile) {
+          const allConcerns = [...(profile.skin_concerns || []), ...(profile.body_concerns || [])];
+
+          if (productType === 'face' && profile.skin_type) {
+            const problematicList = problematicIngredients[profile.skin_type] || [];
+            if (problematicList.some(p => ingredientLower.includes(p))) {
+              isProblematic = true;
+              problematic.push({
+                name: result.name,
+                reason: `May not suit ${profile.skin_type} skin`
+              });
+              warnings.push(`⚠️ ${result.name} may not suit ${profile.skin_type} skin`);
+            }
+          }
+
+          for (const concern of allConcerns) {
+            const problematicList = problematicIngredients[concern] || [];
+            if (problematicList.some(p => ingredientLower.includes(p))) {
+              if (!isProblematic) {
+                isProblematic = true;
+                const concernLabel = concern.replace(/-/g, ' ');
+                problematic.push({
+                  name: result.name,
+                  reason: `May worsen ${concernLabel}`
+                });
+                warnings.push(`⚠️ ${result.name} may worsen ${concernLabel}`);
+              }
+            }
+          }
+
+          if (productType === 'face' && profile.skin_type) {
+            const beneficialList = beneficialIngredients[profile.skin_type] || [];
+            if (beneficialList.some(b => ingredientLower.includes(b))) {
+              isBeneficial = true;
+              beneficial.push({
+                name: result.name,
+                benefit: `Beneficial for ${profile.skin_type} skin`
+              });
+            }
+          }
+
+          for (const concern of allConcerns) {
+            const beneficialList = beneficialIngredients[concern] || [];
+            if (beneficialList.some(b => ingredientLower.includes(b))) {
+              const concernLabel = concern.replace(/-/g, ' ');
+              isBeneficial = true;
+              beneficial.push({
+                name: result.name,
+                benefit: `Targets ${concernLabel}`
+              });
+              break;
+            }
+          }
+        }
+
+        if (isProblematic) {
+          continue;
+        }
+
+        if (isBeneficial || (treatCommonAsSafe && isCommonSafeIngredient(result.name))) {
+          safe.push(result.name);
+        } else {
+          concerns.push(result.name);
+        }
+
+        continue;
+      }
+
       if (result.data) {
         // Ingredient IS in PubChem - now check if it's problematic for THIS user
         let isProblematic = false;
@@ -753,7 +851,7 @@ serve(async (req) => {
         
       } else {
         // NOT in PubChem - check if it's a commonly safe ingredient
-        if (!isCommonSafeIngredient(result.name)) {
+        if (!treatCommonAsSafe || !isCommonSafeIngredient(result.name)) {
           concerns.push(result.name);
         } else {
           safe.push(result.name);
@@ -1415,8 +1513,14 @@ serve(async (req) => {
       beneficial
     );
 
-    // Enrich ALL ingredients with AI explanations and PubChem data
+    // Enrich ingredients with AI explanations and PubChem data
     const lovableApiKey = Deno.env.get('LOVABLE_API_KEY');
+    const maxAiSafeExplanations = 20;
+    const maxAiConcernExplanations = 12;
+    const shouldUseAiIngredientExplanations =
+      Boolean(lovableApiKey) &&
+      !skip_ingredient_ai_explanations &&
+      !isQuickScan;
     console.log('Starting ingredient enrichment...');
     
     // Helper to classify ingredient role based on name and PubChem data
@@ -1430,6 +1534,71 @@ serve(async (req) => {
       if (/fragrance|parfum|essential oil/i.test(nameLower)) return 'fragrance';
       if (/paraben|phenoxyethanol|benzyl/i.test(nameLower)) return 'preservative';
       return 'supporting';
+    };
+
+    const getFallbackIngredientExplanation = (name: string, role: string): string => {
+      const lower = name.toLowerCase();
+      const specific: Record<string, string> = {
+        'sodium levulinate': 'A plant-derived preservative helper that supports formula freshness and can feel gentle on skin.',
+        'potassium sorbate': 'A mild preservative used to keep formulas fresh, often found in sensitive-skin products.',
+        'phenoxyethanol': 'A common preservative used at low levels to keep products stable and safe.',
+        'benzoic acid': 'A preservative and pH helper that supports product stability.',
+        'dehydroacetic acid': 'A preservative used to prevent microbial growth and extend shelf life.',
+        'citric acid': 'A pH adjuster that helps keep formulas balanced and stable.',
+        'sodium hydroxide': 'A pH adjuster used to balance acidity in skincare formulas.',
+        'glyceryl stearate': 'An emollient and emulsifier that helps oil and water mix smoothly.',
+        'cetearyl alcohol': 'A fatty alcohol that thickens and softens formulas without being drying.',
+        'sodium stearoyl lactylate': 'An emulsifier that improves texture and helps blend oil and water.',
+        'tocopheryl acetate': 'A stable form of vitamin E that supports antioxidant protection.',
+        'panthenol': 'Pro‑vitamin B5 that helps soothe and support moisture.',
+        'allantoin': 'A soothing ingredient that helps calm and soften skin.',
+      };
+      if (specific[lower]) {
+        return specific[lower];
+      }
+      if (lower.includes('niacinamide')) {
+        return 'A vitamin B3 ingredient often used to support tone, texture, and oil balance.';
+      }
+      if (lower.includes('hyaluronic')) {
+        return 'A hydration-supporting ingredient that helps skin retain moisture.';
+      }
+      if (lower.includes('caffeine')) {
+        return 'Often used to help energize the look of skin and support a refreshed appearance.';
+      }
+      if (lower.includes('green tea') || lower.includes('camellia sinensis')) {
+        return 'A botanical extract commonly used for antioxidant and soothing support.';
+      }
+      if (role === 'humectant') {
+        return 'Helps attract and hold water in the skin to support hydration.';
+      }
+      if (role === 'emollient') {
+        return 'Softens and smooths the skin by filling in surface gaps.';
+      }
+      if (role === 'occlusive') {
+        return 'Helps seal in moisture and reduce water loss.';
+      }
+      if (role === 'preservative') {
+        return 'Helps keep the formula stable and prevents microbial growth.';
+      }
+      if (role === 'fragrance') {
+        return 'Adds scent to the formula; some sensitive users may prefer fragrance-free options.';
+      }
+      if (role === 'active') {
+        if (lower.includes('peptide')) {
+          return 'Peptide commonly used to support the look of firmer, smoother skin.';
+        }
+        if (lower.includes('acid')) {
+          return 'Active ingredient that can help refine texture or support skin renewal.';
+        }
+        return 'Active ingredient used for targeted skin benefits.';
+      }
+      if (lower.includes('extract') || lower.includes('ferment')) {
+        return 'Botanical or ferment-derived ingredient often used for soothing or antioxidant support.';
+      }
+      if (lower.includes('oil')) {
+        return 'Plant oil that helps soften skin and support the moisture barrier.';
+      }
+      return 'Supports the formula’s texture, stability, or overall performance.';
     };
 
     // Parse AI explanation for ingredient-specific insights
@@ -1466,13 +1635,15 @@ serve(async (req) => {
 
     // Enrich safe ingredients with AI explanations
     const enrichedSafeIngredients = await Promise.all(
-      safe.slice(0, 30).map(async (ingredientName: string) => {
-        const pubchemData = ingredientResults.find((r: any) => 
+      safe.map(async (ingredientName: string, index: number) => {
+        const pubchemData = ingredientResults.find((r: any) =>
+          r.name?.toLowerCase() === ingredientName.toLowerCase() ||
           r.searched_name?.toLowerCase() === ingredientName.toLowerCase()
         );
         
-        let explanation = 'Generally recognized as safe for topical use. Part of the product supporting formula.';
-        if (lovableApiKey) {
+        const role = classifyIngredientRole(ingredientName, pubchemData);
+        let explanation = getFallbackIngredientExplanation(ingredientName, role);
+        if (shouldUseAiIngredientExplanations && index < maxAiSafeExplanations) {
           explanation = await generateIngredientExplanation(
             ingredientName,
             'safe',
@@ -1483,9 +1654,9 @@ serve(async (req) => {
 
         return {
           name: ingredientName,
-          role: classifyIngredientRole(ingredientName, pubchemData),
+          role,
           explanation,
-          molecular_weight: pubchemData?.molecular_weight || null,
+          molecular_weight: pubchemData?.data?.molecular_weight || null,
           safety_profile: 'safe',
           risk_score: 15 + Math.floor(Math.random() * 15) // 15-30 (low risk)
         };
@@ -1494,13 +1665,15 @@ serve(async (req) => {
 
     // Enrich concern/unverified ingredients with AI explanations
     const enrichedConcernIngredients = await Promise.all(
-      concerns.slice(0, 20).map(async (ingredientName: string) => {
-        const pubchemData = ingredientResults.find((r: any) => 
+      concerns.map(async (ingredientName: string, index: number) => {
+        const pubchemData = ingredientResults.find((r: any) =>
+          r.name?.toLowerCase() === ingredientName.toLowerCase() ||
           r.searched_name?.toLowerCase() === ingredientName.toLowerCase()
         );
         
-        let explanation = 'Not found in PubChem or Open Beauty Facts databases. May be a proprietary blend or trade name.';
-        if (lovableApiKey) {
+        const role = classifyIngredientRole(ingredientName, pubchemData);
+        let explanation = getFallbackIngredientExplanation(ingredientName, role);
+        if (shouldUseAiIngredientExplanations && index < maxAiConcernExplanations) {
           explanation = await generateIngredientExplanation(
             ingredientName,
             'unverified',
@@ -1511,9 +1684,9 @@ serve(async (req) => {
 
         return {
           name: ingredientName,
-          role: classifyIngredientRole(ingredientName, pubchemData),
+          role,
           explanation,
-          molecular_weight: pubchemData?.molecular_weight || null,
+          molecular_weight: pubchemData?.data?.molecular_weight || null,
           safety_profile: 'unverified'
         };
       })
@@ -1580,6 +1753,7 @@ serve(async (req) => {
       summary: personalizedSummary,
       routine_suggestions: routineSuggestions,
       personalized: !!profile,
+      fast_mode: isQuickScan,
       sub_scores: subScores,
       product_metadata: {
         brand: extractedBrand,
@@ -1598,7 +1772,7 @@ serve(async (req) => {
     // Generate AI explanation using Gemini 2.5 Flash (graceful degradation)
     let aiExplanation: SkinLytixGptResponse | null = null;
 
-    if (lovableApiKey) {
+    if (lovableApiKey && !skip_ai_explanation && !isQuickScan) {
       const scoreLabel = epiqScore >= 85 ? 'Low Risk - Excellent' :
                          epiqScore >= 70 ? 'Low Risk - Good' :
                          epiqScore >= 50 ? 'Moderate Risk' :

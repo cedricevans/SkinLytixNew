@@ -2,7 +2,7 @@ import { Home, Plus, Microscope, TrendingUp, Sparkles, GitCompare, Heart } from 
 import { useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
 
-interface ResponsiveBottomNavProps {
+export interface ResponsiveBottomNavProps {
   onAddToRoutine?: () => void;
   showAddToRoutine?: boolean;
   onChatOpen?: () => void;
@@ -15,7 +15,7 @@ export const ResponsiveBottomNav = ({ onAddToRoutine, showAddToRoutine = true, o
     {
       icon: Home,
       label: "Home",
-      action: () => navigate('/'),
+      action: () => navigate('/home'),
       show: true,
     },
     {

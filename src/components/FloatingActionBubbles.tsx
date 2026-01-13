@@ -25,7 +25,7 @@ export const FloatingActionBubbles = ({
       label: "Home",
       position: "top-4 left-4",
       gradient: "from-[hsl(197,75%,24%)] to-[hsl(197,75%,32%)]",
-      action: () => navigate('/'),
+      action: () => navigate('/home'),
       show: true,
     },
     {

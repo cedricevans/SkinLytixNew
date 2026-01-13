@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { ArrowLeft, AlertTriangle, TrendingDown, DollarSign, CheckCircle, Info, AlertCircle } from "lucide-react";
 import { toast } from "sonner";
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from "@/components/ui/tooltip";
+import AppShell from "@/components/AppShell";
 
 interface OptimizationData {
   routineType?: string;
@@ -91,17 +92,21 @@ export default function RoutineOptimization() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <p className="text-muted-foreground">Loading optimization...</p>
-      </div>
+      <AppShell showNavigation showBottomNav contentClassName="px-4 py-8">
+        <div className="flex items-center justify-center min-h-[50vh]">
+          <p className="text-muted-foreground">Loading optimization...</p>
+        </div>
+      </AppShell>
     );
   }
 
   if (!data) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <p className="text-muted-foreground">Optimization not found</p>
-      </div>
+      <AppShell showNavigation showBottomNav contentClassName="px-4 py-8">
+        <div className="flex items-center justify-center min-h-[50vh]">
+          <p className="text-muted-foreground">Optimization not found</p>
+        </div>
+      </AppShell>
     );
   }
 
@@ -121,8 +126,8 @@ export default function RoutineOptimization() {
 
   return (
     <TooltipProvider>
-      <div className="min-h-screen bg-background">
-      <div className="container mx-auto px-4 py-8 max-w-4xl">
+      <AppShell showNavigation showBottomNav contentClassName="px-4 py-8">
+      <div className="container mx-auto max-w-4xl">
         <Button
           variant="ghost"
           onClick={() => navigate("/routine")}
@@ -462,7 +467,7 @@ export default function RoutineOptimization() {
           </Card>
         )}
       </div>
-    </div>
+      </AppShell>
     </TooltipProvider>
   );
 }

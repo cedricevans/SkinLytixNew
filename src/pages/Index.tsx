@@ -8,8 +8,23 @@ import MicroEngagement from "@/components/MicroEngagement";
 import ExitIntentPopup from "@/components/ExitIntentPopup";
 import PricingPreview from "@/components/PricingPreview";
 import IngredientPreviewWidget from "@/components/IngredientPreviewWidget";
+import { useEffect } from "react";
+import { useNavigate } from "react-router-dom";
+import { supabase } from "@/integrations/supabase/client";
 
 const Index = () => {
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    const checkSession = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        navigate("/home", { replace: true });
+      }
+    };
+    checkSession();
+  }, [navigate]);
+
   return (
     <main className="min-h-screen">
       <Hero />

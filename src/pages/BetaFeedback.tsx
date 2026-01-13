@@ -10,6 +10,7 @@ import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { ArrowLeft, ArrowRight, CheckCircle2, Loader2 } from "lucide-react";
 import { useTracking, trackEvent } from "@/hooks/useTracking";
+import AppShell from "@/components/AppShell";
 
 const BetaFeedback = () => {
   const navigate = useNavigate();
@@ -166,28 +167,30 @@ const BetaFeedback = () => {
 
   if (submitted) {
     return (
-      <div className="min-h-screen bg-gradient-to-b from-background to-muted py-12 px-4 flex items-center justify-center">
-        <Card className="max-w-2xl w-full p-8 text-center">
-          <CheckCircle2 className="w-16 h-16 text-primary mx-auto mb-4" />
-          <h1 className="text-3xl font-bold mb-3">Thank you for helping shape SkinLytix 💚</h1>
-          <p className="text-muted-foreground mb-6">
-            Your feedback directly influences what we build next. We're so grateful you're here.
-          </p>
-          <div className="flex gap-3 justify-center">
-            <Button onClick={() => navigate('/upload')} size="lg">
-              Back to Analyzer
-            </Button>
-            <Button variant="outline" onClick={() => navigate('/')} size="lg">
-              Close
-            </Button>
-          </div>
-        </Card>
-      </div>
+      <AppShell showNavigation showBottomNav contentClassName="px-4 py-12">
+        <div className="flex items-center justify-center">
+          <Card className="max-w-2xl w-full p-8 text-center">
+            <CheckCircle2 className="w-16 h-16 text-primary mx-auto mb-4" />
+            <h1 className="text-3xl font-bold mb-3">Thank you for helping shape SkinLytix 💚</h1>
+            <p className="text-muted-foreground mb-6">
+              Your feedback directly influences what we build next. We're so grateful you're here.
+            </p>
+            <div className="flex gap-3 justify-center">
+              <Button onClick={() => navigate('/upload')} size="lg">
+                Back to Analyzer
+              </Button>
+              <Button variant="outline" onClick={() => navigate('/home')} size="lg">
+                Close
+              </Button>
+            </div>
+          </Card>
+        </div>
+      </AppShell>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-background to-muted py-12 px-4">
+    <AppShell showNavigation showBottomNav contentClassName="px-4 py-12">
       <div className="container max-w-3xl mx-auto">
         {/* Header */}
         <div className="mb-8">
@@ -476,7 +479,7 @@ const BetaFeedback = () => {
           </Card>
         )}
       </div>
-    </div>
+    </AppShell>
   );
 };
 

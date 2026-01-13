@@ -74,7 +74,7 @@ export const SkinLytixGPTChat = ({
           .select('id')
           .eq('user_id', user.id)
           .eq('analysis_id', analysisId)
-          .single();
+          .maybeSingle();
 
         if (conversation) {
           setConversationId(conversation.id);

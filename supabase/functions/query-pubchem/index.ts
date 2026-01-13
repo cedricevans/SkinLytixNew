@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
+import { COMMON_INGREDIENTS } from "../_shared/common-ingredients.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -14,8 +15,9 @@ const RATE_LIMITS = {
   maxPayloadSize: 50000  // 50KB max payload
 };
 
-// Rate limiting: 1-2 requests per second for PubChem API
-const RATE_LIMIT_DELAY = 1500; // 1.5 seconds between requests
+// Rate limiting: keep requests paced while avoiding long serial delays
+const RATE_LIMIT_DELAY = 300; // 0.3 seconds between PubChem batches
+const PUBCHEM_BATCH_SIZE = 4; // number of concurrent PubChem lookups per batch
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -85,7 +87,7 @@ serve(async (req) => {
     }
 
     // Step 4: Parse and validate request body
-    const { ingredients } = await req.json();
+    const { ingredients, force_pubchem } = await req.json();
     
     // Validation checks
     if (!Array.isArray(ingredients) || ingredients.length === 0) {
@@ -155,108 +157,169 @@ serve(async (req) => {
       'jojoba oil': 'simmondsia chinensis',
       'argan oil': 'argania spinosa',
       'aloe vera': 'aloe barbadensis',
+      'green tea': 'camellia sinensis',
+      'vitamin b3': 'niacinamide',
+      'vitamin b-3': 'niacinamide',
+      'vitamin c': 'ascorbic acid',
     };
 
     // Normalize ingredient name
     const normalizeIngredient = (name: string): string => {
-      const cleaned = name.trim().toLowerCase();
+      let cleaned = name.trim().toLowerCase();
+      cleaned = cleaned.replace(/\([^)]*\)/g, ' ');
+      cleaned = cleaned.replace(/\b\d+(\.\d+)?\s*%\b/g, ' ');
+      cleaned = cleaned.replace(/\b\d+(\.\d+)?\s*percent\b/g, ' ');
+      cleaned = cleaned.replace(/^\s*\d+\s*(types?|forms?)\s+of\s+/i, '');
+      cleaned = cleaned.replace(/^\s*(types?|forms?)\s+of\s+/i, '');
+      cleaned = cleaned.replace(/\b(types?|forms?)\s+of\b/g, ' ');
+      cleaned = cleaned.replace(/\s+/g, ' ').trim();
       return INGREDIENT_ALIASES[cleaned] || cleaned;
     };
 
-    const results = [];
+    const commonSet = new Set(COMMON_INGREDIENTS.map((item: string) => normalizeIngredient(item)));
 
-    for (const ingredientName of ingredients) {
-      const cleanName = normalizeIngredient(ingredientName);
-      
-      // Check cache first (permanent cache)
-      const { data: cached } = await supabase
+    const ingredientsList = ingredients.map((ingredientName: string) => ({
+      original: ingredientName,
+      clean: normalizeIngredient(ingredientName),
+    }));
+
+    const uniqueIngredients = new Map<string, string[]>();
+    ingredientsList.forEach(({ original, clean }: { original: string; clean: string }) => {
+      const existing = uniqueIngredients.get(clean) || [];
+      existing.push(original);
+      uniqueIngredients.set(clean, existing);
+    });
+
+    const uniqueResults = new Map<string, { data: any; source: string; message?: string }>();
+
+    const fetchWithRetry = async (url: string, attempts = 2): Promise<Response> => {
+      let lastError: unknown;
+      for (let attempt = 0; attempt < attempts; attempt += 1) {
+        try {
+          const response = await fetch(url);
+          if (response.status === 429 && attempt < attempts - 1) {
+            await new Promise(resolve => setTimeout(resolve, 1200));
+            continue;
+          }
+          return response;
+        } catch (error) {
+          lastError = error;
+          await new Promise(resolve => setTimeout(resolve, 400));
+        }
+      }
+      throw lastError || new Error('PubChem request failed');
+    };
+
+    const uniqueNames = Array.from(uniqueIngredients.keys());
+
+    if (!force_pubchem) {
+      uniqueNames.forEach((cleanName) => {
+        if (!commonSet.has(cleanName)) return;
+        uniqueResults.set(cleanName, {
+          data: null,
+          source: "local",
+        });
+      });
+    }
+
+    const cacheCandidates = uniqueNames.filter((name) => !uniqueResults.has(name));
+    if (cacheCandidates.length > 0) {
+      const { data: cachedRows } = await supabase
         .from('ingredient_cache')
         .select('*')
-        .eq('ingredient_name', cleanName)
-        .maybeSingle();
+        .in('ingredient_name', cacheCandidates);
 
-      if (cached) {
-        console.log('Cache hit for ingredient:', cleanName);
-        results.push({
-          name: ingredientName,
+      (cachedRows || []).forEach((cached: any) => {
+        console.log('Cache hit for ingredient:', cached.ingredient_name);
+        uniqueResults.set(cached.ingredient_name, {
           data: {
             pubchem_cid: cached.pubchem_cid,
             molecular_weight: cached.molecular_weight,
-            properties: cached.properties_json
+            properties: cached.properties_json,
           },
-          source: 'cache'
+          source: 'cache',
         });
-        continue;
-      }
+      });
+    }
 
-      // Cache miss - query PubChem
+    const missingNames = cacheCandidates.filter((name) => !uniqueResults.has(name));
+
+    const fetchPubchem = async (cleanName: string) => {
       console.log('Cache miss, querying PubChem for:', cleanName);
-      
       try {
-        // Search for compound by name
-        const searchResponse = await fetch(
+        const searchResponse = await fetchWithRetry(
           `https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/name/${encodeURIComponent(cleanName)}/JSON`
         );
 
         if (searchResponse.ok) {
           const searchData = await searchResponse.json();
           const compound = searchData.PC_Compounds?.[0];
-          
+
           if (compound) {
             const cid = compound.id?.id?.cid;
-            const molecularWeight = compound.props?.find((p: any) => 
+            const molecularWeight = compound.props?.find((p: any) =>
               p.urn?.label === 'Molecular Weight'
             )?.value?.fval;
 
-            // Store in cache
             await supabase
               .from('ingredient_cache')
               .insert({
                 ingredient_name: cleanName,
                 pubchem_cid: cid?.toString(),
                 molecular_weight: molecularWeight,
-                properties_json: { compound }
+                properties_json: { compound },
               });
 
-            results.push({
-              name: ingredientName,
+            uniqueResults.set(cleanName, {
               data: {
                 pubchem_cid: cid?.toString(),
                 molecular_weight: molecularWeight,
-                properties: { compound }
+                properties: { compound },
               },
-              source: 'api'
+              source: 'api',
             });
           } else {
-            results.push({
-              name: ingredientName,
+            uniqueResults.set(cleanName, {
               data: null,
               source: 'api',
-              message: 'Not found in PubChem'
+              message: 'Not found in PubChem',
             });
           }
         } else {
-          results.push({
-            name: ingredientName,
+          uniqueResults.set(cleanName, {
             data: null,
             source: 'api',
-            message: 'Not found in PubChem'
+            message: 'Not found in PubChem',
           });
         }
-
-        // Rate limiting delay
-        await new Promise(resolve => setTimeout(resolve, RATE_LIMIT_DELAY));
-
       } catch (error) {
         console.error(`Error querying PubChem for ${cleanName}:`, error);
-        results.push({
-          name: ingredientName,
+        uniqueResults.set(cleanName, {
           data: null,
           source: 'error',
-          message: error instanceof Error ? error.message : 'Unknown error'
+          message: error instanceof Error ? error.message : 'Unknown error',
         });
       }
+    };
+
+    for (let i = 0; i < missingNames.length; i += PUBCHEM_BATCH_SIZE) {
+      const batch = missingNames.slice(i, i + PUBCHEM_BATCH_SIZE);
+      await Promise.all(batch.map(fetchPubchem));
+      if (i + PUBCHEM_BATCH_SIZE < missingNames.length) {
+        await new Promise(resolve => setTimeout(resolve, RATE_LIMIT_DELAY));
+      }
     }
+
+    const results = ingredientsList.map(({ original, clean }) => {
+      const result = uniqueResults.get(clean);
+      return {
+        name: original,
+        searched_name: clean,
+        data: result?.data ?? null,
+        source: result?.source ?? 'error',
+        message: result?.message,
+      };
+    });
 
     return new Response(
       JSON.stringify({ results }),

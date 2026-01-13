@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Camera, Upload as UploadIcon, Loader2, Info, Home, User } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -15,6 +15,8 @@ import OCRLoadingTips from "@/components/OCRLoadingTips";
 import { FrictionFeedbackBanner } from "@/components/FrictionFeedbackBanner";
 import AppShell from "@/components/AppShell";
 import PageHeader from "@/components/PageHeader";
+import { Progress } from "@/components/ui/progress";
+import { getQuickScanSummary } from "@/lib/quick-scan";
 
 // Helper: Preprocess image for better OCR accuracy
 const preprocessImage = (imageDataUrl: string): Promise<string> => {
@@ -74,6 +76,20 @@ const Upload = () => {
   const [productType, setProductType] = useState<'face' | 'body' | 'hair' | 'auto'>('auto');
   const [productPrice, setProductPrice] = useState("");
   const [showFrictionBanner, setShowFrictionBanner] = useState(false);
+  const [analysisProgress, setAnalysisProgress] = useState(0);
+  const [analysisStatus, setAnalysisStatus] = useState("Preparing analysis...");
+  const [analysisId, setAnalysisId] = useState<string | null>(null);
+  const [analysisReady, setAnalysisReady] = useState(false);
+  const analysisStartRef = useRef<number | null>(null);
+  const autoAnalyzeTimerRef = useRef<number | null>(null);
+  const [autoAnalyzePending, setAutoAnalyzePending] = useState(false);
+  const [lastAutoAnalyzeSignature, setLastAutoAnalyzeSignature] = useState<string | null>(null);
+  const [scanMode, setScanMode] = useState<"quick" | "detailed">("quick");
+  const quickScanSummary = useMemo(() => {
+    if (!ingredientsList.trim()) return null;
+    const type = productType === "auto" ? "face" : productType;
+    return getQuickScanSummary(ingredientsList, type);
+  }, [ingredientsList, productType]);
 
   const handleImageUpload = async (file: File) => {
     trackEvent({
@@ -210,7 +226,7 @@ const Upload = () => {
     }
   };
 
-  const handleAnalyze = async () => {
+  const handleAnalyze = async (source: "manual" | "auto" = "manual") => {
     if (!productName.trim() || !ingredientsList.trim()) {
       toast({
         title: "Missing Information",
@@ -218,6 +234,13 @@ const Upload = () => {
         variant: "destructive",
       });
       return;
+    }
+
+    if (isAnalyzing) return;
+    if (autoAnalyzeTimerRef.current) {
+      window.clearTimeout(autoAnalyzeTimerRef.current);
+      autoAnalyzeTimerRef.current = null;
+      setAutoAnalyzePending(false);
     }
 
     const { data: { user } } = await supabase.auth.getUser();
@@ -232,22 +255,57 @@ const Upload = () => {
     }
 
     setIsAnalyzing(true);
+    setAnalysisReady(false);
+    setAnalysisId(null);
+    analysisStartRef.current = Date.now();
+    setAnalysisProgress(5);
+    const modeLabel = scanMode === "quick" ? "Quick scan" : "Detailed scan";
+    setAnalysisStatus(source === "auto" ? `${modeLabel} is running...` : `Preparing ${modeLabel.toLowerCase()}...`);
 
     try {
-      const { data, error } = await supabase.functions.invoke('analyze-product', {
-        body: {
-          product_name: productName,
-          barcode: barcode || null,
-          brand: brand || null,
-          category: category || null,
-          ingredients_list: ingredientsList,
-          product_price: productPrice ? parseFloat(productPrice) : null,
-          user_id: user.id,
-          image_url: productImage || null
-        }
-      });
+      const payload = {
+        product_name: productName,
+        barcode: barcode || null,
+        brand: brand || null,
+        category: category || null,
+        ingredients_list: ingredientsList,
+        product_price: productPrice ? parseFloat(productPrice) : null,
+        user_id: user.id,
+        image_url: productImage || null,
+        skip_ingredient_ai_explanations: scanMode === "quick",
+        scan_mode: scanMode,
+        skip_ai_explanation: scanMode === "quick",
+      };
 
-      if (error) throw error;
+      const useProxy = import.meta.env.DEV && import.meta.env.VITE_USE_FUNCTIONS_PROXY === "true";
+      let data: any;
+
+      if (useProxy) {
+        const { data: sessionData } = await supabase.auth.getSession();
+        const accessToken = sessionData.session?.access_token;
+        const response = await fetch("/functions/analyze-product", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            apikey: import.meta.env.VITE_SUPABASE_ANON_KEY,
+            ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+          },
+          body: JSON.stringify(payload),
+        });
+
+        if (!response.ok) {
+          const errorText = await response.text();
+          throw new Error(errorText || "Failed to analyze product");
+        }
+        data = await response.json();
+      } else {
+        const { data: invokeData, error } = await supabase.functions.invoke('analyze-product', {
+          body: payload
+        });
+
+        if (error) throw error;
+        data = invokeData;
+      }
 
       trackEvent({
         eventName: 'product_analyzed',
@@ -256,17 +314,19 @@ const Upload = () => {
           epiq_score: data.epiq_score,
           productType,
           hasBarcode: !!barcode,
-          hasBrand: !!brand
+          hasBrand: !!brand,
+          scanMode
         }
       });
 
+      setAnalysisProgress(100);
+      setAnalysisStatus("Analysis ready. Review ingredients, then continue.");
       toast({
-        title: "Analysis Complete!",
-        description: `EpiQ Score: ${data.epiq_score}/100. Add to routine to unlock cost savings!`,
+        title: "Analysis Ready",
+        description: "Review your details, then open the report.",
       });
-
-      navigate(`/analysis/${data.analysis_id}`);
-
+      setAnalysisId(data.analysis_id);
+      setAnalysisReady(true);
     } catch (error) {
       console.error('Analysis error:', error);
       setShowFrictionBanner(true);
@@ -277,20 +337,105 @@ const Upload = () => {
       });
     } finally {
       setIsAnalyzing(false);
+      analysisStartRef.current = null;
     }
   };
+
+  useEffect(() => {
+    if (!isAnalyzing) return;
+
+    const ingredientCount = ingredientsList
+      .split(/[,;\n]/)
+      .map((item) => item.trim())
+      .filter(Boolean).length;
+
+    let progressValue = 5;
+    setAnalysisProgress(progressValue);
+
+    const intervalId = window.setInterval(() => {
+      if (progressValue < 80) {
+        progressValue = Math.min(80, progressValue + Math.random() * 3 + 1);
+      } else if (progressValue < 95) {
+        progressValue = Math.min(95, progressValue + Math.random() * 1.2 + 0.5);
+      }
+      setAnalysisProgress(Math.round(progressValue));
+
+      const total = Math.max(ingredientCount, 1);
+      const scanned = Math.min(total, Math.max(1, Math.round((progressValue / 95) * total)));
+      if (progressValue >= 95) {
+        setAnalysisStatus("Finalizing your report...");
+      } else {
+        setAnalysisStatus(`Detected ${total} ingredients. Scanning ${scanned} of ${total} for highest-quality results...`);
+      }
+    }, 900);
+
+    return () => window.clearInterval(intervalId);
+  }, [isAnalyzing, ingredientsList]);
+
+  useEffect(() => {
+    if (isProcessingOCR || isAnalyzing) {
+      if (autoAnalyzeTimerRef.current) {
+        window.clearTimeout(autoAnalyzeTimerRef.current);
+        autoAnalyzeTimerRef.current = null;
+      }
+      setAutoAnalyzePending(false);
+      return;
+    }
+
+    const name = productName.trim();
+    const ingredients = ingredientsList.trim();
+    if (!name || !ingredients) {
+      if (autoAnalyzeTimerRef.current) {
+        window.clearTimeout(autoAnalyzeTimerRef.current);
+        autoAnalyzeTimerRef.current = null;
+      }
+      setAutoAnalyzePending(false);
+      return;
+    }
+
+    const signature = `${name}::${ingredients}`;
+    if (lastAutoAnalyzeSignature === signature) {
+      setAutoAnalyzePending(false);
+      return;
+    }
+
+    if (autoAnalyzeTimerRef.current) {
+      window.clearTimeout(autoAnalyzeTimerRef.current);
+    }
+
+    setAutoAnalyzePending(true);
+    autoAnalyzeTimerRef.current = window.setTimeout(async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        setAutoAnalyzePending(false);
+        return;
+      }
+      setLastAutoAnalyzeSignature(signature);
+      setAutoAnalyzePending(false);
+      handleAnalyze("auto");
+    }, 1500);
+
+    return () => {
+      if (autoAnalyzeTimerRef.current) {
+        window.clearTimeout(autoAnalyzeTimerRef.current);
+        autoAnalyzeTimerRef.current = null;
+      }
+    };
+  }, [productName, ingredientsList, isProcessingOCR, isAnalyzing, lastAutoAnalyzeSignature]);
 
   return (
     <TooltipProvider>
       <AppShell
         className="bg-gradient-to-b from-background to-muted"
+        showNavigation
+        showBottomNav
         header={
           <PageHeader>
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div className="flex flex-wrap gap-2">
                 <Button
                   variant="outline"
-                  onClick={() => navigate('/')}
+                  onClick={() => navigate('/home')}
                   className="gap-2"
                 >
                   <Home className="w-4 h-4" />
@@ -365,6 +510,34 @@ const Upload = () => {
             </div>
             <p className="text-xs text-muted-foreground">
               Helps optimize ingredient analysis for your product type
+            </p>
+          </div>
+
+          {/* Scan Mode Selector */}
+          <div className="space-y-2">
+            <Label>Scan Speed</Label>
+            <div className="flex flex-wrap gap-2">
+              <Button
+                type="button"
+                variant={scanMode === 'quick' ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => setScanMode('quick')}
+                className="touch-target w-full sm:w-auto"
+              >
+                Quick Scan
+              </Button>
+              <Button
+                type="button"
+                variant={scanMode === 'detailed' ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => setScanMode('detailed')}
+                className="touch-target w-full sm:w-auto"
+              >
+                Detailed Scan
+              </Button>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Quick scan returns results faster. Detailed scan verifies more ingredients.
             </p>
           </div>
 
@@ -577,6 +750,23 @@ const Upload = () => {
               <p className="text-xs text-muted-foreground mt-2">
                 Review and correct the extracted text as needed
               </p>
+              {quickScanSummary && (
+                <div className="mt-4 rounded-lg border border-border bg-muted/30 p-4">
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="font-medium text-foreground">Quick scan preview</span>
+                    <span className="text-muted-foreground">{quickScanSummary.total} ingredients</span>
+                  </div>
+                  <div className="mt-2 grid grid-cols-2 gap-2 text-xs text-muted-foreground">
+                    <span>Known safe: {quickScanSummary.safeKnown}</span>
+                    <span>Potential concerns: {quickScanSummary.potentialConcerns}</span>
+                    <span>Beneficial: {quickScanSummary.beneficial}</span>
+                    <span>Needs verification: {quickScanSummary.unknown}</span>
+                  </div>
+                  <p className="mt-2 text-xs text-muted-foreground">
+                    This quick scan uses common ingredient patterns. Detailed scans verify more ingredients.
+                  </p>
+                </div>
+              )}
             </div>
           </div>
 
@@ -597,6 +787,48 @@ const Upload = () => {
               'Analyze Product'
             )}
           </Button>
+          {isAnalyzing && (
+            <div className="space-y-3 rounded-lg border border-border bg-muted/30 p-4">
+              <div className="flex items-center justify-between text-sm">
+                <span className="font-medium text-foreground">Analysis in progress</span>
+                <span className="text-muted-foreground">{analysisProgress}%</span>
+              </div>
+              <Progress value={analysisProgress} />
+              <p className="text-xs text-muted-foreground">{analysisStatus}</p>
+              {scanMode === "quick" && (
+                <p className="text-xs text-muted-foreground">
+                  Quick scan shows results first. We’ll continue detailed verification after this step.
+                </p>
+              )}
+              <p className="text-xs text-muted-foreground">
+                Most scans finish quickly. If it takes a bit longer, we’re running extra quality checks.
+              </p>
+            </div>
+          )}
+          {analysisReady && analysisId && !isAnalyzing && (
+            <div className="space-y-3 rounded-lg border border-border bg-muted/30 p-4">
+              <div className="flex items-center justify-between text-sm">
+                <span className="font-medium text-foreground">Analysis ready</span>
+                <span className="text-muted-foreground">100%</span>
+              </div>
+              <Progress value={100} />
+              <p className="text-xs text-muted-foreground">
+                Review the details above, then open the full report.
+              </p>
+              <Button
+                onClick={() => navigate(`/analysis/${analysisId}`)}
+                className="w-full"
+                variant="cta"
+              >
+                View Analysis Report
+              </Button>
+            </div>
+          )}
+          {autoAnalyzePending && !isAnalyzing && (
+            <div className="rounded-lg border border-border bg-background/50 p-3 text-xs text-muted-foreground">
+              Auto-analysis will start in a moment after you finish edits.
+            </div>
+          )}
         </Card>
         </div>
       </AppShell>

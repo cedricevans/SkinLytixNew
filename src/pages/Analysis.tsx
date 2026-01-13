@@ -5,7 +5,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { AlertCircle, CheckCircle2, Sparkles, Home, ScanLine, Plus, Info, HelpCircle, AlertTriangle, Download } from "lucide-react";
+import { AlertCircle, CheckCircle2, Sparkles, Home, ScanLine, Plus, Info, HelpCircle, AlertTriangle, Download, Loader2 } from "lucide-react";
 import PostAnalysisFeedback from "@/components/PostAnalysisFeedback";
 import { PostAnalysisFeedbackCard } from "@/components/PostAnalysisFeedbackCard";
 import { FrictionFeedbackBanner } from "@/components/FrictionFeedbackBanner";
@@ -17,7 +17,6 @@ import { AnimatedScoreGauge } from "@/components/AnimatedScoreGauge";
 import { SafetyLevelMeter } from "@/components/SafetyLevelMeter";
 import { ProfessionalReferralBanner } from "@/components/ProfessionalReferralBanner";
 import { FloatingActionBubbles } from "@/components/FloatingActionBubbles";
-import { ResponsiveBottomNav } from "@/components/ResponsiveBottomNav";
 import { IngredientRiskHeatmap } from "@/components/IngredientRiskHeatmap";
 import { ScoreBreakdownAccordion } from "@/components/ScoreBreakdownAccordion";
 import { AIExplanationAccordion } from "@/components/AIExplanationAccordion";
@@ -31,6 +30,7 @@ import AppShell from "@/components/AppShell";
 import PageHeader from "@/components/PageHeader";
 import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { fetchIngredientExplanations, IngredientExplanationInput } from "@/lib/ingredient-explanations";
 
 interface AnalysisData {
   id: string;
@@ -39,8 +39,8 @@ interface AnalysisData {
   category?: string;
   ingredients_list: string;
   epiq_score: number;
-  recommendations_json: {
-    safe_ingredients: Array<{ name: string; risk_score?: number; role?: string; explanation?: string; molecular_weight?: number; safety_profile?: string }>;
+    recommendations_json: {
+      safe_ingredients: Array<{ name: string; risk_score?: number; role?: string; explanation?: string; molecular_weight?: number; safety_profile?: string }>;
     problematic_ingredients?: Array<{
       name: string;
       reason: string;
@@ -52,12 +52,13 @@ interface AnalysisData {
       risk_score?: number;
     }>;
     concern_ingredients: Array<{ name: string; risk_score?: number; role?: string; explanation?: string; molecular_weight?: number; safety_profile?: string }>;
-    warnings?: string[];
-    summary: string;
-    routine_suggestions: string[];
-    personalized?: boolean;
-    sub_scores?: {
-      ingredient_safety: number;
+      warnings?: string[];
+      summary: string;
+      routine_suggestions: string[];
+      personalized?: boolean;
+      fast_mode?: boolean;
+      sub_scores?: {
+        ingredient_safety: number;
       skin_compatibility: number;
       active_quality: number;
       preservative_safety: number;
@@ -107,6 +108,14 @@ const Analysis = () => {
   const [showAllSafe, setShowAllSafe] = useState(false);
   const [showAllConcerns, setShowAllConcerns] = useState(false);
   const [showAllNeeds, setShowAllNeeds] = useState(false);
+  const [aiExplanations, setAiExplanations] = useState<Record<string, string>>({});
+  const [loadingExplanationTab, setLoadingExplanationTab] = useState<"safe" | "concerns" | "needs" | null>(null);
+  const [hasAutoLoadedInitial, setHasAutoLoadedInitial] = useState(false);
+  const canLoadIngredientExplanations = import.meta.env.VITE_ENABLE_EXPLAIN_INGREDIENTS === "true";
+  const [isUpgradingScan, setIsUpgradingScan] = useState(false);
+  const [autoUpgradeTriggered, setAutoUpgradeTriggered] = useState(false);
+  const [detailProgress, setDetailProgress] = useState(0);
+  const [detailStatus, setDetailStatus] = useState("Preparing detailed scan...");
 
   const fetchAnalysis = async (options?: { silent?: boolean }) => {
     if (!id) return;
@@ -141,7 +150,7 @@ const Analysis = () => {
             description: "Could not load the analysis data.",
             variant: "destructive",
           });
-          navigate('/');
+          navigate('/home');
         }
         return;
       }
@@ -157,6 +166,105 @@ const Analysis = () => {
       }
     }
   };
+
+  const handleRunDetailedScan = async () => {
+    if (!analysis || isUpgradingScan) return;
+    setIsUpgradingScan(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        toast({
+          title: "Authentication Required",
+          description: "Please sign in to run a detailed scan.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      const payload = {
+        product_name: analysis.product_name,
+        barcode: null,
+        brand: analysis.brand || null,
+        category: analysis.category || null,
+        ingredients_list: analysis.ingredients_list,
+        product_price: null,
+        user_id: user.id,
+        image_url: null,
+        skip_ingredient_ai_explanations: false,
+        scan_mode: "detailed",
+      };
+
+      const { data, error } = await supabase.functions.invoke("analyze-product", {
+        body: payload,
+      });
+
+      if (error) throw error;
+
+      toast({
+        title: "Detailed scan started",
+        description: "We’re verifying more ingredients now.",
+      });
+
+      if (data?.analysis_id) {
+        toast({
+          title: "Detailed scan ready",
+          description: "Loading your full report now.",
+        });
+        navigate(`/analysis/${data.analysis_id}`);
+      } else {
+        fetchAnalysis({ silent: true });
+      }
+    } catch (error) {
+      console.error("Detailed scan error:", error);
+      toast({
+        title: "Detailed scan failed",
+        description: "Please try again in a moment.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsUpgradingScan(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!isUpgradingScan) {
+      setDetailProgress(0);
+      setDetailStatus("Preparing detailed scan...");
+      return;
+    }
+
+    let progressValue = 5;
+    setDetailProgress(progressValue);
+    setDetailStatus("Running detailed verification...");
+
+    const intervalId = window.setInterval(() => {
+      if (progressValue < 85) {
+        progressValue = Math.min(85, progressValue + Math.random() * 8 + 3);
+      } else if (progressValue < 95) {
+        progressValue = Math.min(95, progressValue + Math.random() * 2 + 1);
+      }
+      setDetailProgress(Math.round(progressValue));
+
+      if (progressValue >= 95) {
+        setDetailStatus("Finalizing detailed results...");
+      } else {
+        setDetailStatus("Verifying ingredients for the full report...");
+      }
+    }, 900);
+
+    return () => window.clearInterval(intervalId);
+  }, [isUpgradingScan]);
+
+  useEffect(() => {
+    if (!analysis?.recommendations_json.fast_mode) return;
+    if (isUpgradingScan || autoUpgradeTriggered) return;
+    setAutoUpgradeTriggered(true);
+    const timeoutId = window.setTimeout(() => {
+      handleRunDetailedScan();
+    }, 1500);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [analysis, isUpgradingScan, autoUpgradeTriggered]);
 
 
   const handleAddToRoutine = async () => {
@@ -255,6 +363,123 @@ const Analysis = () => {
     return () => window.clearTimeout(timeoutId);
   }, [analysis, isProcessingDetails, refreshAttempts, id]);
 
+  const getIngredientName = (ingredient: any) => {
+    return typeof ingredient === "string" ? ingredient : ingredient.name;
+  };
+
+  const getIngredientId = (name: string) => {
+    return `ingredient-${name.replace(/\s+/g, '-')}`;
+  };
+  const getIngredientKey = (name: string) => name.trim().toLowerCase();
+  const getAiExplanation = (name: string) => aiExplanations[getIngredientKey(name)];
+
+  const explanationBatchSize = 8;
+  const loadIngredientExplanations = async (
+    inputs: IngredientExplanationInput[],
+    tab: "safe" | "concerns" | "needs"
+  ) => {
+    if (!canLoadIngredientExplanations) return;
+    if (loadingExplanationTab) return;
+    const missing = inputs.filter((item) => !aiExplanations[getIngredientKey(item.name)]);
+    if (missing.length === 0) return;
+
+    setLoadingExplanationTab(tab);
+    try {
+      const results = await fetchIngredientExplanations(missing.slice(0, explanationBatchSize));
+      if (results.length === 0) return;
+      setAiExplanations((prev) => {
+        const next = { ...prev };
+        results.forEach((result) => {
+          next[getIngredientKey(result.name)] = result.explanation;
+        });
+        return next;
+      });
+    } catch (error) {
+      console.error("Error loading ingredient explanations:", error);
+    } finally {
+      setLoadingExplanationTab(null);
+    }
+  };
+
+  const safeInputs: IngredientExplanationInput[] = analysis
+    ? (() => {
+        const beneficial = analysis.recommendations_json.beneficial_ingredients || [];
+        const safe = analysis.recommendations_json.safe_ingredients || [];
+        const safeItems = [
+          ...beneficial.map((item: any) => ({
+            name: item.name,
+            label: "Targeted",
+          })),
+          ...safe
+            .filter((ing: any) => !beneficial.some((b: any) => b.name === getIngredientName(ing)))
+            .map((ingredient: any) => ({
+              name: getIngredientName(ingredient),
+              label: "Safe",
+            })),
+        ];
+        return safeItems.map((item) => ({
+          name: item.name,
+          category: item.label === "Targeted" ? "beneficial" : "safe",
+        }));
+      })()
+    : [];
+
+  const concernInputs: IngredientExplanationInput[] = analysis
+    ? (analysis.recommendations_json.problematic_ingredients || []).map((item) => ({
+        name: item.name,
+        category: "problematic",
+      }))
+    : [];
+
+  const needsInputs: IngredientExplanationInput[] = analysis
+    ? (analysis.recommendations_json.concern_ingredients || []).map((item: any) => ({
+        name: getIngredientName(item),
+        category: "unverified",
+      }))
+    : [];
+
+  useEffect(() => {
+    if (!canLoadIngredientExplanations) return;
+    if (!analysis || hasAutoLoadedInitial) return;
+    setHasAutoLoadedInitial(true);
+    const loadInitial = async () => {
+      if (concernInputs.length > 0) {
+        await loadIngredientExplanations(concernInputs, "concerns");
+      }
+      if (needsInputs.length > 0) {
+        await loadIngredientExplanations(needsInputs, "needs");
+      }
+    };
+    loadInitial();
+  }, [analysis, concernInputs, needsInputs, hasAutoLoadedInitial]);
+
+  useEffect(() => {
+    if (!canLoadIngredientExplanations) return;
+    if (!showAllSafe || safeInputs.length === 0 || loadingExplanationTab) return;
+    const remaining = safeInputs.filter((item) => !getAiExplanation(item.name));
+    if (remaining.length > 0) {
+      loadIngredientExplanations(remaining, "safe");
+    }
+  }, [showAllSafe, safeInputs, aiExplanations, loadingExplanationTab]);
+
+  useEffect(() => {
+    if (!canLoadIngredientExplanations) return;
+    if (!showAllConcerns || concernInputs.length === 0 || loadingExplanationTab) return;
+    const remaining = concernInputs.filter((item) => !getAiExplanation(item.name));
+    if (remaining.length > 0) {
+      loadIngredientExplanations(remaining, "concerns");
+    }
+  }, [showAllConcerns, concernInputs, aiExplanations, loadingExplanationTab]);
+
+  useEffect(() => {
+    if (!canLoadIngredientExplanations) return;
+    if (!showAllNeeds || needsInputs.length === 0 || loadingExplanationTab) return;
+    const remaining = needsInputs.filter((item) => !getAiExplanation(item.name));
+    if (remaining.length > 0) {
+      loadIngredientExplanations(remaining, "needs");
+    }
+  }, [showAllNeeds, needsInputs, aiExplanations, loadingExplanationTab]);
+
   if (loading) {
     return (
       <main className="min-h-screen flex items-center justify-center bg-gradient-to-b from-background to-muted">
@@ -283,14 +508,6 @@ const Analysis = () => {
     return "Needs Attention";
   };
 
-  const getIngredientName = (ingredient: any) => {
-    return typeof ingredient === "string" ? ingredient : ingredient.name;
-  };
-
-  const getIngredientId = (name: string) => {
-    return `ingredient-${name.replace(/\s+/g, '-')}`;
-  };
-
   return (
     <TooltipProvider>
       {analysis?.recommendations_json?.ai_explanation?.professional_referral?.needed && (
@@ -302,10 +519,24 @@ const Analysis = () => {
       <AppShell
         className="bg-gradient-to-b from-background to-muted"
         contentClassName="px-4 py-6 md:py-10"
+        showNavigation
+        showBottomNav
+        bottomNavProps={{
+          onAddToRoutine: handleAddToRoutine,
+          showAddToRoutine: true,
+          onChatOpen: () => {
+            setIsChatOpen(true);
+            trackEvent({
+              eventName: 'chat_opened',
+              eventCategory: 'chat',
+              eventProperties: { analysisId: analysis.id, source: 'bottom_nav' }
+            });
+          },
+        }}
         header={
           <PageHeader>
             <div className="flex flex-wrap items-center justify-between gap-3">
-              <Button variant="ghost" onClick={() => navigate('/')}>
+              <Button variant="ghost" onClick={() => navigate('/home')}>
                 <Home className="w-4 h-4 mr-2" />
                 Back to Home
               </Button>
@@ -563,6 +794,44 @@ const Analysis = () => {
               Ingredient Breakdown
             </p>
           </div>
+          {analysis.recommendations_json.fast_mode && (
+            <Alert className="border-amber-200 bg-amber-50 text-amber-900 sticky top-2 z-30">
+              <AlertDescription>
+                Quick scan results are shown first. We’re upgrading to a detailed scan in the background.
+              </AlertDescription>
+              {isUpgradingScan && (
+                <div className="mt-3 space-y-2">
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="font-medium">Detailed scan</span>
+                    <span>{detailProgress}%</span>
+                  </div>
+                  <Progress value={detailProgress} />
+                  <p className="text-xs text-amber-900">{detailStatus}</p>
+                  <p className="text-xs text-amber-900/80">
+                    Keep browsing—your full report will load automatically when it’s ready.
+                  </p>
+                </div>
+              )}
+              <div className="mt-3">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleRunDetailedScan}
+                  disabled={isUpgradingScan}
+                  className="border-amber-300 text-amber-900 hover:bg-amber-100"
+                >
+                  {isUpgradingScan ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      Upgrading to detailed scan...
+                    </>
+                  ) : (
+                    "Run detailed scan"
+                  )}
+                </Button>
+              </div>
+            </Alert>
+          )}
 
         {/* Ingredient Risk Heatmap */}
         {(() => {
@@ -684,7 +953,6 @@ const Analysis = () => {
 
                   const limit = 8;
                   const visible = showAllSafe ? safeItems : safeItems.slice(0, limit);
-
                   return (
                     <>
                       {visible.map((item, index) => (
@@ -701,6 +969,12 @@ const Analysis = () => {
                           </summary>
                           {item.details && (
                             <p className="mt-2 text-sm text-muted-foreground">{item.details}</p>
+                          )}
+                          {getAiExplanation(item.name) && getAiExplanation(item.name) !== item.details && (
+                            <p className="mt-2 text-sm text-muted-foreground">
+                              <span className="font-medium text-foreground">AI explanation:</span>{" "}
+                              {getAiExplanation(item.name)}
+                            </p>
                           )}
                         </details>
                       ))}
@@ -729,7 +1003,6 @@ const Analysis = () => {
                   const items = analysis.recommendations_json.problematic_ingredients || [];
                   const limit = 6;
                   const visible = showAllConcerns ? items : items.slice(0, limit);
-
                   return (
                     <>
                       {visible.map((item, index) => (
@@ -744,6 +1017,12 @@ const Analysis = () => {
                             )}
                           </summary>
                           <p className="mt-2 text-sm text-muted-foreground">{item.reason}</p>
+                          {getAiExplanation(item.name) && (
+                            <p className="mt-2 text-sm text-muted-foreground">
+                              <span className="font-medium text-foreground">AI explanation:</span>{" "}
+                              {getAiExplanation(item.name)}
+                            </p>
+                          )}
                         </details>
                       ))}
                       {items.length > limit && (
@@ -771,7 +1050,6 @@ const Analysis = () => {
                   const items = analysis.recommendations_json.concern_ingredients || [];
                   const limit = 6;
                   const visible = showAllNeeds ? items : items.slice(0, limit);
-
                   return (
                     <>
                       {visible.map((ingredient: any, index: number) => {
@@ -790,6 +1068,12 @@ const Analysis = () => {
                               {role && <span className="text-xs text-muted-foreground">Role: {role}</span>}
                             </summary>
                             <p className="mt-2 text-sm text-muted-foreground">{details}</p>
+                            {getAiExplanation(name) && getAiExplanation(name) !== details && (
+                              <p className="mt-2 text-sm text-muted-foreground">
+                                <span className="font-medium text-foreground">AI explanation:</span>{" "}
+                                {getAiExplanation(name)}
+                              </p>
+                            )}
                           </details>
                         );
                       })}
@@ -887,20 +1171,6 @@ const Analysis = () => {
         <FloatingActionBubbles 
           onAddToRoutine={handleAddToRoutine}
           showAddToRoutine={true}
-        />
-
-        {/* Responsive Bottom Navigation (Mobile + Tablet) */}
-        <ResponsiveBottomNav 
-          onAddToRoutine={handleAddToRoutine}
-          showAddToRoutine={true}
-          onChatOpen={() => {
-            setIsChatOpen(true);
-            trackEvent({
-              eventName: 'chat_opened',
-              eventCategory: 'chat',
-              eventProperties: { analysisId: analysis.id, source: 'bottom_nav' }
-            });
-          }}
         />
 
         {/* SkinLytixGPT Chat with Voice */}
