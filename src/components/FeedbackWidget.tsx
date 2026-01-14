@@ -135,7 +135,7 @@ const FeedbackWidget = () => {
           <TooltipTrigger asChild>
             <button
               onClick={handleOpen}
-              className="fixed bottom-[90px] right-[24px] z-50 bg-primary hover:bg-primary/90 text-primary-foreground rounded-full p-3 md:p-4 shadow-lg transition-all hover:scale-110 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 md:bottom-[42px] md:right-[32px]"
+              className="fixed bottom-[calc(env(safe-area-inset-bottom,0px)+90px)] right-[24px] z-50 bg-primary hover:bg-primary/90 text-primary-foreground rounded-full p-3 md:p-4 shadow-lg transition-all hover:scale-110 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 md:bottom-[calc(env(safe-area-inset-bottom,0px)+42px)] md:right-[32px]"
               aria-label="Report bug or suggest feature"
             >
               <Bug className="w-5 h-5 md:w-6 md:h-6 text-background" />
