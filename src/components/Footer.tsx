@@ -97,18 +97,11 @@ const Footer = () => {
           <p className="text-sm font-body text-primary-foreground/60">
             © 2025 SkinLytix. Built with open science & real user data.
           </p>
-          <div className="flex flex-col md:flex-row items-center gap-4">
-            <div className="flex items-center gap-2 text-sm font-body text-primary-foreground/60">
-              <span>Made with</span>
-              <Heart className="w-4 h-4 text-cta fill-cta" />
-              <span>for beauty enthusiasts everywhere</span>
-            </div>
-            {showFeedback && (
-              <Button variant="cta" size="sm" onClick={() => navigate("/beta-feedback")}>
-                Feedback
-              </Button>
-            )}
-          </div>
+          {showFeedback && (
+            <Button variant="cta" size="sm" onClick={() => navigate("/beta-feedback")}>
+              Feedback
+            </Button>
+          )}
         </div>
       </div>
     </footer>
