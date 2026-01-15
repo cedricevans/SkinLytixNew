@@ -9,6 +9,7 @@ import Upload from "./pages/Upload";
 import Analysis from "./pages/Analysis";
 import AnalysisFast from "./pages/AnalysisFast";
 import Auth from "./pages/Auth";
+import ResetPassword from "./pages/ResetPassword";
 import Onboarding from "./pages/Onboarding";
 import Walkthrough from "./pages/Walkthrough";
 import Profile from "./pages/Profile";
@@ -48,6 +49,7 @@ const App = () => (
           <Route path="/analysis/:id" element={<AppProtectedRoute><Analysis /></AppProtectedRoute>} />
           <Route path="/analysis-fast" element={<AppProtectedRoute><AnalysisFast /></AppProtectedRoute>} />
           <Route path="/auth" element={<Auth />} />
+          <Route path="/reset-password" element={<ResetPassword />} />
           <Route path="/onboarding" element={<AppProtectedRoute><Onboarding /></AppProtectedRoute>} />
           <Route path="/walkthrough" element={<AppProtectedRoute><Walkthrough /></AppProtectedRoute>} />
           <Route path="/profile" element={<AppProtectedRoute><Profile /></AppProtectedRoute>} />

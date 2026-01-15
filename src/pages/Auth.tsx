@@ -109,10 +109,10 @@ const Auth = () => {
           </p>
         </div>
 
-        <Alert className="mb-6 border-amber-500/50 bg-amber-500/10">
-          <AlertCircle className="h-4 w-4 text-amber-500" />
+        <Alert className="mb-6 border-border bg-muted/40">
+          <AlertCircle className="h-4 w-4 text-muted-foreground" />
           <AlertDescription className="text-sm">
-            <strong>Beta Notice:</strong> Password recovery is not available yet. Please remember your password - if you forget it, you'll need to create a new account and will lose your progress.
+            <strong>Beta Notice:</strong> If you forget your password, use the password reset flow to regain access.
           </AlertDescription>
         </Alert>
 
@@ -144,6 +144,14 @@ const Auth = () => {
                   required
                 />
               </div>
+              <Button
+                type="button"
+                variant="link"
+                className="px-0 text-sm"
+                onClick={() => navigate("/reset-password")}
+              >
+                Forgot password?
+              </Button>
               <Button type="submit" className="w-full" disabled={isLoading}>
                 {isLoading ? "Signing in..." : "Sign In"}
               </Button>
