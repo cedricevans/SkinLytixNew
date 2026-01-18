@@ -63,6 +63,7 @@ const Upload = () => {
   const { toast } = useToast();
   useTracking('upload');
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const cameraInputRef = useRef<HTMLInputElement>(null);
   
   const [productImage, setProductImage] = useState<string | null>(null);
   const [productName, setProductName] = useState("");
@@ -599,13 +600,7 @@ const Upload = () => {
               </Button>
               <Button
                 variant="outline"
-                onClick={() => {
-                  // Camera functionality would require additional setup
-                  toast({
-                    title: "Camera",
-                    description: "Camera feature coming soon. Please upload from gallery.",
-                  });
-                }}
+                onClick={() => cameraInputRef.current?.click()}
                 className="flex-1 w-full touch-target"
               >
                 <Camera className="w-4 h-4 mr-2" />
@@ -616,6 +611,14 @@ const Upload = () => {
               ref={fileInputRef}
               type="file"
               accept="image/*"
+              onChange={handleFileChange}
+              className="hidden"
+            />
+            <input
+              ref={cameraInputRef}
+              type="file"
+              accept="image/*"
+              capture="environment"
               onChange={handleFileChange}
               className="hidden"
             />

@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import AppShell from "@/components/AppShell";
 import { Button } from "@/components/ui/button";
@@ -35,6 +35,8 @@ interface MarketDupe {
   profileMatch: boolean;
   category: string;
   whereToBuy?: string;
+  purchaseUrl?: string;
+  productUrl?: string;
 }
 
 interface SavedDupe {
@@ -43,11 +45,76 @@ interface SavedDupe {
   brand: string | null;
 }
 
-const CATEGORY_FILTERS = ['all', 'face', 'body', 'hair'] as const;
+const CATEGORY_FILTERS = ['all', 'face', 'body', 'hair', 'scalp'] as const;
 type CategoryFilter = typeof CATEGORY_FILTERS[number];
+
+const RETAILER_SEARCH_URLS: Record<string, string> = {
+  target: "https://www.target.com/s?searchTerm=",
+  ulta: "https://www.ulta.com/search?Ntt=",
+  sephora: "https://www.sephora.com/search?keyword=",
+  amazon: "https://www.amazon.com/s?k=",
+  walmart: "https://www.walmart.com/search?q=",
+};
+
+const buildPurchaseUrl = (whereToBuy: string | undefined, name: string, brand: string) => {
+  if (!whereToBuy) return undefined;
+  const primary = whereToBuy.split(",")[0]?.trim().toLowerCase();
+  if (!primary) return undefined;
+  const baseUrl = RETAILER_SEARCH_URLS[primary];
+  if (!baseUrl) return undefined;
+  const query = encodeURIComponent(`${brand} ${name}`.trim());
+  return `${baseUrl}${query}`;
+};
+
+const normalizePrice = (price: unknown) => {
+  if (!price) return undefined;
+  if (typeof price === "number") {
+    return `$${price.toFixed(2)}`;
+  }
+  if (typeof price === "string") {
+    return price.trim();
+  }
+  return undefined;
+};
+
+const normalizeDupe = (dupe: any, fallbackCategory: string): MarketDupe | null => {
+  const name = dupe?.name || dupe?.productName || dupe?.product_name;
+  const brand = dupe?.brand || dupe?.brandName || dupe?.brand_name;
+  if (!name || !brand) return null;
+
+  const imageUrl = dupe?.imageUrl || dupe?.image_url || dupe?.image || "";
+  const priceEstimate = normalizePrice(
+    dupe?.priceEstimate || dupe?.price_estimate || dupe?.price || dupe?.priceRange || dupe?.price_range
+  );
+  const whereToBuy = dupe?.whereToBuy || dupe?.where_to_buy || dupe?.retailer || dupe?.retailers;
+  const productUrl = dupe?.productUrl || dupe?.product_url || dupe?.url;
+  const category = String(dupe?.category || fallbackCategory || "face").toLowerCase();
+  const reasons = Array.isArray(dupe?.reasons) ? dupe.reasons : [];
+  const sharedIngredients = Array.isArray(dupe?.sharedIngredients)
+    ? dupe.sharedIngredients
+    : Array.isArray(dupe?.shared_ingredients)
+      ? dupe.shared_ingredients
+      : [];
+  const profileMatch = Boolean(dupe?.profileMatch ?? dupe?.profile_match);
+
+  return {
+    name,
+    brand,
+    imageUrl,
+    reasons,
+    sharedIngredients,
+    priceEstimate: priceEstimate || "",
+    profileMatch,
+    category,
+    whereToBuy,
+    purchaseUrl: productUrl || buildPurchaseUrl(whereToBuy, name, brand),
+    productUrl,
+  };
+};
 
 export default function Compare() {
   const navigate = useNavigate();
+  const location = useLocation();
   const [analyses, setAnalyses] = useState<Analysis[]>([]);
   const [selectedProductId, setSelectedProductId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -112,6 +179,16 @@ export default function Compare() {
     fetchData();
   }, [navigate]);
 
+  useEffect(() => {
+    if (!analyses.length) return;
+    const params = new URLSearchParams(location.search);
+    const requestedId = params.get("productId");
+    if (!requestedId) return;
+    if (analyses.some(a => a.id === requestedId)) {
+      setSelectedProductId(requestedId);
+    }
+  }, [analyses, location.search]);
+
   const selectedProduct = useMemo(() => 
     analyses.find(a => a.id === selectedProductId), 
     [analyses, selectedProductId]
@@ -143,7 +220,19 @@ export default function Compare() {
       if (error) throw error;
       
       if (data?.dupes && Array.isArray(data.dupes)) {
-        setMarketDupes(data.dupes);
+        const normalizedDupes = data.dupes
+          .map((dupe: any) => normalizeDupe(dupe, selectedProduct.category || "face"))
+          .filter((dupe: MarketDupe | null): dupe is MarketDupe => Boolean(dupe));
+
+        setMarketDupes(normalizedDupes);
+
+        if (data.dupes.length > 0 && normalizedDupes.length === 0) {
+          toast({
+            title: "No valid dupes returned",
+            description: "Try again in a moment.",
+            variant: "destructive",
+          });
+        }
       }
     } catch (error) {
       console.error('Error finding dupes:', error);
@@ -246,7 +335,9 @@ export default function Compare() {
           reasons: dupe.reasons,
           shared_ingredients: dupe.sharedIngredients,
           price_estimate: dupe.priceEstimate,
-          source_product_id: selectedProductId
+          source_product_id: selectedProductId,
+          where_to_buy: dupe.whereToBuy || null,
+          purchase_url: dupe.purchaseUrl || null
         });
 
       if (!error) {
@@ -486,7 +577,9 @@ export default function Compare() {
                               isSaved={savedDupes.has(key)}
                               onToggleSave={() => toggleSaveMarketDupe(dupe)}
                               whereToBuy={dupe.whereToBuy}
+                              purchaseUrl={dupe.purchaseUrl}
                               category={dupe.category}
+                              showPlaceholder={true}
                             />
                           </div>
                         );
@@ -533,6 +626,7 @@ export default function Compare() {
                               isSaved={savedDupes.has(key)}
                               onToggleSave={() => toggleSaveMyProduct(match)}
                               category={match.product.category || 'face'}
+                              showPlaceholder={true}
                             />
                           </div>
                         );

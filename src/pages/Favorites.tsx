@@ -18,6 +18,8 @@ interface SavedDupe {
   reasons: string[] | null;
   shared_ingredients: string[] | null;
   price_estimate: string | null;
+  where_to_buy?: string | null;
+  purchase_url?: string | null;
   saved_at: string | null;
 }
 
@@ -223,9 +225,12 @@ export default function Favorites() {
                     reasons={dupe.reasons || []}
                     sharedIngredients={dupe.shared_ingredients || []}
                     priceEstimate={dupe.price_estimate || undefined}
+                    whereToBuy={dupe.where_to_buy || undefined}
+                    purchaseUrl={dupe.purchase_url || undefined}
                     isSaved={true}
                     onToggleSave={() => handleUnsave(dupe.id)}
                     category="skincare"
+                    showPlaceholder={true}
                   />
                 </div>
               ))}

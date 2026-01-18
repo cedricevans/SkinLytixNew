@@ -685,6 +685,14 @@ const Analysis = () => {
             >
               Ask SkinLytixGPT
             </Button>
+            <Button
+              variant="outline"
+              onClick={() => navigate(`/compare?productId=${analysis.id}`)}
+              className="gap-2"
+            >
+              <Sparkles className="w-4 h-4" />
+              Find Dupes
+            </Button>
           </div>
         </Card>
 

@@ -102,11 +102,88 @@ Return ONLY the JSON array, no other text.`;
     try {
       // Remove markdown code blocks if present
       const cleanContent = content.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
-      dupes = JSON.parse(cleanContent);
+      const jsonMatch = cleanContent.match(/\[[\s\S]*\]/);
+      const parsed = JSON.parse(jsonMatch ? jsonMatch[0] : cleanContent);
+      dupes = Array.isArray(parsed) ? parsed : (Array.isArray(parsed?.dupes) ? parsed.dupes : []);
     } catch (parseError) {
       console.error('Failed to parse AI response:', parseError);
       dupes = [];
     }
+
+    const getObfProductMatch = async (productName: string, brand?: string) => {
+      const terms = `${brand ? `${brand} ` : ''}${productName}`.trim();
+      if (!terms) return null;
+
+      const params = new URLSearchParams({
+        search_terms: terms,
+        search_simple: '1',
+        action: 'process',
+        json: '1',
+        page_size: '1',
+      });
+
+      try {
+        const obfResponse = await fetch(`https://world.openbeautyfacts.org/cgi/search.pl?${params.toString()}`);
+        if (!obfResponse.ok) return null;
+        const obfData = await obfResponse.json();
+        const product = obfData?.products?.[0];
+        if (!product) return null;
+        const imageUrl =
+          product.image_url ||
+          product.image_front_url ||
+          product.image_front_small_url ||
+          product.image_small_url ||
+          null;
+        const productUrl = product.url || null;
+        return { imageUrl, productUrl };
+      } catch (error) {
+        console.error('OBF lookup failed:', error);
+        return null;
+      }
+    };
+
+    const isPlaceholderImage = (url?: string) => {
+      if (!url) return true;
+      return url.includes('images.unsplash.com');
+    };
+
+    const isObfImageUrl = (url?: string) => {
+      if (!url) return false;
+      try {
+        const hostname = new URL(url).hostname.toLowerCase();
+        return (
+          hostname.endsWith('openbeautyfacts.org') ||
+          hostname.endsWith('images.openbeautyfacts.org')
+        );
+      } catch (_error) {
+        return false;
+      }
+    };
+
+    dupes = await Promise.all(
+      dupes.map(async (dupe: any) => {
+        const name = dupe?.name || dupe?.productName || dupe?.product_name;
+        const brand = dupe?.brand || dupe?.brandName || dupe?.brand_name;
+        if (!name) return dupe;
+
+        const currentUrl = dupe?.imageUrl;
+        const shouldReplaceImage = isPlaceholderImage(currentUrl) || !isObfImageUrl(currentUrl);
+
+        if (shouldReplaceImage || !dupe?.productUrl) {
+          const obfMatch = await getObfProductMatch(name, brand);
+          if (obfMatch?.imageUrl || obfMatch?.productUrl) {
+            return {
+              ...dupe,
+              imageUrl: obfMatch?.imageUrl ?? dupe?.imageUrl ?? null,
+              productUrl: obfMatch?.productUrl ?? dupe?.productUrl ?? null,
+              whereToBuy: dupe?.whereToBuy || (obfMatch?.productUrl ? 'Open Beauty Facts' : undefined),
+            };
+          }
+          return { ...dupe, imageUrl: null, productUrl: dupe?.productUrl ?? null, whereToBuy: dupe?.whereToBuy };
+        }
+        return dupe;
+      })
+    );
 
     return new Response(JSON.stringify({ dupes }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
