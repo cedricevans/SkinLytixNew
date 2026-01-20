@@ -20,6 +20,7 @@ interface SavedDupe {
   price_estimate: string | null;
   where_to_buy?: string | null;
   purchase_url?: string | null;
+  source_product_id?: string | null;
   saved_at: string | null;
 }
 
@@ -232,6 +233,19 @@ export default function Favorites() {
                     category="skincare"
                     showPlaceholder={true}
                   />
+                  <Button
+                    variant="link"
+                    className="mt-2 px-0 text-xs"
+                    onClick={() => {
+                      if (dupe.source_product_id) {
+                        navigate(`/compare?productId=${dupe.source_product_id}`);
+                      } else {
+                        navigate("/compare");
+                      }
+                    }}
+                  >
+                    Find more dupes like this
+                  </Button>
                 </div>
               ))}
             </div>

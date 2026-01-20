@@ -595,6 +595,16 @@ const Analysis = () => {
                 <h1 className="text-xl md:text-2xl lg:text-3xl font-bold">{analysis.product_name}</h1>
                 <ExpertReviewBadge analysisId={analysis.id} />
               </div>
+              <div className="flex flex-wrap items-center gap-2 mb-3">
+                <Button
+                  variant="default"
+                  size="sm"
+                  onClick={() => navigate(`/compare?productId=${analysis.id}`)}
+                >
+                  <Sparkles className="w-4 h-4 mr-2" />
+                  Find Dupes
+                </Button>
+              </div>
               <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
                 {analysis.brand && <span className="font-medium">{analysis.brand}</span>}
                 {analysis.brand && analysis.category && <span>•</span>}
