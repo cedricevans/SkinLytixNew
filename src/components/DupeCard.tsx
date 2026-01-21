@@ -1,8 +1,9 @@
 import { useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
-import { Heart, Check, ExternalLink, ImageOff } from "lucide-react";
+import { Heart, Check, ExternalLink } from "lucide-react";
 import { cn } from "@/lib/utils";
+import skinNotFound from "@/assets/skin_notfound.png";
 
 interface DupeCardProps {
   name: string;
@@ -21,77 +22,6 @@ interface DupeCardProps {
   showPlaceholder?: boolean;
 }
 
-const fallbackPools: Record<string, string[]> = {
-  face: [
-    'https://images.unsplash.com/photo-1620916566398-39f1143ab7be?w=300',
-    'https://images.unsplash.com/photo-1611930022073-b7a4ba5fcccd?w=300',
-    'https://images.unsplash.com/photo-1556228578-0d85b1a4d571?w=300',
-  ],
-  body: [
-    'https://images.unsplash.com/photo-1556228578-0d85b1a4d571?w=300',
-    'https://images.unsplash.com/photo-1608248543803-ba4f8c70ae0b?w=300',
-    'https://images.unsplash.com/photo-1556228720-195a672e8a03?w=300',
-  ],
-  hair: [
-    'https://images.unsplash.com/photo-1527799820374-dcf8d9d4a388?w=300',
-    'https://images.unsplash.com/photo-1608248543803-ba4f8c70ae0b?w=300',
-  ],
-  scalp: [
-    'https://images.unsplash.com/photo-1527799820374-dcf8d9d4a388?w=300',
-  ],
-  serum: [
-    'https://images.unsplash.com/photo-1620916566398-39f1143ab7be?w=300',
-    'https://images.unsplash.com/photo-1556228578-0d85b1a4d571?w=300',
-  ],
-  moisturizer: [
-    'https://images.unsplash.com/photo-1611930022073-b7a4ba5fcccd?w=300',
-    'https://images.unsplash.com/photo-1556228720-195a672e8a03?w=300',
-  ],
-  cleanser: [
-    'https://images.unsplash.com/photo-1556228578-0d85b1a4d571?w=300',
-    'https://images.unsplash.com/photo-1620916566398-39f1143ab7be?w=300',
-  ],
-  sunscreen: [
-    'https://images.unsplash.com/photo-1556228720-195a672e8a03?w=300',
-    'https://images.unsplash.com/photo-1556228578-0d85b1a4d571?w=300',
-  ],
-  default: [
-    'https://images.unsplash.com/photo-1620916566398-39f1143ab7be?w=300',
-    'https://images.unsplash.com/photo-1611930022073-b7a4ba5fcccd?w=300',
-    'https://images.unsplash.com/photo-1556228578-0d85b1a4d571?w=300',
-  ],
-};
-
-const globalFallbacks = [
-  'https://images.unsplash.com/photo-1620916566398-39f1143ab7be?w=300',
-  'https://images.unsplash.com/photo-1611930022073-b7a4ba5fcccd?w=300',
-  'https://images.unsplash.com/photo-1556228578-0d85b1a4d571?w=300',
-  'https://images.unsplash.com/photo-1608248543803-ba4f8c70ae0b?w=300',
-  'https://images.unsplash.com/photo-1556228720-195a672e8a03?w=300',
-  'https://images.unsplash.com/photo-1527799820374-dcf8d9d4a388?w=300',
-];
-
-const buildFallbackPool = (pool: string[]) => {
-  const unique = Array.from(new Set(pool));
-  if (unique.length >= 5) return unique;
-  const expanded = [...unique];
-  for (const url of globalFallbacks) {
-    if (expanded.length >= 5) break;
-    if (!expanded.includes(url)) {
-      expanded.push(url);
-    }
-  }
-  return expanded;
-};
-
-const pickFallbackImage = (seed: string, pool: string[]) => {
-  let hash = 0;
-  for (let i = 0; i < seed.length; i += 1) {
-    hash = (hash * 31 + seed.charCodeAt(i)) % 100000;
-  }
-  return pool[hash % pool.length];
-};
-
 export const DupeCard = ({
   name,
   brand,
@@ -104,19 +34,12 @@ export const DupeCard = ({
   onToggleSave,
   whereToBuy,
   purchaseUrl,
-  category = 'face',
-  showPlaceholder = true,
 }: DupeCardProps) => {
   const [imageError, setImageError] = useState(false);
   const [imageLoaded, setImageLoaded] = useState(false);
 
-  const normalizedCategory = category?.toLowerCase() || 'default';
-  const pool = buildFallbackPool(fallbackPools[normalizedCategory] || fallbackPools.default);
-  const fallbackImage = showPlaceholder
-    ? pickFallbackImage(`${brand}-${name}`, pool)
-    : undefined;
+  const fallbackImage = skinNotFound;
   const displayImage = imageError ? fallbackImage : (imageUrl || fallbackImage);
-  const isBlankImage = showPlaceholder && (!imageUrl || imageError);
 
   return (
     <Card className="group relative overflow-hidden bg-card border-border hover:shadow-lg transition-all duration-300 hover:-translate-y-0.5 min-w-0">
@@ -151,11 +74,6 @@ export const DupeCard = ({
         {!imageLoaded && !imageError && (
           <div className="absolute inset-0 bg-muted animate-pulse" />
         )}
-        {imageError && !imageUrl && (
-          <div className="absolute inset-0 flex items-center justify-center bg-muted/50">
-            <ImageOff className="w-8 h-8 text-muted-foreground/50" />
-          </div>
-        )}
         {displayImage ? (
           <img
             src={displayImage}
@@ -168,14 +86,7 @@ export const DupeCard = ({
             onLoad={() => setImageLoaded(true)}
           />
         ) : (
-          <div className="absolute inset-0 flex items-center justify-center bg-muted/50">
-            <ImageOff className="w-8 h-8 text-muted-foreground/50" />
-          </div>
-        )}
-        {isBlankImage && (
-          <div className="absolute inset-x-3 bottom-3 rounded-md bg-white/80 px-2 py-1 text-center text-[10px] sm:text-xs font-semibold text-foreground shadow-sm">
-            {name}
-          </div>
+          <div className="absolute inset-0 bg-muted/50" />
         )}
       </div>
 
