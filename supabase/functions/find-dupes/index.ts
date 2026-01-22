@@ -80,12 +80,11 @@ You are a skincare expert that finds real, existing product dupes. You MUST retu
 Return ONLY a JSON array of 12 real skincare products that are dupes/alternatives. Each object must have:
 - "name": string (exact product name as sold in stores)
 - "brand": string (brand name)
-- "imageUrl": string (MUST be a real product image URL from one of these sources:
+- "imageUrl": string (MUST be a real product image URL from one of these sources, or null if unavailable:
   * Target: https://target.scene7.com/is/image/Target/[product-id]
   * Ulta: https://media.ulta.com/i/ulta/[product-id]
   * Sephora: https://www.sephora.com/productimages/[product-id]
-  * Amazon: https://m.media-amazon.com/images/I/[product-id]
-  If you cannot find a real URL, use: https://images.unsplash.com/photo-1620916566398-39f1143ab7be?w=300 for serums, https://images.unsplash.com/photo-1611930022073-b7a4ba5fcccd?w=300 for moisturizers, https://images.unsplash.com/photo-1556228578-0d85b1a4d571?w=300 for cleansers)
+  * Amazon: https://m.media-amazon.com/images/I/[product-id])
 - "reasons": array of 2-3 strings explaining why it's a dupe
 - "sharedIngredients": array of 2-4 key shared ingredients
 - "priceEstimate": string (e.g., "$15-25")
@@ -478,6 +477,9 @@ Return ONLY the JSON array, no other text.`;
         // Choose the best image: use the existing image if it's not a placeholder or OBF image.
         const currentImage: string | undefined = dupe?.imageUrl || dupe?.image_url;
         let imageUrl: string | undefined = obf?.imageUrl ?? currentImage;
+        if (isPlaceholderImage(imageUrl)) {
+          imageUrl = undefined;
+        }
 
         // Determine where to buy.
         let whereToBuy: string | undefined = dupe?.whereToBuy;

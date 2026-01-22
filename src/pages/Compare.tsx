@@ -86,6 +86,9 @@ const normalizeDupe = (dupe: any, fallbackCategory: string): MarketDupe | null =
   if (!name || !brand) return null;
 
   const imageUrl = dupe?.imageUrl || dupe?.image_url || dupe?.image || "";
+  const normalizedImageUrl = typeof imageUrl === "string" && imageUrl.includes("images.unsplash.com")
+    ? ""
+    : imageUrl;
   const priceEstimate = normalizePrice(
     dupe?.priceEstimate || dupe?.price_estimate || dupe?.price || dupe?.priceRange || dupe?.price_range
   );
@@ -111,7 +114,7 @@ const normalizeDupe = (dupe: any, fallbackCategory: string): MarketDupe | null =
   return {
     name,
     brand,
-    imageUrl,
+    imageUrl: normalizedImageUrl,
     reasons,
     sharedIngredients,
     priceEstimate: priceEstimate || "",
