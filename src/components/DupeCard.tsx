@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { Heart, Check, ExternalLink } from "lucide-react";
@@ -37,9 +37,23 @@ export const DupeCard = ({
 }: DupeCardProps) => {
   const [imageError, setImageError] = useState(false);
   const [imageLoaded, setImageLoaded] = useState(false);
+  const [useProxy, setUseProxy] = useState(false);
 
   const fallbackImage = skinNotFound;
-  const displayImage = imageError ? fallbackImage : (imageUrl || fallbackImage);
+  const normalizedUrl = imageUrl?.trim() || "";
+  const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+  const proxyUrl = normalizedUrl && supabaseUrl
+    ? `${supabaseUrl}/functions/v1/image-proxy?url=${encodeURIComponent(normalizedUrl)}`
+    : "";
+  const displayImage = imageError
+    ? fallbackImage
+    : (useProxy && proxyUrl ? proxyUrl : (normalizedUrl || fallbackImage));
+
+  useEffect(() => {
+    setImageError(false);
+    setImageLoaded(false);
+    setUseProxy(false);
+  }, [normalizedUrl]);
 
   return (
     <Card className="group relative overflow-hidden bg-card border-border hover:shadow-lg transition-all duration-300 hover:-translate-y-0.5 min-w-0">
@@ -63,7 +77,7 @@ export const DupeCard = ({
       </button>
 
       {/* Match Badge */}
-      {matchPercentage && (
+      {matchPercentage !== undefined && matchPercentage !== null && (
         <Badge className="absolute top-2 left-2 z-10 bg-primary/90 text-primary-foreground backdrop-blur-sm text-[10px] sm:text-xs px-1.5 sm:px-2">
           {matchPercentage}%
         </Badge>
@@ -82,7 +96,15 @@ export const DupeCard = ({
               "w-full h-full object-cover group-hover:scale-105 transition-all duration-300",
               imageLoaded ? "opacity-100" : "opacity-0"
             )}
-            onError={() => setImageError(true)}
+            referrerPolicy="no-referrer"
+            onError={() => {
+              if (!useProxy && normalizedUrl && proxyUrl) {
+                setUseProxy(true);
+                setImageLoaded(false);
+                return;
+              }
+              setImageError(true);
+            }}
             onLoad={() => setImageLoaded(true)}
           />
         ) : (

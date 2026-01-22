@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import AppShell from "@/components/AppShell";
@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Progress } from "@/components/ui/progress";
 import { ArrowLeft, Search, Sparkles, FlaskConical, Package, Loader2 } from "lucide-react";
 import { useSubscription } from "@/hooks/useSubscription";
 import { PaywallModal } from "@/components/paywall/PaywallModal";
@@ -130,7 +131,11 @@ export default function Compare() {
   const [analyses, setAnalyses] = useState<Analysis[]>([]);
   const [selectedProductId, setSelectedProductId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [loadingProgress, setLoadingProgress] = useState(10);
   const [findingDupes, setFindingDupes] = useState(false);
+  const [dupeProgress, setDupeProgress] = useState(0);
+  const [dupeStage, setDupeStage] = useState("Preparing search");
+  const dupeProgressRef = useRef<number | null>(null);
   const [marketDupes, setMarketDupes] = useState<MarketDupe[]>([]);
   const [showPaywall, setShowPaywall] = useState(false);
   const [savedDupes, setSavedDupes] = useState<Set<string>>(new Set());
@@ -192,6 +197,24 @@ export default function Compare() {
   }, [navigate]);
 
   useEffect(() => {
+    if (!loading) {
+      setLoadingProgress(100);
+      return;
+    }
+
+    setLoadingProgress(10);
+    let current = 10;
+    const interval = window.setInterval(() => {
+      current = Math.min(95, current + Math.floor(Math.random() * 8) + 3);
+      setLoadingProgress(current);
+    }, 350);
+
+    return () => {
+      window.clearInterval(interval);
+    };
+  }, [loading]);
+
+  useEffect(() => {
     if (!analyses.length) return;
     const params = new URLSearchParams(location.search);
     const requestedId = params.get("productId");
@@ -227,7 +250,7 @@ export default function Compare() {
 
   const getMarketMatchPercent = (dupe: MarketDupe, sourceList: string[]) => {
     if (typeof dupe.matchPercent === "number" && dupe.matchPercent > 0) {
-      return Math.min(98, Math.max(50, Math.round(dupe.matchPercent)));
+      return Math.min(98, Math.max(1, Math.round(dupe.matchPercent)));
     }
 
     if (!dupe.ingredients || dupe.ingredients.length === 0 || sourceList.length === 0) {
@@ -248,7 +271,7 @@ export default function Compare() {
 
     const percent = Math.round((matched / sourceIngredients.length) * 100);
     if (percent <= 0) return undefined;
-    return Math.min(98, Math.max(1, percent));
+    return Math.min(98, percent);
   };
 
 
@@ -257,10 +280,31 @@ export default function Compare() {
     
     setFindingDupes(true);
     setMarketDupes([]);
+    setDupeProgress(5);
+    setDupeStage("Analyzing ingredients");
+
+    if (dupeProgressRef.current) {
+      window.clearInterval(dupeProgressRef.current);
+    }
+
+    let progressValue = 5;
+    dupeProgressRef.current = window.setInterval(() => {
+      progressValue = Math.min(90, progressValue + Math.floor(Math.random() * 6) + 3);
+      setDupeProgress(progressValue);
+      if (progressValue < 35) {
+        setDupeStage("Analyzing ingredients");
+      } else if (progressValue < 60) {
+        setDupeStage("Finding market matches");
+      } else if (progressValue < 80) {
+        setDupeStage("Verifying ingredients");
+      } else {
+        setDupeStage("Finalizing results");
+      }
+    }, 500);
 
     try {
       const ingredients = selectedProduct.ingredients_list
-        .split(',')
+        .split(/[,;\n]+/)
         .map(i => i.trim())
         .filter(Boolean);
 
@@ -300,13 +344,19 @@ export default function Compare() {
         variant: 'destructive',
       });
     } finally {
+      if (dupeProgressRef.current) {
+        window.clearInterval(dupeProgressRef.current);
+        dupeProgressRef.current = null;
+      }
+      setDupeProgress(100);
+      setDupeStage("Results ready");
       setFindingDupes(false);
     }
   };
 
   function parseIngredients(list: string): string[] {
     return list.toLowerCase()
-      .split(/[,;]/)
+      .split(/[,;\n]+/)
       .map(i => i.trim())
       .filter(i => i.length > 2);
   }
@@ -464,6 +514,13 @@ export default function Compare() {
         <div className="container mx-auto pb-24 lg:pb-8">
           <Skeleton className="h-10 w-48 mb-6" />
           <Skeleton className="h-12 w-full mb-8" />
+          <div className="mb-6 space-y-2">
+            <div className="flex items-center justify-between text-sm text-muted-foreground">
+              <span>Loading your comparisons</span>
+              <span>{loadingProgress}%</span>
+            </div>
+            <Progress value={loadingProgress} className="h-2" />
+          </div>
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
             {[1, 2, 3, 4].map(i => <Skeleton key={i} className="aspect-[3/4] w-full" />)}
           </div>
@@ -612,7 +669,15 @@ export default function Compare() {
                         <div className="absolute inset-0 rounded-full border-4 border-primary border-t-transparent animate-spin" />
                         <Search className="absolute inset-0 m-auto w-8 h-8 text-primary" />
                       </div>
-                      <p className="text-muted-foreground">🔍 Searching the market for dupes...</p>
+                      <div className="space-y-2">
+                        <p className="text-muted-foreground">🔍 {dupeStage}...</p>
+                        <div className="flex items-center justify-center gap-3 text-sm text-muted-foreground">
+                          <span>{dupeProgress}%</span>
+                          <div className="w-48">
+                            <Progress value={dupeProgress} className="h-2" />
+                          </div>
+                        </div>
+                      </div>
                     </div>
                   ) : filteredMarketDupes.length > 0 ? (
                     <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">

@@ -8,3 +8,4 @@ dist-ssr
 coverage
 .vscode
 .idea
+.vercel
