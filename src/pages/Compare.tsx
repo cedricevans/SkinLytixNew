@@ -21,7 +21,7 @@ interface Analysis {
   brand: string | null;
   epiq_score: number | null;
   product_price: number | null;
-  ingredients_list: string;
+  ingredients_list?: string | null;
   category: string | null;
   image_url: string | null;
 }
@@ -144,6 +144,8 @@ export default function Compare() {
   const [savedDupes, setSavedDupes] = useState<Set<string>>(new Set());
   const [userId, setUserId] = useState<string | null>(null);
   const [categoryFilter, setCategoryFilter] = useState<CategoryFilter>('all');
+  const [activeTab, setActiveTab] = useState("market");
+  const [analysisIngredients, setAnalysisIngredients] = useState<Record<string, string>>({});
   const [skinProfile, setSkinProfile] = useState<{ skinType: string; concerns: string[] }>({ skinType: 'normal', concerns: [] });
   const { effectiveTier } = useSubscription();
 
@@ -161,7 +163,7 @@ export default function Compare() {
       const [analysesRes, savedRes, profileRes] = await Promise.all([
         supabase
           .from("user_analyses")
-          .select("id, product_name, brand, epiq_score, product_price, ingredients_list, category, image_url")
+          .select("id, product_name, brand, epiq_score, product_price, category, image_url")
           .eq("user_id", user.id)
           .order("analyzed_at", { ascending: false }),
         supabase
@@ -232,10 +234,52 @@ export default function Compare() {
     [analyses, selectedProductId]
   );
 
+  const selectedIngredients = useMemo(() => {
+    if (!selectedProductId) return undefined;
+    return analysisIngredients[selectedProductId];
+  }, [analysisIngredients, selectedProductId]);
+
   const sourceIngredients = useMemo(
-    () => (selectedProduct ? parseIngredients(selectedProduct.ingredients_list) : []),
-    [selectedProduct]
+    () => (selectedIngredients ? parseIngredients(selectedIngredients) : []),
+    [selectedIngredients]
   );
+
+  const loadIngredientsForIds = async (ids: string[]) => {
+    if (!userId || ids.length === 0) return;
+    const missing = ids.filter((id) => !analysisIngredients[id]);
+    if (missing.length === 0) return;
+
+    const { data, error } = await supabase
+      .from("user_analyses")
+      .select("id, ingredients_list")
+      .eq("user_id", userId)
+      .in("id", missing);
+
+    if (error || !data) return;
+    setAnalysisIngredients((prev) => {
+      const next = { ...prev };
+      data.forEach((row) => {
+        if (row.ingredients_list) {
+          next[row.id] = row.ingredients_list;
+        }
+      });
+      return next;
+    });
+  };
+
+  const fetchIngredientsForId = async (id: string) => {
+    if (!userId) return null;
+    const { data, error } = await supabase
+      .from("user_analyses")
+      .select("ingredients_list")
+      .eq("user_id", userId)
+      .eq("id", id)
+      .maybeSingle();
+
+    if (error || !data?.ingredients_list) return null;
+    setAnalysisIngredients((prev) => ({ ...prev, [id]: data.ingredients_list }));
+    return data.ingredients_list;
+  };
 
   const normalizeIngredientName = (value: string) => {
     return value
@@ -279,7 +323,7 @@ export default function Compare() {
 
 
   const findMarketDupes = async () => {
-    if (!selectedProduct) return;
+    if (!selectedProduct || !selectedProductId) return;
     
     setFindingDupes(true);
     setMarketDupes([]);
@@ -292,7 +336,7 @@ export default function Compare() {
 
     let progressValue = 5;
     dupeProgressRef.current = window.setInterval(() => {
-      progressValue = Math.min(90, progressValue + Math.floor(Math.random() * 6) + 3);
+      progressValue = Math.min(95, progressValue + Math.floor(Math.random() * 6) + 3);
       setDupeProgress(progressValue);
       if (progressValue < 35) {
         setDupeStage("Analyzing ingredients");
@@ -300,13 +344,24 @@ export default function Compare() {
         setDupeStage("Finding market matches");
       } else if (progressValue < 80) {
         setDupeStage("Verifying ingredients");
-      } else {
+      } else if (progressValue < 90) {
         setDupeStage("Finalizing results");
+      } else {
+        setDupeStage("Wrapping up results");
       }
     }, 500);
 
     try {
-      const ingredients = selectedProduct.ingredients_list
+      await loadIngredientsForIds([selectedProductId]);
+      let ingredientText = analysisIngredients[selectedProductId];
+      if (!ingredientText) {
+        ingredientText = await fetchIngredientsForId(selectedProductId);
+      }
+      if (!ingredientText) {
+        ingredientText = "";
+      }
+
+      const ingredients = ingredientText
         .split(/[,;\n]+/)
         .map(i => i.trim())
         .filter(Boolean);
@@ -366,15 +421,18 @@ export default function Compare() {
 
   // My Products comparison (existing logic)
   const myProductMatches = useMemo(() => {
-    if (!selectedProduct || analyses.length < 2) return [];
+    if (!selectedProduct || !selectedProductId || analyses.length < 2) return [];
+    if (!analysisIngredients[selectedProductId]) return [];
 
-    const sourceIngredients = parseIngredients(selectedProduct.ingredients_list);
+    const sourceIngredients = parseIngredients(analysisIngredients[selectedProductId] || "");
     const sourcePrice = selectedProduct.product_price;
 
     return analyses
       .filter(a => a.id !== selectedProductId)
       .map(product => {
-        const targetIngredients = parseIngredients(product.ingredients_list);
+        const ingredientText = analysisIngredients[product.id];
+        if (!ingredientText) return null;
+        const targetIngredients = parseIngredients(ingredientText);
         const shared = sourceIngredients.filter(i => 
           targetIngredients.some(t => t.includes(i) || i.includes(t))
         );
@@ -410,9 +468,26 @@ export default function Compare() {
           whyDupe
         };
       })
+      .filter((m): m is NonNullable<typeof m> => Boolean(m))
       .filter(m => m.overlapPercent >= 30)
       .sort((a, b) => b.overlapPercent - a.overlapPercent);
-  }, [selectedProduct, analyses, selectedProductId]);
+  }, [selectedProduct, analyses, selectedProductId, analysisIngredients]);
+
+  useEffect(() => {
+    if (!selectedProductId || !analysisIngredients[selectedProductId]) return;
+    setMarketDupes([]);
+  }, [selectedProductId, analysisIngredients]);
+
+  useEffect(() => {
+    if (!selectedProductId || !userId) return;
+    loadIngredientsForIds([selectedProductId]);
+  }, [selectedProductId, userId]);
+
+  useEffect(() => {
+    if (activeTab !== "myproducts") return;
+    if (!userId || analyses.length === 0) return;
+    loadIngredientsForIds(analyses.map(a => a.id));
+  }, [activeTab, analyses, userId]);
 
   const toggleSaveMarketDupe = async (dupe: MarketDupe) => {
     if (!userId || !selectedProductId) return;
@@ -637,7 +712,7 @@ export default function Compare() {
             </Card>
 
             {selectedProduct && (
-              <Tabs defaultValue="market" className="space-y-6">
+              <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
                 <TabsList className="grid w-full max-w-md grid-cols-2">
                   <TabsTrigger value="market" className="gap-2">
                     <Sparkles className="w-4 h-4" />
@@ -765,7 +840,9 @@ export default function Compare() {
                         <p className="text-muted-foreground">
                           {analyses.length < 2 
                             ? "Analyze at least 2 products to compare your collection."
-                            : "No similar products found in your collection."}
+                            : activeTab === "myproducts" && !analysisIngredients[selectedProductId || ""]
+                              ? "Loading ingredients to compare your collection..."
+                              : "No similar products found in your collection."}
                         </p>
                       </CardContent>
                     </Card>

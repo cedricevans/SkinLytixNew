@@ -402,11 +402,12 @@ Return ONLY the JSON array, no other text.`;
       imageUrl: string | null;
       productUrl: string | null;
       ingredients: string[] | null;
+      brand: string | null;
     } | null> => {
       const termsList = buildSearchTerms(name, brandName);
       if (!termsList.length) return null;
 
-      let bestResult: { imageUrl: string | null; productUrl: string | null; ingredients: string[] | null } | null = null;
+      let bestResult: { imageUrl: string | null; productUrl: string | null; ingredients: string[] | null; brand: string | null } | null = null;
       let bestScore = -1;
 
       for (const terms of termsList) {
@@ -454,7 +455,8 @@ Return ONLY the JSON array, no other text.`;
             chosen.image_small_url ||
             null;
           const productUrl = chosen.url || null;
-          const result = { imageUrl, productUrl, ingredients: chosenIngredients ?? null };
+          const chosenBrand = chosen.brands || chosen.brands_tags?.join(' ') || null;
+          const result = { imageUrl, productUrl, ingredients: chosenIngredients ?? null, brand: chosenBrand };
           setCache(obfCache, cacheKey, result, 6 * 60 * 60 * 1000);
 
           const overlapStats = chosenIngredients ? computeOverlapStats(sourceList, chosenIngredients) : null;
@@ -476,6 +478,19 @@ Return ONLY the JSON array, no other text.`;
     const isPlaceholderImage = (url?: string): boolean => {
       if (!url) return true;
       return url.includes('images.unsplash.com');
+    };
+
+    const brandTokens = (value: string) =>
+      normaliseText(value)
+        .split(' ')
+        .filter((token) => token.length > 1);
+
+    const isBrandMatch = (obfBrand: string | null | undefined, dupeBrand: string | null | undefined) => {
+      if (!obfBrand || !dupeBrand) return false;
+      const obfTokens = new Set(brandTokens(obfBrand));
+      const dupeTokens = brandTokens(dupeBrand);
+      if (!obfTokens.size || !dupeTokens.length) return false;
+      return dupeTokens.some((token) => obfTokens.has(token));
     };
 
     // Normalise the source ingredients once.
@@ -538,6 +553,9 @@ Return ONLY the JSON array, no other text.`;
         // Strict mode: only use OBF images to avoid mismatches.
         let imageUrl: string | undefined = obf?.imageUrl ?? undefined;
         if (isPlaceholderImage(imageUrl)) {
+          imageUrl = undefined;
+        }
+        if (!isBrandMatch(obf?.brand, dupeBrand)) {
           imageUrl = undefined;
         }
 
