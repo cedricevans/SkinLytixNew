@@ -332,6 +332,67 @@ Return ONLY the JSON array, no other text.`;
       return null;
     };
 
+    const buildSearchTerms = (name: string, brandName?: string): string[] => {
+      const normalized = normaliseText(name);
+      const tokens = normalized.split(' ').filter((token) => token.length > 2);
+      const topTokens = tokens.slice(0, 3).join(' ');
+      const firstTwo = tokens.slice(0, 2).join(' ');
+      const terms = new Set<string>();
+
+      if (brandName) {
+        const brand = normaliseText(brandName);
+        terms.add(`${brand} ${normalized}`.trim());
+        if (topTokens) terms.add(`${brand} ${topTokens}`.trim());
+        if (firstTwo) terms.add(`${brand} ${firstTwo}`.trim());
+      }
+
+      terms.add(normalized);
+      if (topTokens) terms.add(topTokens);
+      if (firstTwo) terms.add(firstTwo);
+
+      return Array.from(terms).filter((term) => term.length > 2);
+    };
+
+    const selectBestObfProduct = (
+      products: any[],
+      name: string,
+      brandName: string | undefined,
+      sourceList: string[],
+    ) => {
+      let chosen = products[0];
+      let chosenIngredients = extractObfIngredients(chosen);
+      let chosenScore = -1;
+
+      for (const candidate of products) {
+        const candidateName =
+          candidate.product_name ||
+          candidate.product_name_en ||
+          candidate.product_name_fr ||
+          candidate.product_name_es ||
+          candidate.product_name_it ||
+          '';
+        const candidateBrands = candidate.brands || candidate.brands_tags?.join(' ') || '';
+        const candidateIngredients = extractObfIngredients(candidate);
+        const overlapStats = candidateIngredients && sourceList.length
+          ? computeOverlapStats(sourceList, candidateIngredients)
+          : null;
+        const nameScore = computeTokenSimilarity(name, candidateName);
+        const brandScore = brandName
+          ? computeTokenSimilarity(brandName, candidateBrands)
+          : 0;
+        const overlapScore = overlapStats ? overlapStats.percent / 100 : 0;
+        const candidateScore = overlapScore * 2 + nameScore * 1.2 + brandScore * 0.8;
+
+        if (candidateScore > chosenScore) {
+          chosenScore = candidateScore;
+          chosen = candidate;
+          chosenIngredients = candidateIngredients;
+        }
+      }
+
+      return { chosen, chosenIngredients };
+    };
+
     // Look up a product on OBF by name/brand to enrich ingredients and images.
     const lookupOpenBeautyFacts = async (
       name: string,
@@ -342,73 +403,73 @@ Return ONLY the JSON array, no other text.`;
       productUrl: string | null;
       ingredients: string[] | null;
     } | null> => {
-      const terms = `${brandName ? `${brandName} ` : ''}${name}`.trim();
-      if (!terms) return null;
-      const cacheKey = `obf:${terms.toLowerCase()}`;
-      const cached = getCache(obfCache, cacheKey);
-      if (cached !== undefined) return cached;
-      const params = new URLSearchParams({
-        search_terms: terms,
-        search_simple: '1',
-        action: 'process',
-        json: '1',
-        page_size: '10',
-      });
-      try {
-        const response = await fetch(`https://world.openbeautyfacts.org/cgi/search.pl?${params.toString()}`);
-        if (!response.ok) {
-          console.warn('Open Beauty Facts lookup failed with status', response.status);
-          return null;
-        }
-        const data = await response.json();
-        const products: any[] = Array.isArray(data?.products) ? data.products : [];
-        if (!products.length) return null;
-        let chosen = products[0];
-        let chosenIngredients = extractObfIngredients(chosen);
-        let chosenScore = -1;
+      const termsList = buildSearchTerms(name, brandName);
+      if (!termsList.length) return null;
 
-        for (const candidate of products) {
-          const candidateName =
-            candidate.product_name ||
-            candidate.product_name_en ||
-            candidate.product_name_fr ||
-            candidate.product_name_es ||
-            candidate.product_name_it ||
-            '';
-          const candidateBrands = candidate.brands || candidate.brands_tags?.join(' ') || '';
-          const candidateIngredients = extractObfIngredients(candidate);
-          const overlapStats = candidateIngredients && sourceList.length
-            ? computeOverlapStats(sourceList, candidateIngredients)
-            : null;
-          const nameScore = computeTokenSimilarity(name, candidateName);
-          const brandScore = brandName
-            ? computeTokenSimilarity(brandName, candidateBrands)
-            : 0;
-          const overlapScore = overlapStats ? overlapStats.percent / 100 : 0;
-          const candidateScore = overlapScore * 2 + nameScore * 1.2 + brandScore * 0.8;
+      let bestResult: { imageUrl: string | null; productUrl: string | null; ingredients: string[] | null } | null = null;
+      let bestScore = -1;
 
-          if (candidateScore > chosenScore) {
-            chosenScore = candidateScore;
-            chosen = candidate;
-            chosenIngredients = candidateIngredients;
+      for (const terms of termsList) {
+        const cacheKey = `obf:${terms.toLowerCase()}`;
+        const cached = getCache(obfCache, cacheKey);
+        if (cached !== undefined) {
+          if (cached && cached.ingredients) {
+            const overlapStats = computeOverlapStats(sourceList, cached.ingredients);
+            const score = overlapStats ? overlapStats.percent : 0;
+            if (score > bestScore) {
+              bestScore = score;
+              bestResult = cached;
+            }
           }
+          continue;
         }
-        const imageUrl =
-          chosen.image_url ||
-          chosen.image_front_url ||
-          chosen.image_front_small_url ||
-          chosen.image_small_url ||
-          null;
-        const productUrl = chosen.url || null;
-        const result = { imageUrl, productUrl, ingredients: chosenIngredients ?? null };
-        setCache(obfCache, cacheKey, result, 6 * 60 * 60 * 1000);
-        return result;
-      } catch (error) {
-        // The OBF site may present proof‑of‑work challenges, causing fetch to fail.
-        console.error('Failed to query Open Beauty Facts:', error);
-        setCache(obfCache, cacheKey, null, 15 * 60 * 1000);
-        return null;
+
+        const params = new URLSearchParams({
+          search_terms: terms,
+          search_simple: '1',
+          action: 'process',
+          json: '1',
+          page_size: '10',
+        });
+
+        try {
+          const response = await fetch(`https://world.openbeautyfacts.org/cgi/search.pl?${params.toString()}`);
+          if (!response.ok) {
+            console.warn('Open Beauty Facts lookup failed with status', response.status);
+            setCache(obfCache, cacheKey, null, 15 * 60 * 1000);
+            continue;
+          }
+          const data = await response.json();
+          const products: any[] = Array.isArray(data?.products) ? data.products : [];
+          if (!products.length) {
+            setCache(obfCache, cacheKey, null, 15 * 60 * 1000);
+            continue;
+          }
+
+          const { chosen, chosenIngredients } = selectBestObfProduct(products, name, brandName, sourceList);
+          const imageUrl =
+            chosen.image_url ||
+            chosen.image_front_url ||
+            chosen.image_front_small_url ||
+            chosen.image_small_url ||
+            null;
+          const productUrl = chosen.url || null;
+          const result = { imageUrl, productUrl, ingredients: chosenIngredients ?? null };
+          setCache(obfCache, cacheKey, result, 6 * 60 * 60 * 1000);
+
+          const overlapStats = chosenIngredients ? computeOverlapStats(sourceList, chosenIngredients) : null;
+          const score = overlapStats ? overlapStats.percent : 0;
+          if (score > bestScore) {
+            bestScore = score;
+            bestResult = result;
+          }
+        } catch (error) {
+          console.error('Failed to query Open Beauty Facts:', error);
+          setCache(obfCache, cacheKey, null, 15 * 60 * 1000);
+        }
       }
+
+      return bestResult;
     };
 
     // Utility to check if an image is a placeholder.
@@ -474,9 +535,8 @@ Return ONLY the JSON array, no other text.`;
           ? computeOverlapStats(sourceIngredients, targetIngredients)
           : null;
 
-        // Choose the best image: use the existing image if it's not a placeholder or OBF image.
-        const currentImage: string | undefined = dupe?.imageUrl || dupe?.image_url;
-        let imageUrl: string | undefined = obf?.imageUrl ?? currentImage;
+        // Strict mode: only use OBF images to avoid mismatches.
+        let imageUrl: string | undefined = obf?.imageUrl ?? undefined;
         if (isPlaceholderImage(imageUrl)) {
           imageUrl = undefined;
         }
