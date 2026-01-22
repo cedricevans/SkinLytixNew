@@ -418,35 +418,6 @@ Return ONLY the JSON array, no other text.`;
       return url.includes('images.unsplash.com');
     };
 
-    const isRetailerImageUrl = (url?: string): boolean => {
-      if (!url) return false;
-      try {
-        const hostname = new URL(url).hostname.toLowerCase();
-        return (
-          hostname.endsWith('target.scene7.com') ||
-          hostname.endsWith('media.ulta.com') ||
-          hostname.endsWith('sephora.com') ||
-          hostname.endsWith('m.media-amazon.com')
-        );
-      } catch (_error) {
-        return false;
-      }
-    };
-
-    // Utility to check if a URL belongs to an OBF image host.
-    const isObfImageUrl = (url?: string): boolean => {
-      if (!url) return false;
-      try {
-        const hostname = new URL(url).hostname.toLowerCase();
-        return (
-          hostname.endsWith('openbeautyfacts.org') ||
-          hostname.endsWith('images.openbeautyfacts.org')
-        );
-      } catch (_error) {
-        return false;
-      }
-    };
-
     // Normalise the source ingredients once.
     const sourceIngredients = Array.isArray(ingredients) && ingredients.length > 0
       ? normaliseIngredientList(ingredients)
@@ -468,12 +439,7 @@ Return ONLY the JSON array, no other text.`;
       return { index, preScore, nameScore, brandScore, scentScore };
     });
 
-    const enrichIndexes = new Set(
-      [...scoredDupes]
-        .sort((a, b) => b.preScore - a.preScore)
-        .slice(0, 8)
-        .map((item) => item.index)
-    );
+    const enrichIndexes = new Set(scoredDupes.map((item) => item.index));
 
     // Process each AI‑returned dupe. We do not filter out dupes based on match
     // percentage; instead we annotate overlap statistics.
@@ -511,12 +477,7 @@ Return ONLY the JSON array, no other text.`;
 
         // Choose the best image: use the existing image if it's not a placeholder or OBF image.
         const currentImage: string | undefined = dupe?.imageUrl || dupe?.image_url;
-        let imageUrl: string | undefined = currentImage;
-        if (!currentImage || isPlaceholderImage(currentImage)) {
-          imageUrl = obf?.imageUrl ?? currentImage;
-        } else if (!isRetailerImageUrl(currentImage) && isObfImageUrl(currentImage) === false) {
-          imageUrl = obf?.imageUrl ?? currentImage;
-        }
+        let imageUrl: string | undefined = obf?.imageUrl ?? currentImage;
 
         // Determine where to buy.
         let whereToBuy: string | undefined = dupe?.whereToBuy;
@@ -548,7 +509,7 @@ Return ONLY the JSON array, no other text.`;
     const filteredDupes = finalDupes
       .filter(Boolean)
       .sort((a: any, b: any) => (b?._score ?? 0) - (a?._score ?? 0))
-      .slice(0, 10)
+      .slice(0, 5)
       .map((dupe: any) => {
         const { _score, ...rest } = dupe;
         return rest;
