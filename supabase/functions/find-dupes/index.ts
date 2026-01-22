@@ -1,3 +1,4 @@
+/// <reference lib="deno.ns" />
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 
 const corsHeaders = {
@@ -5,7 +6,7 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-serve(async (req) => {
+serve(async (req: Request) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
@@ -18,7 +19,9 @@ serve(async (req) => {
       throw new Error('LOVABLE_API_KEY is not configured');
     }
 
-    const topIngredients = ingredients?.slice(0, 15) || [];
+    const promptIngredients = Array.isArray(ingredients)
+      ? ingredients.slice(0, 40)
+      : [];
     
     const systemPrompt = `You are a skincare expert that finds real, existing product dupes. You MUST return valid JSON only, no markdown or explanation.
 
@@ -44,7 +47,7 @@ Focus on REAL products from brands like CeraVe, La Roche-Posay, The Ordinary, Ne
 
 Product: ${productName}${brand ? ` by ${brand}` : ''}
 Category: ${category || 'face'}
-Key Ingredients: ${topIngredients.join(', ') || 'Not specified'}
+Key Ingredients: ${promptIngredients.join(', ') || 'Not specified'}
 User Profile: ${skinType || 'normal'} skin${concerns?.length ? `, concerns: ${concerns.join(', ')}` : ''}
 
 Return products that:
@@ -110,6 +113,63 @@ Return ONLY the JSON array, no other text.`;
       dupes = [];
     }
 
+    const normalizeIngredientName = (value: string) => {
+      return value
+        .toLowerCase()
+        .replace(/\(.*?\)/g, " ")
+        .replace(/[^a-z0-9\s]/g, " ")
+        .replace(/\s+/g, " ")
+        .trim();
+    };
+
+    const normalizeIngredientList = (items: string[]) => {
+      return items
+        .map((item) => normalizeIngredientName(item))
+        .filter((item) => item.length > 2);
+    };
+
+    const computeOverlapStats = (sourceList: string[], targetList: string[]) => {
+      const sourceIngredients = Array.from(new Set(normalizeIngredientList(sourceList)));
+      const targetIngredients = Array.from(new Set(normalizeIngredientList(targetList)));
+      if (!sourceIngredients.length || !targetIngredients.length) return null;
+
+      let matched = 0;
+      for (const sourceItem of sourceIngredients) {
+        const isMatch = targetIngredients.some(
+          (targetItem) => targetItem.includes(sourceItem) || sourceItem.includes(targetItem)
+        );
+        if (isMatch) matched += 1;
+      }
+
+      return {
+        percent: Math.round((matched / sourceIngredients.length) * 100),
+        matchedCount: matched,
+        sourceCount: sourceIngredients.length,
+      };
+    };
+
+    const extractObfIngredients = (product: any) => {
+      if (!product) return null;
+      if (Array.isArray(product.ingredients) && product.ingredients.length > 0) {
+        const list = product.ingredients
+          .map((ing: any) => ing?.text)
+          .filter((text: string | undefined): text is string => Boolean(text));
+        if (list.length) return normalizeIngredientList(list);
+      }
+
+      const text =
+        product.ingredients_text_en ||
+        product.ingredients_text ||
+        product.ingredients_text_fr ||
+        product.ingredients_text_es;
+
+      if (typeof text === 'string' && text.trim().length > 2) {
+        return normalizeIngredientList(text.split(/[,;]+/));
+      }
+
+      return null;
+    };
+
     const getObfProductMatch = async (productName: string, brand?: string) => {
       const terms = `${brand ? `${brand} ` : ''}${productName}`.trim();
       if (!terms) return null;
@@ -119,23 +179,35 @@ Return ONLY the JSON array, no other text.`;
         search_simple: '1',
         action: 'process',
         json: '1',
-        page_size: '1',
+        page_size: '10',
       });
 
       try {
         const obfResponse = await fetch(`https://world.openbeautyfacts.org/cgi/search.pl?${params.toString()}`);
         if (!obfResponse.ok) return null;
         const obfData = await obfResponse.json();
-        const product = obfData?.products?.[0];
-        if (!product) return null;
+        const products = Array.isArray(obfData?.products) ? obfData.products : [];
+        if (!products.length) return null;
+
+        let bestMatch = products[0];
+        let bestIngredients = extractObfIngredients(bestMatch);
+        for (const candidate of products) {
+          const candidateIngredients = extractObfIngredients(candidate);
+          if (candidateIngredients && candidateIngredients.length >= 5) {
+            bestMatch = candidate;
+            bestIngredients = candidateIngredients;
+            break;
+          }
+        }
+
         const imageUrl =
-          product.image_url ||
-          product.image_front_url ||
-          product.image_front_small_url ||
-          product.image_small_url ||
+          bestMatch.image_url ||
+          bestMatch.image_front_url ||
+          bestMatch.image_front_small_url ||
+          bestMatch.image_small_url ||
           null;
-        const productUrl = product.url || null;
-        return { imageUrl, productUrl };
+        const productUrl = bestMatch.url || null;
+        return { imageUrl, productUrl, ingredients: bestIngredients };
       } catch (error) {
         console.error('OBF lookup failed:', error);
         return null;
@@ -160,6 +232,11 @@ Return ONLY the JSON array, no other text.`;
       }
     };
 
+    const sourceIngredients = Array.isArray(ingredients) && ingredients.length > 0
+      ? normalizeIngredientList(ingredients)
+      : normalizeIngredientList(promptIngredients);
+    const minMatchedCount = Math.max(3, Math.round(sourceIngredients.length * 0.15));
+
     dupes = await Promise.all(
       dupes.map(async (dupe: any) => {
         const name = dupe?.name || dupe?.productName || dupe?.product_name;
@@ -168,22 +245,38 @@ Return ONLY the JSON array, no other text.`;
 
         const currentUrl = dupe?.imageUrl;
         const shouldReplaceImage = isPlaceholderImage(currentUrl) || !isObfImageUrl(currentUrl);
+        const obfMatch = await getObfProductMatch(name, brand);
 
-        if (shouldReplaceImage || !dupe?.productUrl) {
-          const obfMatch = await getObfProductMatch(name, brand);
-          if (obfMatch?.imageUrl || obfMatch?.productUrl) {
-            return {
-              ...dupe,
-              imageUrl: obfMatch?.imageUrl ?? dupe?.imageUrl ?? null,
-              productUrl: obfMatch?.productUrl ?? dupe?.productUrl ?? null,
-              whereToBuy: dupe?.whereToBuy || (obfMatch?.productUrl ? 'Open Beauty Facts' : undefined),
-            };
-          }
-          return { ...dupe, imageUrl: null, productUrl: dupe?.productUrl ?? null, whereToBuy: dupe?.whereToBuy };
+        const obfIngredients = obfMatch?.ingredients ?? dupe?.ingredients ?? dupe?.ingredients_list ?? null;
+        const overlapStats = obfIngredients
+          ? computeOverlapStats(sourceIngredients, obfIngredients)
+          : null;
+        if (!overlapStats || overlapStats.matchedCount < minMatchedCount) {
+          return null;
         }
-        return dupe;
+        const matchPercent = overlapStats.percent;
+
+        const nextImageUrl = shouldReplaceImage
+          ? obfMatch?.imageUrl ?? dupe?.imageUrl ?? null
+          : dupe?.imageUrl ?? obfMatch?.imageUrl ?? null;
+
+        const nextProductUrl = obfMatch?.productUrl ?? dupe?.productUrl ?? null;
+        const nextWhereToBuy = dupe?.whereToBuy || (obfMatch?.productUrl ? 'Open Beauty Facts' : undefined);
+
+        return {
+          ...dupe,
+          imageUrl: nextImageUrl,
+          productUrl: nextProductUrl,
+          whereToBuy: nextWhereToBuy,
+          ingredients: obfIngredients,
+          matchPercent: matchPercent ?? dupe?.matchPercent ?? dupe?.match_percent ?? null,
+          matchedCount: overlapStats.matchedCount,
+          sourceCount: overlapStats.sourceCount,
+        };
       })
     );
+
+    dupes = dupes.filter((dupe) => Boolean(dupe));
 
     return new Response(JSON.stringify({ dupes }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },

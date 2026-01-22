@@ -195,6 +195,10 @@ const Home = () => {
                 Optimize routine
                 <ArrowRight className="h-4 w-4" />
               </Button>
+              <Button variant="outline" onClick={() => navigate("/profile")} className="justify-between">
+                View profile
+                <ArrowRight className="h-4 w-4" />
+              </Button>
             </div>
           </Card>
         </section>

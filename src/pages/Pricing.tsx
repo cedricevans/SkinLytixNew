@@ -19,7 +19,7 @@ const FREE_FEATURES = [
   'Basic EpiQ Score',
   'Ingredient safety flags',
   '1 routine (up to 5 products)',
-  '3 SkinLytixGPT messages/day',
+  '3 SkinLytixGPT chats/month',
   'Compare 2 products',
 ];
 
@@ -192,7 +192,7 @@ const Pricing = () => {
       <section className="px-4 pb-20">
         <div className="max-w-6xl mx-auto grid md:grid-cols-3 gap-6 lg:gap-8">
           {/* Free Tier */}
-          <Card className="border-2 border-border relative overflow-hidden">
+          <Card className="border-2 border-border relative overflow-hidden order-3">
             <CardHeader className="pb-4">
               <div className="flex items-center gap-2 mb-2">
                 <Zap className="h-5 w-5 text-muted-foreground" />
@@ -226,11 +226,8 @@ const Pricing = () => {
           </Card>
 
           {/* Premium Tier */}
-          <Card className="border-2 border-primary relative overflow-hidden shadow-lg scale-105">
+          <Card className="border-2 border-primary relative overflow-hidden shadow-lg scale-105 order-2">
             <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-primary to-accent" />
-            <Badge className="absolute top-4 right-4 bg-primary">
-              Most Popular
-            </Badge>
             <CardHeader className="pb-4">
               <div className="flex items-center gap-2 mb-2">
                 <Sparkles className="h-5 w-5 text-primary" />
@@ -269,10 +266,10 @@ const Pricing = () => {
           </Card>
 
           {/* Pro Tier */}
-          <Card className="border-2 border-amber-500/50 relative overflow-hidden">
+          <Card className="border-2 border-amber-500/50 relative overflow-hidden order-1">
             <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-amber-500 to-orange-500" />
             <Badge className="absolute top-4 right-4 bg-amber-500">
-              Best Value
+              Most Popular
             </Badge>
             <CardHeader className="pb-4">
               <div className="flex items-center gap-2 mb-2">

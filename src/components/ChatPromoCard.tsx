@@ -93,7 +93,7 @@ const ChatPromoCard = ({ onOpenChat, className }: ChatPromoCardProps) => {
 
         {/* Usage hint */}
         <p className="text-xs text-center text-muted-foreground mt-3">
-          Free users: 3 messages/day • Premium: 30/month
+          Free users: 3 chats/month • Premium: 30/month
         </p>
       </CardContent>
     </Card>

@@ -154,6 +154,26 @@ export function PaywallModal({
           {/* Plan Selection */}
           <div className="grid grid-cols-2 gap-3">
             <button
+              onClick={() => setSelectedPlan('pro')}
+              className={cn(
+                "p-4 rounded-xl border-2 text-left transition-all relative overflow-hidden",
+                selectedPlan === 'pro' 
+                  ? "border-amber-500 bg-amber-500/5" 
+                  : "border-border hover:border-amber-500/50"
+              )}
+            >
+              <Badge className="absolute top-2 right-2 bg-amber-500 text-xs">
+                Most Popular
+              </Badge>
+              <div className="flex items-center gap-2 mb-2">
+                <Crown className="h-4 w-4 text-amber-500" />
+                <span className="font-semibold">Pro</span>
+              </div>
+              <div className="text-2xl font-bold">$14.99</div>
+              <div className="text-xs text-muted-foreground">/month</div>
+            </button>
+
+            <button
               onClick={() => setSelectedPlan('premium')}
               className={cn(
                 "p-4 rounded-xl border-2 text-left transition-all",
@@ -167,26 +187,6 @@ export function PaywallModal({
                 <span className="font-semibold">Premium</span>
               </div>
               <div className="text-2xl font-bold">$7.99</div>
-              <div className="text-xs text-muted-foreground">/month</div>
-            </button>
-
-            <button
-              onClick={() => setSelectedPlan('pro')}
-              className={cn(
-                "p-4 rounded-xl border-2 text-left transition-all relative overflow-hidden",
-                selectedPlan === 'pro' 
-                  ? "border-amber-500 bg-amber-500/5" 
-                  : "border-border hover:border-amber-500/50"
-              )}
-            >
-              <Badge className="absolute top-2 right-2 bg-amber-500 text-xs">
-                Best Value
-              </Badge>
-              <div className="flex items-center gap-2 mb-2">
-                <Crown className="h-4 w-4 text-amber-500" />
-                <span className="font-semibold">Pro</span>
-              </div>
-              <div className="text-2xl font-bold">$14.99</div>
               <div className="text-xs text-muted-foreground">/month</div>
             </button>
           </div>

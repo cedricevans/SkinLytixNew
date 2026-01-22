@@ -9,13 +9,14 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { Droplets, Wind, Flame, Shield, Sparkles, Home, ArrowLeft, User, TrendingUp, Calendar, DollarSign, Edit2, ChevronDown, ScanLine, Plus, History, Search, Info, MessageSquare, Crown } from "lucide-react";
+import { Droplets, Wind, Flame, Shield, Sparkles, Home, ArrowLeft, User, TrendingUp, Calendar, DollarSign, Edit2, ChevronDown, ScanLine, Plus, History, Search, Info, MessageSquare, Crown, Trash2 } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { useTracking, trackEvent } from "@/hooks/useTracking";
 import { DemoModeToggle } from "@/components/DemoModeToggle";
 import { useSubscription } from "@/hooks/useSubscription";
 import { SubscriptionSection, TrialBanner } from "@/components/subscription";
 import AppShell from "@/components/AppShell";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 
 const skinTypes = [
   { value: "oily", label: "Oily", icon: Droplets, description: "Shiny, prone to breakouts" },
@@ -72,6 +73,9 @@ const Profile = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [scoreFilter, setScoreFilter] = useState<"all" | "excellent" | "good" | "attention">("all");
   const [feedbackCount, setFeedbackCount] = useState(0);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [analysisToDelete, setAnalysisToDelete] = useState<string | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   useEffect(() => {
     fetchProfile();
@@ -211,6 +215,48 @@ const Profile = () => {
         ? prev.filter((c) => c !== concern)
         : [...prev, concern]
     );
+  };
+
+  const confirmDeleteAnalysis = (analysisId: string) => {
+    setAnalysisToDelete(analysisId);
+    setShowDeleteDialog(true);
+  };
+
+  const handleDeleteAnalysis = async () => {
+    if (!analysisToDelete) return;
+    setIsDeleting(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        navigate("/auth");
+        return;
+      }
+
+      const { error } = await supabase
+        .from("user_analyses")
+        .delete()
+        .eq("id", analysisToDelete)
+        .eq("user_id", user.id);
+
+      if (error) throw error;
+
+      setAllAnalyses((prev) => prev.filter((analysis) => analysis.id !== analysisToDelete));
+      setStats((prev) => ({
+        ...prev,
+        totalAnalyses: Math.max(0, prev.totalAnalyses - 1),
+      }));
+      toast({ title: "Scan deleted" });
+    } catch (error: any) {
+      toast({
+        title: "Delete failed",
+        description: error?.message || "Try removing it from your routine first.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsDeleting(false);
+      setShowDeleteDialog(false);
+      setAnalysisToDelete(null);
+    }
   };
 
   const fetchAllAnalyses = async () => {
@@ -1048,6 +1094,14 @@ const Profile = () => {
                                         <Plus className="w-4 h-4 mr-1" />
                                         Add to Routine
                                       </Button>
+                                      <Button
+                                        variant="destructive"
+                                        size="sm"
+                                        onClick={() => confirmDeleteAnalysis(product.id)}
+                                      >
+                                        <Trash2 className="w-4 h-4 mr-1" />
+                                        Delete
+                                      </Button>
                                     </div>
                                   </CollapsibleContent>
                                 </Collapsible>
@@ -1062,7 +1116,6 @@ const Profile = () => {
               </>
             )}
           </TabsContent>
-
           {/* Routines Tab */}
           <TabsContent value="routines" className="space-y-6">
             {loadingRoutines ? (
@@ -1251,6 +1304,27 @@ const Profile = () => {
             )}
           </TabsContent>
         </Tabs>
+
+        <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Delete this scan?</AlertDialogTitle>
+              <AlertDialogDescription>
+                This removes the analysis from your account. You can re-scan the product later.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={handleDeleteAnalysis}
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                disabled={isDeleting}
+              >
+                {isDeleting ? "Deleting..." : "Delete"}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </div>
 
       {/* Demo Mode Toggle - Admin Only */}

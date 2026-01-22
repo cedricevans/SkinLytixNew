@@ -23,6 +23,7 @@ import Compare from "./pages/Compare";
 import Favorites from "./pages/Favorites";
 import Pricing from "./pages/Pricing";
 import NotFound from "./pages/NotFound";
+import Settings from "./pages/Settings";
 import StudentReviewer from "./pages/dashboard/StudentReviewer";
 import FeedbackWidget from "@/components/FeedbackWidget";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
@@ -59,6 +60,7 @@ const App = () => (
           <Route path="/beta-feedback" element={<AppProtectedRoute><BetaFeedback /></AppProtectedRoute>} />
           <Route path="/compare" element={<AppProtectedRoute><Compare /></AppProtectedRoute>} />
           <Route path="/favorites" element={<AppProtectedRoute><Favorites /></AppProtectedRoute>} />
+          <Route path="/settings" element={<AppProtectedRoute><Settings /></AppProtectedRoute>} />
           <Route path="/pricing" element={<Pricing />} />
           <Route path="/dashboard/reviewer" element={<AppProtectedRoute><ProtectedRoute><StudentReviewer /></ProtectedRoute></AppProtectedRoute>} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}

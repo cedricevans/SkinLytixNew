@@ -31,12 +31,14 @@ interface MarketDupe {
   imageUrl: string;
   reasons: string[];
   sharedIngredients: string[];
+  ingredients?: string[];
   priceEstimate: string;
   profileMatch: boolean;
   category: string;
   whereToBuy?: string;
   purchaseUrl?: string;
   productUrl?: string;
+  matchPercent?: number;
 }
 
 interface SavedDupe {
@@ -96,6 +98,14 @@ const normalizeDupe = (dupe: any, fallbackCategory: string): MarketDupe | null =
       ? dupe.shared_ingredients
       : [];
   const profileMatch = Boolean(dupe?.profileMatch ?? dupe?.profile_match);
+  const matchPercentRaw = dupe?.matchPercent ?? dupe?.match_percent ?? dupe?.overlapPercent ?? dupe?.overlap_percent;
+  const matchPercent = typeof matchPercentRaw === "number" ? matchPercentRaw : undefined;
+  const ingredientsRaw = dupe?.ingredients ?? dupe?.ingredients_list ?? dupe?.ingredientsList ?? dupe?.ingredients_text;
+  const ingredients = Array.isArray(ingredientsRaw)
+    ? ingredientsRaw.filter(Boolean).map((item: string) => item.trim())
+    : typeof ingredientsRaw === "string"
+      ? ingredientsRaw.split(/[,;]+/).map((item) => item.trim()).filter((item) => item.length > 2)
+      : undefined;
 
   return {
     name,
@@ -109,6 +119,8 @@ const normalizeDupe = (dupe: any, fallbackCategory: string): MarketDupe | null =
     whereToBuy,
     purchaseUrl: productUrl || buildPurchaseUrl(whereToBuy, name, brand),
     productUrl,
+    matchPercent,
+    ingredients,
   };
 };
 
@@ -194,6 +206,52 @@ export default function Compare() {
     [analyses, selectedProductId]
   );
 
+  const sourceIngredients = useMemo(
+    () => (selectedProduct ? parseIngredients(selectedProduct.ingredients_list) : []),
+    [selectedProduct]
+  );
+
+  const normalizeIngredientName = (value: string) => {
+    return value
+      .toLowerCase()
+      .replace(/\(.*?\)/g, " ")
+      .replace(/[^a-z0-9\s]/g, " ")
+      .replace(/\s+/g, " ")
+      .trim();
+  };
+
+  const normalizeList = (items: string[]) =>
+    items
+      .map((item) => normalizeIngredientName(item))
+      .filter((item) => item.length > 2);
+
+  const getMarketMatchPercent = (dupe: MarketDupe, sourceList: string[]) => {
+    if (typeof dupe.matchPercent === "number" && dupe.matchPercent > 0) {
+      return Math.min(98, Math.max(50, Math.round(dupe.matchPercent)));
+    }
+
+    if (!dupe.ingredients || dupe.ingredients.length === 0 || sourceList.length === 0) {
+      return undefined;
+    }
+
+    const sourceIngredients = Array.from(new Set(normalizeList(sourceList)));
+    const targetIngredients = Array.from(new Set(normalizeList(dupe.ingredients)));
+    if (!sourceIngredients.length || !targetIngredients.length) return undefined;
+
+    let matched = 0;
+    for (const sourceItem of sourceIngredients) {
+      const isMatch = targetIngredients.some(
+        (targetItem) => targetItem.includes(sourceItem) || sourceItem.includes(targetItem)
+      );
+      if (isMatch) matched += 1;
+    }
+
+    const percent = Math.round((matched / sourceIngredients.length) * 100);
+    if (percent <= 0) return undefined;
+    return Math.min(98, Math.max(1, percent));
+  };
+
+
   const findMarketDupes = async () => {
     if (!selectedProduct) return;
     
@@ -246,12 +304,12 @@ export default function Compare() {
     }
   };
 
-  const parseIngredients = (list: string): string[] => {
+  function parseIngredients(list: string): string[] {
     return list.toLowerCase()
       .split(/[,;]/)
       .map(i => i.trim())
       .filter(i => i.length > 2);
-  };
+  }
 
   // My Products comparison (existing logic)
   const myProductMatches = useMemo(() => {
@@ -571,7 +629,7 @@ export default function Compare() {
                               brand={dupe.brand}
                               imageUrl={dupe.imageUrl}
                               priceEstimate={dupe.priceEstimate}
-                              matchPercentage={dupe.profileMatch ? 95 : 80}
+                              matchPercentage={getMarketMatchPercent(dupe, sourceIngredients)}
                               reasons={dupe.reasons}
                               sharedIngredients={dupe.sharedIngredients}
                               isSaved={savedDupes.has(key)}

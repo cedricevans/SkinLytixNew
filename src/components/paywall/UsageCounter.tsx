@@ -66,7 +66,7 @@ export function UsageCounter({
           <div className="mt-3 flex items-center justify-between">
             <span className="text-xs text-muted-foreground">
               {isExhausted 
-                ? "You've used all your free messages" 
+                ? "You've used all your free chats" 
                 : `Only ${remaining} remaining this month`
               }
             </span>

@@ -16,7 +16,6 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { AnimatedScoreGauge } from "@/components/AnimatedScoreGauge";
 import { SafetyLevelMeter } from "@/components/SafetyLevelMeter";
 import { ProfessionalReferralBanner } from "@/components/ProfessionalReferralBanner";
-import { FloatingActionBubbles } from "@/components/FloatingActionBubbles";
 import { IngredientRiskHeatmap } from "@/components/IngredientRiskHeatmap";
 import { ScoreBreakdownAccordion } from "@/components/ScoreBreakdownAccordion";
 import { AIExplanationAccordion } from "@/components/AIExplanationAccordion";
@@ -1193,12 +1192,6 @@ const Analysis = () => {
         </section>
 
         </div>
-
-        {/* Floating Action Bubbles - Desktop only */}
-        <FloatingActionBubbles 
-          onAddToRoutine={handleAddToRoutine}
-          showAddToRoutine={true}
-        />
 
         {/* SkinLytixGPT Chat with Voice */}
         {/* SkinLytixGPT Chat with Voice */}

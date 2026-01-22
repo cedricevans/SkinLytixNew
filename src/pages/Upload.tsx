@@ -663,6 +663,7 @@ const Upload = () => {
                 value={productName}
                 onChange={(e) => setProductName(e.target.value)}
                 placeholder="e.g., Glow Serum SPF 30"
+                className="placeholder:text-muted-foreground/60"
               />
             </div>
 
@@ -673,6 +674,7 @@ const Upload = () => {
                 value={barcode}
                 onChange={(e) => setBarcode(e.target.value)}
                 placeholder="e.g., 012345678901"
+                className="placeholder:text-muted-foreground/60"
               />
             </div>
 
@@ -683,6 +685,7 @@ const Upload = () => {
                 value={brand}
                 onChange={(e) => setBrand(e.target.value)}
                 placeholder="e.g., CeraVe, The Ordinary"
+                className="placeholder:text-muted-foreground/60"
               />
             </div>
 
@@ -693,6 +696,7 @@ const Upload = () => {
                 value={category}
                 onChange={(e) => setCategory(e.target.value)}
                 placeholder="e.g., serum, moisturizer, cleanser"
+                className="placeholder:text-muted-foreground/60"
               />
             </div>
 
@@ -720,7 +724,7 @@ const Upload = () => {
                   value={productPrice}
                   onChange={(e) => setProductPrice(e.target.value)}
                   placeholder="24.99"
-                  className="pl-7"
+                  className="pl-7 placeholder:text-muted-foreground/60"
                 />
               </div>
             </div>
@@ -746,7 +750,7 @@ const Upload = () => {
                 value={ingredientsList}
                 onChange={(e) => setIngredientsList(e.target.value)}
                 placeholder="Water, Glycerin, Niacinamide, ..."
-                className="min-h-[200px]"
+                className="min-h-[200px] placeholder:text-muted-foreground/60"
               />
               <p className="text-xs text-muted-foreground mt-2">
                 Review and correct the extracted text as needed

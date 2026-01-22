@@ -1,7 +1,14 @@
-import { useState } from "react";
-import { ClipboardCheck, LogOut, Menu } from "lucide-react";
+import { useEffect, useState } from "react";
+import { Bell, ClipboardCheck, LogOut, Menu, Settings, User } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { useNavigate } from "react-router-dom";
 import { useReviewerAccess } from "@/hooks/useReviewerAccess";
 import { supabase } from "@/integrations/supabase/client";
@@ -38,6 +45,53 @@ const Navigation = ({
   const { toast } = useToast();
   const isAppNav = variant === "app";
   const navigationItems = isAppNav ? appNavigationItems : marketingNavigationItems;
+  const desktopNavigationItems = isAppNav
+    ? appNavigationItems.filter((item) => item.label !== "Profile")
+    : marketingNavigationItems;
+  const [userInitials, setUserInitials] = useState(() => {
+    if (typeof window === "undefined") return "";
+    return localStorage.getItem("sl_user_initials") || "";
+  });
+  const [isInitialsLoaded, setIsInitialsLoaded] = useState(false);
+
+  const getInitials = (value: string) => {
+    const parts = value.trim().split(/\s+/).filter(Boolean);
+    if (parts.length === 0) return "";
+    if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+    return `${parts[0][0]}${parts[1][0]}`.toUpperCase();
+  };
+
+  useEffect(() => {
+    if (!isAppNav) return;
+    let isMounted = true;
+
+    const loadUser = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!isMounted) return;
+      if (!user) {
+        setUserInitials("SL");
+        if (typeof window !== "undefined") {
+          localStorage.removeItem("sl_user_initials");
+        }
+        setIsInitialsLoaded(true);
+        return;
+      }
+      const name = `${user.user_metadata?.display_name || user.user_metadata?.full_name || user.email || ""}`;
+      const initials = getInitials(name);
+      const nextInitials = initials || "SL";
+      setUserInitials(nextInitials);
+      if (typeof window !== "undefined") {
+        localStorage.setItem("sl_user_initials", nextInitials);
+      }
+      setIsInitialsLoaded(true);
+    };
+
+    loadUser();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [isAppNav]);
 
   const scrollToSection = (href: string, isRoute?: boolean) => {
     if (isRoute) {
@@ -72,6 +126,49 @@ const Navigation = ({
     setOpen(false);
     navigate("/", { replace: true });
   };
+
+  const handleAlerts = () => {
+    toast({
+      title: "Alerts coming soon",
+      description: "Notification settings will be available in a future update.",
+    });
+  };
+
+  const renderAvatarTrigger = (className?: string) => (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button
+          variant="ghost"
+          size="icon"
+          className={className}
+          aria-label="Open profile menu"
+        >
+          <span className="text-xs font-semibold">
+            {userInitials || (isInitialsLoaded ? "SL" : "...")}
+          </span>
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="w-44">
+        <DropdownMenuItem onClick={() => navigate("/profile")}>
+          <User className="mr-2 h-4 w-4" />
+          Profile
+        </DropdownMenuItem>
+        <DropdownMenuItem onClick={() => navigate("/settings")}>
+          <Settings className="mr-2 h-4 w-4" />
+          Settings
+        </DropdownMenuItem>
+        <DropdownMenuItem onClick={handleAlerts}>
+          <Bell className="mr-2 h-4 w-4" />
+          Alerts
+        </DropdownMenuItem>
+        <DropdownMenuSeparator />
+        <DropdownMenuItem onClick={handleLogout}>
+          <LogOut className="mr-2 h-4 w-4" />
+          Log Out
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
 
   const handleAskGpt = async () => {
     if (!isAppNav) return;
@@ -114,7 +211,10 @@ const Navigation = ({
   };
 
   return (
-    <>
+    <div className="flex items-center gap-2">
+      {isAppNav && (
+        renderAvatarTrigger("md:hidden h-9 w-9 rounded-full bg-white/15 text-primary-foreground hover:bg-white/25")
+      )}
       <Sheet open={open} onOpenChange={setOpen}>
         <SheetTrigger asChild>
           <Button
@@ -161,16 +261,7 @@ const Navigation = ({
               </div>
             )}
             {isAppNav ? (
-              <div className="mt-4 space-y-3 px-4">
-                <Button
-                  variant="outline"
-                  className="w-full"
-                  onClick={handleLogout}
-                >
-                  <LogOut className="w-4 h-4 mr-2" />
-                  Log Out
-                </Button>
-              </div>
+              <div className="mt-4 space-y-3 px-4" />
             ) : (
               <div className="mt-4 space-y-3 px-4">
                 <Button
@@ -194,7 +285,7 @@ const Navigation = ({
       </Sheet>
 
       <nav className="hidden md:flex items-center gap-6">
-        {navigationItems.map((item) => (
+        {desktopNavigationItems.map((item) => (
           <button
             key={item.label}
             onClick={() => scrollToSection(item.href, (item as any).isRoute)}
@@ -222,15 +313,7 @@ const Navigation = ({
           </Button>
         )}
         {isAppNav ? (
-          <Button
-            variant="ghost"
-            size="sm"
-            className="bg-white/20 text-white border border-white/50 hover:bg-white/30 transition-all"
-            onClick={handleLogout}
-          >
-            <LogOut className="w-4 h-4 mr-2" />
-            Log Out
-          </Button>
+          renderAvatarTrigger("h-9 w-9 rounded-full bg-white/20 text-white border border-white/30 hover:bg-white/30 transition-all")
         ) : (
           <>
             <Button
@@ -247,7 +330,7 @@ const Navigation = ({
           </>
         )}
       </nav>
-    </>
+    </div>
   );
 };
 

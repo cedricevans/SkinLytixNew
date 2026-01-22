@@ -216,25 +216,40 @@ export const SkinLytixGPTChat = ({
     });
   };
 
-  // Chat limit for free tier: 3 messages/month, Premium: 30, Pro: unlimited
+  // Chat limit for free tier: 3 chats/month, Premium: 30, Pro: unlimited
   const getChatLimit = () => {
     if (hasUnlimitedChat) return Infinity;
     if (effectiveTier === 'premium') return 30;
     return 3; // free
   };
 
+  const maxMessagesPerChat = effectiveTier === 'free' ? 10 : Infinity;
   const chatLimit = getChatLimit();
   const chatUsed = usage?.chatMessagesUsed || 0;
-  const canSendMessage = hasUnlimitedChat || chatUsed < chatLimit;
+  const canStartNewChat = hasUnlimitedChat || chatUsed < chatLimit;
+  const userMessagesInChat = messages.reduce((count, msg) => {
+    return msg.role === 'user' ? count + 1 : count;
+  }, 0);
+  const canSendMessage = userMessagesInChat < maxMessagesPerChat;
 
   // Send message handler
   const sendMessage = async (messageText?: string) => {
     const textToSend = messageText || input.trim();
     if (!textToSend || isLoading) return;
 
-    // Check chat limit
-    if (!canSendMessage) {
+    // Check monthly chat limit when starting a new conversation
+    if (!conversationId && messages.length === 0 && !canStartNewChat) {
       setShowPaywall(true);
+      return;
+    }
+
+    // Check per-chat message limit (free tier)
+    if (!canSendMessage) {
+      toast({
+        title: "Chat limit reached",
+        description: "This chat is capped at 10 messages. Start a new chat to continue.",
+        variant: "destructive",
+      });
       return;
     }
 
@@ -242,11 +257,6 @@ export const SkinLytixGPTChat = ({
     setMessages(prev => [...prev, userMessage]);
     setInput("");
     setIsLoading(true);
-
-    // Increment usage for non-unlimited tiers
-    if (!hasUnlimitedChat) {
-      await incrementUsage('chatMessagesUsed');
-    }
 
     trackEvent({
       eventName: 'chat_message_sent',
@@ -302,6 +312,9 @@ export const SkinLytixGPTChat = ({
       const newConvId = response.headers.get('X-Conversation-Id');
       if (newConvId && !conversationId) {
         setConversationId(newConvId);
+        if (!hasUnlimitedChat) {
+          await incrementUsage('chatMessagesUsed');
+        }
         trackEvent({
           eventName: 'chat_conversation_created',
           eventCategory: 'chat',
@@ -461,8 +474,9 @@ export const SkinLytixGPTChat = ({
               <UsageCounter
                 used={chatUsed}
                 limit={chatLimit}
-                label="Chat messages"
+                label="Chats"
                 feature="Unlimited Chat"
+                showUpgradeAt={100}
               />
             </div>
           )}

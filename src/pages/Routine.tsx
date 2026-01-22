@@ -705,6 +705,7 @@ export default function Routine() {
                   placeholder="0.00"
                   value={productPrice}
                   onChange={(e) => setProductPrice(e.target.value)}
+                  className="placeholder:text-muted-foreground/60"
                 />
               </div>
               <div>
@@ -810,6 +811,7 @@ export default function Routine() {
                   placeholder="0.00"
                   value={manualPrice}
                   onChange={(e) => setManualPrice(e.target.value)}
+                  className="placeholder:text-muted-foreground/60"
                 />
               </div>
               <div>
