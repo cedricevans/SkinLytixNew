@@ -1,16 +1,18 @@
-import Hero from "@/components/Hero";
-import Features from "@/components/Features";
-import HowItWorks from "@/components/HowItWorks";
-import LiveTrustSignals from "@/components/LiveTrustSignals";
-import CTASection from "@/components/CTASection";
-import Footer from "@/components/Footer";
-import MicroEngagement from "@/components/MicroEngagement";
-import ExitIntentPopup from "@/components/ExitIntentPopup";
-import PricingPreview from "@/components/PricingPreview";
-import IngredientPreviewWidget from "@/components/IngredientPreviewWidget";
 import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
+import Navigation from "@/components/Navigation";
+import BrandName from "@/components/landing/BrandName";
+import Hero from "@/components/landing/Hero";
+import ProblemSection from "@/components/landing/ProblemSection";
+import FreeChecklist from "@/components/landing/FreeChecklist";
+import HowItWorks from "@/components/landing/HowItWorks";
+import SocialProof from "@/components/landing/SocialProof";
+import Testimonials from "@/components/landing/Testimonials";
+import CommunityPhotos from "@/components/landing/CommunityPhotos";
+import Footer from "@/components/landing/Footer";
+import Waitlist from "@/components/landing/Waitlist";
+import PricingPreview from "@/components/PricingPreview";
 
 const Index = () => {
   const navigate = useNavigate();
@@ -26,17 +28,34 @@ const Index = () => {
   }, [navigate]);
 
   return (
-    <main className="min-h-screen">
-      <Hero />
-      <MicroEngagement />
-      <LiveTrustSignals />
-      <IngredientPreviewWidget />
-      <Features />
-      <HowItWorks />
-      <PricingPreview />
-      <CTASection />
+    <main className="min-h-screen font-landing">
+      <header className="sticky top-0 z-50 w-full bg-azure text-primary-foreground">
+        <div className="container mx-auto px-6">
+          <div className="flex h-16 items-center justify-between">
+            <button
+              type="button"
+              onClick={() => window.document.getElementById("home")?.scrollIntoView({ behavior: "smooth" })}
+              className="font-heading text-xl md:text-2xl font-bold text-primary-foreground hover:text-primary-foreground/80 transition-colors"
+              aria-label="SkinLytix home"
+            >
+              <BrandName />
+            </button>
+            <Navigation />
+          </div>
+        </div>
+      </header>
+      <Hero id="home" />
+      <SocialProof />
+      <FreeChecklist />
+      <ProblemSection id="features" />
+      <HowItWorks id="how-it-works" />
+      <div id="pricing">
+        <PricingPreview />
+      </div>
+      <Waitlist />
+      <Testimonials id="testimonials" />
+      <CommunityPhotos />
       <Footer />
-      <ExitIntentPopup />
     </main>
   );
 };

@@ -3,7 +3,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { Heart, Check, ExternalLink } from "lucide-react";
 import { cn } from "@/lib/utils";
-import skinNotFound from "@/assets/skin_notfound.png";
+import noImageFound from "@/assets/no_image_found.png";
 
 interface DupeCardProps {
   name: string;
@@ -38,8 +38,7 @@ export const DupeCard = ({
   const [imageError, setImageError] = useState(false);
   const [imageLoaded, setImageLoaded] = useState(false);
 
-  const fallbackImage = skinNotFound;
-  const displayImage = imageError ? fallbackImage : (imageUrl || fallbackImage);
+  const displayImage = !imageError && imageUrl ? imageUrl : noImageFound;
 
   return (
     <Card className="group relative overflow-hidden bg-card border-border hover:shadow-lg transition-all duration-300 hover:-translate-y-0.5 min-w-0">
@@ -74,30 +73,28 @@ export const DupeCard = ({
         {!imageLoaded && !imageError && (
           <div className="absolute inset-0 bg-muted animate-pulse" />
         )}
-        {displayImage ? (
-          <img
-            src={displayImage}
-            alt={`${brand} ${name}`}
-            className={cn(
-              "w-full h-full object-cover group-hover:scale-105 transition-all duration-300",
-              imageLoaded ? "opacity-100" : "opacity-0"
-            )}
-            onError={() => {
-              setImageError(true);
-            }}
-            onLoad={() => setImageLoaded(true)}
-          />
-        ) : (
-          <div className="absolute inset-0 bg-muted/50" />
-        )}
+        <img
+          src={displayImage}
+          alt={`${brand} ${name}`}
+          className={cn(
+            "w-full h-full object-cover group-hover:scale-105 transition-all duration-300",
+            imageLoaded ? "opacity-100" : "opacity-0"
+          )}
+          onError={() => {
+            if (!imageError) setImageError(true);
+          }}
+          onLoad={() => setImageLoaded(true)}
+        />
       </div>
 
       {/* Content - Mobile optimized */}
       <div className="p-2.5 sm:p-3 space-y-1.5 min-w-0">
         {/* Brand */}
-        <p className="text-[10px] sm:text-xs text-muted-foreground uppercase tracking-wide font-medium truncate">
-          {brand}
-        </p>
+        {brand && (
+          <p className="text-[10px] sm:text-xs text-muted-foreground uppercase tracking-wide font-medium truncate">
+            {brand}
+          </p>
+        )}
 
         {/* Product Name */}
         <h3 className="font-semibold text-xs sm:text-sm text-foreground line-clamp-2 min-h-[2rem] sm:min-h-[2.5rem] break-words hyphens-auto">

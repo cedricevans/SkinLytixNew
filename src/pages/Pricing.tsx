@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Check, Crown, Sparkles, Zap, ArrowLeft, Shield, Star } from 'lucide-react';
+import { Check, Crown, Sparkles, Zap, Shield, Star } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -13,6 +13,8 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from '@/components/ui/accordion';
+import Navigation from '@/components/Navigation';
+import BrandName from '@/components/landing/BrandName';
 
 const FREE_FEATURES = [
   'Unlimited product analyses',
@@ -120,22 +122,17 @@ const Pricing = () => {
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
-      <header className="bg-primary py-4">
-        <div className="max-w-6xl mx-auto px-4 flex items-center justify-between">
-          <button 
+      <header className="sticky top-0 z-50 w-full bg-primary text-primary-foreground">
+        <div className="max-w-6xl mx-auto px-4 flex items-center justify-between h-16">
+          <button
+            type="button"
             onClick={() => navigate('/')}
-            className="flex items-center gap-2 text-primary-foreground hover:opacity-80 transition-opacity"
+            className="font-heading text-xl font-bold text-primary-foreground hover:opacity-80 transition-opacity"
+            aria-label="SkinLytix home"
           >
-            <ArrowLeft className="h-5 w-5" />
-            <span className="font-heading font-bold text-xl">SkinLytix</span>
+            <BrandName />
           </button>
-          <Button 
-            variant="ghost" 
-            className="text-primary-foreground hover:bg-primary-foreground/10"
-            onClick={() => navigate('/auth')}
-          >
-            Sign In
-          </Button>
+          <Navigation />
         </div>
       </header>
 
@@ -209,10 +206,10 @@ const Pricing = () => {
             <CardContent className="space-y-4">
               <Button 
                 variant="outline" 
-                className="w-full"
-                onClick={() => navigate('/demo-analysis')}
+                className="w-full whitespace-normal"
+                onClick={() => navigate('/auth')}
               >
-                Try Demo
+                Get Started Free
               </Button>
               <ul className="space-y-3">
                 {FREE_FEATURES.map((feature, i) => (
@@ -369,10 +366,10 @@ const Pricing = () => {
             <Button 
               variant="cta" 
               size="lg"
-              onClick={() => navigate('/demo-analysis')}
-              className="px-8"
+              onClick={() => navigate('/auth')}
+              className="px-8 whitespace-normal"
             >
-              Try Demo Free
+              Get Started Free
             </Button>
             <Button 
               variant="outline" 

@@ -49,7 +49,7 @@ export function UsageCounter({
             isLow ? "text-amber-600" : 
             "text-foreground"
           )}>
-            {remaining} / {limit}
+            {remaining} remaining · {used}/{limit} used
           </span>
         </div>
         

@@ -15,7 +15,6 @@ import OCRLoadingTips from "@/components/OCRLoadingTips";
 import { FrictionFeedbackBanner } from "@/components/FrictionFeedbackBanner";
 import AppShell from "@/components/AppShell";
 import PageHeader from "@/components/PageHeader";
-import { Progress } from "@/components/ui/progress";
 import { getQuickScanSummary } from "@/lib/quick-scan";
 
 // Helper: Preprocess image for better OCR accuracy
@@ -49,13 +48,66 @@ const preprocessImage = (imageDataUrl: string): Promise<string> => {
   });
 };
 
-// Helper: Clean extracted text
+// Helper: Extract and clean ingredient text
+const extractIngredientSection = (text: string): string => {
+  const lower = text.toLowerCase();
+  const ingredientIndex = lower.search(/ingredients?\b/);
+  let section = ingredientIndex >= 0 ? text.slice(ingredientIndex) : text;
+  section = section.replace(/ingredients?\s*[:\-]?\s*/i, '');
+  section = section.split(/\bmay contain\b|\bcontains\b|\bwarning\b|\bdirections\b|\buse\b/i)[0] || section;
+  return section;
+};
+
 const cleanIngredientText = (text: string): string => {
   let cleaned = text.replace(/[^a-zA-Z0-9\s,\-\(\)\/\.]/g, '');
   cleaned = cleaned.replace(/\s+/g, ' ');
   cleaned = cleaned.replace(/\b\d+\b/g, '');
   cleaned = cleaned.trim();
   return cleaned;
+};
+
+const buildAnalysisSignature = (name: string, ingredients: string) => {
+  const normalizedName = name.trim().toLowerCase();
+  const normalizedIngredients = ingredients.trim().toLowerCase().replace(/\s+/g, ' ');
+  return `${normalizedName}::${normalizedIngredients}`;
+};
+
+const getAnalysisCacheKey = (userId: string | null, signature: string) => {
+  if (!userId || !signature) return null;
+  return `sl_analysis_cache_${userId}_${signature}`;
+};
+
+const readAnalysisCache = (userId: string | null, signature: string) => {
+  const key = getAnalysisCacheKey(userId, signature);
+  if (!key) return null;
+  const sources = [() => sessionStorage.getItem(key), () => localStorage.getItem(key)];
+  for (const source of sources) {
+    try {
+      const value = source();
+      if (!value) continue;
+      const parsed = JSON.parse(value);
+      if (parsed?.analysisId) return parsed.analysisId as string;
+    } catch {
+      continue;
+    }
+  }
+  return null;
+};
+
+const writeAnalysisCache = (userId: string | null, signature: string, analysisId: string) => {
+  const key = getAnalysisCacheKey(userId, signature);
+  if (!key) return;
+  const payload = JSON.stringify({ analysisId, cachedAt: Date.now() });
+  try {
+    sessionStorage.setItem(key, payload);
+  } catch {
+    // ignore storage errors
+  }
+  try {
+    localStorage.setItem(key, payload);
+  } catch {
+    // ignore storage errors
+  }
 };
 
 const Upload = () => {
@@ -82,9 +134,7 @@ const Upload = () => {
   const [analysisId, setAnalysisId] = useState<string | null>(null);
   const [analysisReady, setAnalysisReady] = useState(false);
   const analysisStartRef = useRef<number | null>(null);
-  const autoAnalyzeTimerRef = useRef<number | null>(null);
-  const [autoAnalyzePending, setAutoAnalyzePending] = useState(false);
-  const [lastAutoAnalyzeSignature, setLastAutoAnalyzeSignature] = useState<string | null>(null);
+  const [lastCacheSignature, setLastCacheSignature] = useState<string | null>(null);
   const [scanMode, setScanMode] = useState<"quick" | "detailed">("quick");
   const quickScanSummary = useMemo(() => {
     if (!ingredientsList.trim()) return null;
@@ -161,7 +211,7 @@ const Upload = () => {
       
       // Extract and clean ingredients
       const ingredientsMatch = fullText.match(/ingredients?[:\s]+(.+?)(?:\n\n|$)/is);
-      const rawIngredients = ingredientsMatch ? ingredientsMatch[1].trim() : fullText;
+      const rawIngredients = ingredientsMatch ? ingredientsMatch[1].trim() : extractIngredientSection(fullText);
       setIngredientsList(cleanIngredientText(rawIngredients));
       
       toast({
@@ -238,11 +288,6 @@ const Upload = () => {
     }
 
     if (isAnalyzing) return;
-    if (autoAnalyzeTimerRef.current) {
-      window.clearTimeout(autoAnalyzeTimerRef.current);
-      autoAnalyzeTimerRef.current = null;
-      setAutoAnalyzePending(false);
-    }
 
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) {
@@ -252,6 +297,33 @@ const Upload = () => {
         variant: "destructive",
       });
       navigate('/auth');
+      return;
+    }
+
+    const signature = buildAnalysisSignature(productName, ingredientsList);
+    const cachedAnalysisId = readAnalysisCache(user.id, signature);
+    if (cachedAnalysisId) {
+      setAnalysisId(cachedAnalysisId);
+      setAnalysisReady(true);
+      setAnalysisStatus("Results ready. Review ingredients, then continue.");
+      return;
+    }
+
+    const { data: existingAnalysis } = await supabase
+      .from("user_analyses")
+      .select("id")
+      .eq("user_id", user.id)
+      .eq("product_name", productName)
+      .eq("ingredients_list", ingredientsList)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (existingAnalysis?.id) {
+      writeAnalysisCache(user.id, signature, existingAnalysis.id);
+      setAnalysisId(existingAnalysis.id);
+      setAnalysisReady(true);
+      setAnalysisStatus("Results ready. Review ingredients, then continue.");
       return;
     }
 
@@ -320,14 +392,23 @@ const Upload = () => {
         }
       });
 
+      const resolvedAnalysisId = data?.analysis_id || data?.analysisId || data?.id || null;
+      if (!resolvedAnalysisId) {
+        throw new Error("Analysis completed but no report ID was returned.");
+      }
+
+      writeAnalysisCache(user.id, signature, resolvedAnalysisId);
       setAnalysisProgress(100);
       setAnalysisStatus("Analysis ready. Review ingredients, then continue.");
       toast({
         title: "Analysis Ready",
         description: "Review your details, then open the report.",
       });
-      setAnalysisId(data.analysis_id);
+      setAnalysisId(resolvedAnalysisId);
       setAnalysisReady(true);
+      window.requestAnimationFrame(() => {
+        document.getElementById("analysis-ready")?.scrollIntoView({ behavior: "smooth", block: "center" });
+      });
     } catch (error) {
       console.error('Analysis error:', error);
       setShowFrictionBanner(true);
@@ -375,54 +456,52 @@ const Upload = () => {
 
   useEffect(() => {
     if (isProcessingOCR || isAnalyzing) {
-      if (autoAnalyzeTimerRef.current) {
-        window.clearTimeout(autoAnalyzeTimerRef.current);
-        autoAnalyzeTimerRef.current = null;
-      }
-      setAutoAnalyzePending(false);
       return;
     }
 
     const name = productName.trim();
     const ingredients = ingredientsList.trim();
     if (!name || !ingredients) {
-      if (autoAnalyzeTimerRef.current) {
-        window.clearTimeout(autoAnalyzeTimerRef.current);
-        autoAnalyzeTimerRef.current = null;
-      }
-      setAutoAnalyzePending(false);
+      setAnalysisReady(false);
+      setAnalysisId(null);
       return;
     }
 
-    const signature = `${name}::${ingredients}`;
-    if (lastAutoAnalyzeSignature === signature) {
-      setAutoAnalyzePending(false);
+    const signature = buildAnalysisSignature(name, ingredients);
+    if (lastCacheSignature === signature) {
       return;
     }
 
-    if (autoAnalyzeTimerRef.current) {
-      window.clearTimeout(autoAnalyzeTimerRef.current);
-    }
-
-    setAutoAnalyzePending(true);
-    autoAnalyzeTimerRef.current = window.setTimeout(async () => {
+    const checkCache = async () => {
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user) {
-        setAutoAnalyzePending(false);
+      if (!user) return;
+      setLastCacheSignature(signature);
+      const cachedId = readAnalysisCache(user.id, signature);
+      if (cachedId) {
+        setAnalysisId(cachedId);
+        setAnalysisReady(true);
+        setAnalysisStatus("Results ready. Review ingredients, then continue.");
         return;
       }
-      setLastAutoAnalyzeSignature(signature);
-      setAutoAnalyzePending(false);
-      handleAnalyze("auto");
-    }, 1500);
-
-    return () => {
-      if (autoAnalyzeTimerRef.current) {
-        window.clearTimeout(autoAnalyzeTimerRef.current);
-        autoAnalyzeTimerRef.current = null;
+      const { data: existingAnalysis } = await supabase
+        .from("user_analyses")
+        .select("id")
+        .eq("user_id", user.id)
+        .eq("product_name", productName)
+        .eq("ingredients_list", ingredientsList)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (existingAnalysis?.id) {
+        writeAnalysisCache(user.id, signature, existingAnalysis.id);
+        setAnalysisId(existingAnalysis.id);
+        setAnalysisReady(true);
+        setAnalysisStatus("Results ready. Review ingredients, then continue.");
       }
     };
-  }, [productName, ingredientsList, isProcessingOCR, isAnalyzing, lastAutoAnalyzeSignature]);
+
+    checkCache();
+  }, [productName, ingredientsList, isProcessingOCR, isAnalyzing, lastCacheSignature]);
 
   return (
     <TooltipProvider>
@@ -523,7 +602,7 @@ const Upload = () => {
                 onClick={() => setScanMode('quick')}
                 className="touch-target w-full sm:w-auto"
               >
-                Quick Scan
+                Quick Scan (estimate)
               </Button>
               <Button
                 type="button"
@@ -532,11 +611,11 @@ const Upload = () => {
                 onClick={() => setScanMode('detailed')}
                 className="touch-target w-full sm:w-auto"
               >
-                Detailed Scan
+                Detailed Scan (full report)
               </Button>
             </div>
             <p className="text-xs text-muted-foreground">
-              Quick scan returns results faster. Detailed scan verifies more ingredients.
+              Quick scan returns a fast estimate. Detailed scan verifies more ingredients and may adjust your score.
             </p>
           </div>
 
@@ -777,10 +856,12 @@ const Upload = () => {
 
           {/* Analyze Button */}
           <Button
-            onClick={handleAnalyze}
+            onClick={analysisReady && analysisId ? () => navigate(`/analysis/${analysisId}`) : handleAnalyze}
             disabled={isAnalyzing || isProcessingOCR}
-            className="w-full"
-            variant="cta"
+            className={analysisReady && analysisId
+              ? "w-full bg-emerald-600 hover:bg-emerald-700 text-white"
+              : "w-full"}
+            variant={analysisReady && analysisId ? "default" : "cta"}
             size="lg"
           >
             {isAnalyzing ? (
@@ -788,51 +869,16 @@ const Upload = () => {
                 <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                 Analyzing...
               </>
+            ) : analysisReady && analysisId ? (
+              "Results Ready - View Report"
             ) : (
-              'Analyze Product'
+              "Analyze Product"
             )}
           </Button>
-          {isAnalyzing && (
-            <div className="space-y-3 rounded-lg border border-border bg-muted/30 p-4">
-              <div className="flex items-center justify-between text-sm">
-                <span className="font-medium text-foreground">Analysis in progress</span>
-                <span className="text-muted-foreground">{analysisProgress}%</span>
-              </div>
-              <Progress value={analysisProgress} />
-              <p className="text-xs text-muted-foreground">{analysisStatus}</p>
-              {scanMode === "quick" && (
-                <p className="text-xs text-muted-foreground">
-                  Quick scan shows results first. We’ll continue detailed verification after this step.
-                </p>
-              )}
-              <p className="text-xs text-muted-foreground">
-                Most scans finish quickly. If it takes a bit longer, we’re running extra quality checks.
-              </p>
-            </div>
-          )}
-          {analysisReady && analysisId && !isAnalyzing && (
-            <div className="space-y-3 rounded-lg border border-border bg-muted/30 p-4">
-              <div className="flex items-center justify-between text-sm">
-                <span className="font-medium text-foreground">Analysis ready</span>
-                <span className="text-muted-foreground">100%</span>
-              </div>
-              <Progress value={100} />
-              <p className="text-xs text-muted-foreground">
-                Review the details above, then open the full report.
-              </p>
-              <Button
-                onClick={() => navigate(`/analysis/${analysisId}`)}
-                className="w-full"
-                variant="cta"
-              >
-                View Analysis Report
-              </Button>
-            </div>
-          )}
-          {autoAnalyzePending && !isAnalyzing && (
-            <div className="rounded-lg border border-border bg-background/50 p-3 text-xs text-muted-foreground">
-              Auto-analysis will start in a moment after you finish edits.
-            </div>
+          {analysisStatus && isAnalyzing && (
+            <p className="text-xs text-muted-foreground mt-2">
+              {analysisStatus}
+            </p>
           )}
         </Card>
         </div>

@@ -171,9 +171,9 @@ const IngredientPreviewWidget = () => {
                     <Button 
                       variant="cta" 
                       className="w-full mt-4 gap-2"
-                      onClick={() => navigate('/demo-analysis')}
+                      onClick={() => navigate('/auth')}
                     >
-                      Get Full Analysis
+                      Get Started Free
                       <ArrowRight className="h-4 w-4" />
                     </Button>
                   </div>

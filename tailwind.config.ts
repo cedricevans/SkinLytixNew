@@ -38,6 +38,7 @@ export default {
         },
         accent: {
           DEFAULT: "hsl(var(--accent))",
+          hover: "hsl(var(--accent-hover))",
           foreground: "hsl(var(--accent-foreground))",
         },
         popover: {
@@ -60,12 +61,14 @@ export default {
           DEFAULT: "hsl(var(--cta))",
           foreground: "hsl(var(--cta-foreground))",
         },
+        azure: "hsl(var(--azure))",
       },
       fontFamily: {
         heading: ['"Montserrat"', 'sans-serif'],
         subheading: ['"Source Sans 3"', 'sans-serif'],
         body: ['"Source Sans 3"', 'sans-serif'],
         cta: ['"Poppins"', 'sans-serif'],
+        landing: ['"Open Sans"', 'sans-serif'],
       },
       backgroundImage: {
         'gradient-hero': 'var(--gradient-hero)',
@@ -77,6 +80,7 @@ export default {
         'strong': 'var(--shadow-strong)',
         'elegant': '0 10px 30px -10px rgba(0, 0, 0, 0.3)',
         'glow': '0 0 40px rgba(0, 188, 212, 0.4)',
+        'hover': 'var(--shadow-hover)',
       },
       borderRadius: {
         lg: "var(--radius)",

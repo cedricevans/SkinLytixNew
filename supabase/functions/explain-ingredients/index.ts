@@ -1,5 +1,9 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
+import {
+  lookupIngredientKnowledge,
+  normalizeIngredientName,
+} from "../_shared/ingredient-knowledge.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -13,6 +17,8 @@ type IngredientInput = {
 };
 
 const classifyIngredientRole = (name: string, pubchemData: any): string => {
+  const knowledge = lookupIngredientKnowledge(name);
+  if (knowledge?.role) return knowledge.role;
   const nameLower = name.toLowerCase();
   if (/acid|retinol|peptide|vitamin c|ascorbic/i.test(nameLower)) return "active";
   if (/hyaluronic|glycerin|aloe|aqua|water/i.test(nameLower)) return "humectant";
@@ -25,35 +31,51 @@ const classifyIngredientRole = (name: string, pubchemData: any): string => {
   return "supporting";
 };
 
-const fallbackExplanation = (category?: IngredientInput["category"]) => {
-  switch (category) {
-    case "safe":
-      return "Generally recognized as safe for topical use. Part of the product supporting formula.";
-    case "beneficial":
-      return "Often used for targeted skin benefits. Consider how it fits your skin goals.";
-    case "problematic":
-      return "May be irritating for some users or not ideal for certain skin concerns.";
-    case "unverified":
-      return "Not found in PubChem or Open Beauty Facts databases. May be a proprietary blend or trade name.";
-    default:
-      return "No detailed information available.";
+const getFallbackIngredientExplanation = (name: string, role: string): string => {
+  const knowledge = lookupIngredientKnowledge(name);
+  if (knowledge?.description) return knowledge.description;
+  if (role === "humectant") {
+    return "Helps attract and hold water in the skin to support hydration.";
   }
+  if (role === "emollient") {
+    return "Softens and smooths the skin by filling in surface gaps.";
+  }
+  if (role === "occlusive") {
+    return "Helps seal in moisture and reduce water loss.";
+  }
+  if (role === "preservative") {
+    return "Helps keep the formula stable and prevents microbial growth.";
+  }
+  if (role === "fragrance") {
+    return "Adds scent to the formula; some sensitive users may prefer fragrance-free options.";
+  }
+  if (role === "active") {
+    return "Active ingredient used for targeted skin benefits.";
+  }
+  return "Supports the formula’s texture, stability, or overall performance.";
 };
 
-async function generateIngredientExplanation(
-  ingredientName: string,
-  category: IngredientInput["category"],
-  pubchemData: any,
+async function generateBatchExplanations(
+  items: Array<{ name: string; role: string; context: string }>,
   lovableApiKey: string
-): Promise<string> {
+): Promise<Record<string, string>> {
+  const fallback: Record<string, string> = {};
+  items.forEach((item) => {
+    fallback[item.name] = getFallbackIngredientExplanation(item.name, item.role);
+  });
+
+  const systemPrompt = `You are an ingredient expert. Return ONLY valid JSON.
+Each entry should explain what the ingredient does in 1-2 concise sentences, non-medical, consumer-friendly.`;
+
+  const userMessage = `Explain these ingredients in JSON array format:
+[
+  { "name": "Ingredient Name", "role": "role", "explanation": "..." }
+]
+Ingredients:
+${items.map((item) => `- ${item.name} (role: ${item.role}) ${item.context}` ).join("\n")}
+`;
+
   try {
-    const systemPrompt = `You are an ingredient expert. Explain this skincare ingredient in 2-3 friendly sentences for consumers.
-Focus on: what it does (role/function), why it's used, and any key safety notes.
-Keep it conversational and non-technical. No medical claims.`;
-
-    const context = pubchemData ? `Molecular weight: ${pubchemData.molecular_weight || "unknown"}` : "Limited scientific data available";
-    const userMessage = `Explain ${ingredientName} (category: ${category || "unknown"}) for a consumer. ${context}`;
-
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
       headers: {
@@ -66,18 +88,28 @@ Keep it conversational and non-technical. No medical claims.`;
           { role: "system", content: systemPrompt },
           { role: "user", content: userMessage },
         ],
-        max_tokens: 150,
-        temperature: 0.7,
+        max_tokens: 600,
+        temperature: 0.3,
       }),
     });
 
-    if (!response.ok) return fallbackExplanation(category);
-
+    if (!response.ok) return fallback;
     const data = await response.json();
-    return data.choices[0].message.content.trim();
+    const content = data?.choices?.[0]?.message?.content ?? "";
+    const match = content.match(/\[.*\]/s);
+    if (!match) return fallback;
+    const parsed = JSON.parse(match[0]);
+    if (!Array.isArray(parsed)) return fallback;
+    const mapped: Record<string, string> = { ...fallback };
+    parsed.forEach((item: any) => {
+      if (item?.name && item?.explanation) {
+        mapped[item.name] = String(item.explanation).trim();
+      }
+    });
+    return mapped;
   } catch (error) {
-    console.error(`Error generating explanation for ${ingredientName}:`, error);
-    return fallbackExplanation(category);
+    console.error("Error generating batch explanations:", error);
+    return fallback;
   }
 }
 
@@ -104,40 +136,142 @@ serve(async (req) => {
     const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    const pubchemResponse = await fetch(`${supabaseUrl}/functions/v1/query-pubchem`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${supabaseKey}`,
-      },
-      body: JSON.stringify({ ingredients: ingredients.map((i) => i.name) }),
-    });
-
-    const pubchemData = await pubchemResponse.json();
-    const ingredientResults = pubchemData.results || [];
-
     const lovableApiKey = Deno.env.get("LOVABLE_API_KEY");
 
-    const results = await Promise.all(
-      ingredients.map(async (ingredient) => {
-        const pubchemMatch = ingredientResults.find(
-          (r: any) => r.searched_name?.toLowerCase() === ingredient.name.toLowerCase()
-        );
+    const normalizedInputs = ingredients.map((ingredient) => ({
+      ...ingredient,
+      normalized: normalizeIngredientName(ingredient.name),
+    }));
 
-        const role = classifyIngredientRole(ingredient.name, pubchemMatch);
-        const explanation = lovableApiKey
-          ? await generateIngredientExplanation(ingredient.name, ingredient.category, pubchemMatch, lovableApiKey)
-          : fallbackExplanation(ingredient.category);
+    const uniqueNormalized = Array.from(
+      new Set(normalizedInputs.map((item) => item.normalized))
+    );
 
+    const { data: cachedRows } = await supabase
+      .from("ingredient_explanations_cache")
+      .select("normalized_name, role, explanation, source, updated_at")
+      .in("normalized_name", uniqueNormalized);
+
+    const cachedMap = new Map<string, { role: string | null; explanation: string }>();
+    (cachedRows || []).forEach((row: any) => {
+      if (row?.normalized_name && row?.explanation) {
+        cachedMap.set(row.normalized_name, {
+          role: row.role,
+          explanation: row.explanation,
+        });
+      }
+    });
+
+    const missing = normalizedInputs.filter((item) => !cachedMap.has(item.normalized));
+
+    let ingredientResults: any[] = [];
+    if (missing.length > 0) {
+      const pubchemResponse = await fetch(`${supabaseUrl}/functions/v1/query-pubchem`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${supabaseKey}`,
+        },
+        body: JSON.stringify({ ingredients: missing.map((i) => i.name) }),
+      });
+      const pubchemData = await pubchemResponse.json();
+      ingredientResults = pubchemData.results || [];
+    }
+
+    const batchSize = 8;
+    const explanations: Record<string, string> = {};
+
+    for (let i = 0; i < missing.length; i += batchSize) {
+      const batch = missing.slice(i, i + batchSize);
+      const items = batch.map((ingredient) => {
+        const pubchemMatch = ingredientResults.find((r: any) => {
+          const searched = r.searched_name?.toLowerCase();
+          const original =
+            typeof r.name === "string" ? normalizeIngredientName(r.name) : undefined;
+          return searched === ingredient.normalized || original === ingredient.normalized;
+        });
+        const pubchemData = pubchemMatch?.data ?? null;
+        const role = classifyIngredientRole(ingredient.name, pubchemData);
+        const context = pubchemData?.molecular_weight
+          ? `(molecular weight: ${pubchemData.molecular_weight})`
+          : "";
+        return { name: ingredient.name, role, context };
+      });
+
+      if (lovableApiKey) {
+        const batchExplanations = await generateBatchExplanations(items, lovableApiKey);
+        Object.assign(explanations, batchExplanations);
+      } else {
+        items.forEach((item) => {
+          explanations[item.name] = getFallbackIngredientExplanation(item.name, item.role);
+        });
+      }
+    }
+
+    if (missing.length > 0) {
+      const upserts = missing.map((ingredient) => {
+        const knowledge = lookupIngredientKnowledge(ingredient.name);
+        const pubchemMatch = ingredientResults.find((r: any) => {
+          const searched = r.searched_name?.toLowerCase();
+          const original =
+            typeof r.name === "string" ? normalizeIngredientName(r.name) : undefined;
+          return searched === ingredient.normalized || original === ingredient.normalized;
+        });
+        const pubchemData = pubchemMatch?.data ?? null;
+        const role = knowledge?.role || classifyIngredientRole(ingredient.name, pubchemData);
+        const explanation =
+          knowledge?.description ||
+          explanations[ingredient.name] ||
+          getFallbackIngredientExplanation(ingredient.name, role);
+        return {
+          ingredient_name: ingredient.name,
+          normalized_name: ingredient.normalized,
+          role,
+          explanation,
+          source: knowledge?.description ? "knowledge" : lovableApiKey ? "ai" : "fallback",
+          updated_at: new Date().toISOString(),
+        };
+      });
+
+      if (upserts.length > 0) {
+        await supabase
+          .from("ingredient_explanations_cache")
+          .upsert(upserts, { onConflict: "normalized_name" });
+      }
+    }
+
+    const results = normalizedInputs.map((ingredient) => {
+      const cached = cachedMap.get(ingredient.normalized);
+      if (cached) {
         return {
           name: ingredient.name,
           category: ingredient.category || "unknown",
-          role,
-          explanation,
-          molecular_weight: pubchemMatch?.molecular_weight || null,
+          role: cached.role || classifyIngredientRole(ingredient.name, null),
+          explanation: cached.explanation,
+          molecular_weight: null,
         };
-      })
-    );
+      }
+
+      const knowledge = lookupIngredientKnowledge(ingredient.name);
+      const pubchemMatch = ingredientResults.find((r: any) => {
+        const searched = r.searched_name?.toLowerCase();
+        const original =
+          typeof r.name === "string" ? normalizeIngredientName(r.name) : undefined;
+        return searched === ingredient.normalized || original === ingredient.normalized;
+      });
+      const pubchemData = pubchemMatch?.data ?? null;
+      const role = knowledge?.role || classifyIngredientRole(ingredient.name, pubchemData);
+      return {
+        name: ingredient.name,
+        category: ingredient.category || "unknown",
+        role,
+        explanation:
+          knowledge?.description ||
+          explanations[ingredient.name] ||
+          getFallbackIngredientExplanation(ingredient.name, role),
+        molecular_weight: pubchemData?.molecular_weight || null,
+      };
+    });
 
     return new Response(JSON.stringify({ results }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },

@@ -6,6 +6,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
+import Navigation from "@/components/Navigation";
+import BrandName from "@/components/landing/BrandName";
 
 const ResetPassword = () => {
   const navigate = useNavigate();
@@ -113,8 +115,23 @@ const ResetPassword = () => {
   };
 
   return (
-    <main className="min-h-screen bg-gradient-to-b from-background to-muted flex items-center justify-center py-12 px-4">
-      <Card className="w-full max-w-md p-6 space-y-6">
+    <div className="min-h-screen bg-gradient-to-b from-background to-muted flex flex-col">
+      <header className="w-full bg-primary text-primary-foreground shadow-soft">
+        <div className="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between">
+          <button
+            type="button"
+            onClick={() => navigate('/')}
+            className="font-heading text-lg font-bold text-primary-foreground hover:opacity-80 transition-opacity"
+            aria-label="SkinLytix home"
+          >
+            <BrandName />
+          </button>
+          <Navigation />
+        </div>
+      </header>
+
+      <main className="flex-1 flex items-center justify-center py-12 px-4">
+        <Card className="w-full max-w-md p-6 space-y-6">
         <div className="text-center">
           <h1 className="text-3xl font-bold mb-2">Reset Password</h1>
           <p className="text-muted-foreground text-sm">
@@ -176,8 +193,9 @@ const ResetPassword = () => {
         >
           Back to sign in
         </Button>
-      </Card>
-    </main>
+        </Card>
+      </main>
+    </div>
   );
 };
 

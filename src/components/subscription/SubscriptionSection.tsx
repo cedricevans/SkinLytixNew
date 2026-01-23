@@ -84,15 +84,16 @@ export function SubscriptionSection({ className }: SubscriptionSectionProps) {
       const { data, error } = await supabase.functions.invoke('customer-portal');
       if (error) throw error;
       
-      if (data?.url) {
-        window.open(data.url, '_blank');
+      if (!data?.url) {
+        throw new Error("Billing portal is not available for this account yet.");
       }
+      window.open(data.url, '_blank');
     } catch (error: any) {
       console.error('Error opening billing portal:', error);
       if (error.message?.includes('No Stripe customer found')) {
         toast.error('No billing account found. Please subscribe first.');
       } else {
-        toast.error('Failed to open billing portal');
+        toast.error(error.message || 'Failed to open billing portal');
       }
     } finally {
       setIsManagingBilling(false);

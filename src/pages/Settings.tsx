@@ -6,10 +6,21 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Separator } from "@/components/ui/separator";
 import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
+import { SubscriptionSection } from "@/components/subscription";
 
 const Settings = () => {
   const navigate = useNavigate();
@@ -21,8 +32,11 @@ const Settings = () => {
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [isUpdatingPassword, setIsUpdatingPassword] = useState(false);
+  const [isDeletingAccount, setIsDeletingAccount] = useState(false);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [emailTips, setEmailTips] = useState(true);
   const [productUpdates, setProductUpdates] = useState(true);
+  const [unsubscribeAll, setUnsubscribeAll] = useState(false);
 
   useEffect(() => {
     const loadSettings = async () => {
@@ -46,8 +60,10 @@ const Settings = () => {
       if (typeof window !== "undefined") {
         const tipsValue = localStorage.getItem("sl_settings_email_tips");
         const updatesValue = localStorage.getItem("sl_settings_product_updates");
+        const unsubscribeValue = localStorage.getItem("sl_settings_unsubscribe_all");
         if (tipsValue !== null) setEmailTips(tipsValue === "true");
         if (updatesValue !== null) setProductUpdates(updatesValue === "true");
+        if (unsubscribeValue !== null) setUnsubscribeAll(unsubscribeValue === "true");
       }
       setIsLoading(false);
     };
@@ -59,7 +75,8 @@ const Settings = () => {
     if (typeof window === "undefined") return;
     localStorage.setItem("sl_settings_email_tips", String(emailTips));
     localStorage.setItem("sl_settings_product_updates", String(productUpdates));
-  }, [emailTips, productUpdates]);
+    localStorage.setItem("sl_settings_unsubscribe_all", String(unsubscribeAll));
+  }, [emailTips, productUpdates, unsubscribeAll]);
 
   const getInitials = (value: string) => {
     const parts = value.trim().split(/\s+/).filter(Boolean);
@@ -150,6 +167,56 @@ const Settings = () => {
     }
   };
 
+  const handlePasswordResetEmail = async () => {
+    if (!email) {
+      toast({
+        title: "Missing email",
+        description: "We could not find an email for this account.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      const redirectTo = `${window.location.origin}/reset-password`;
+      const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo });
+      if (error) throw error;
+      toast({
+        title: "Reset email sent",
+        description: "Check your inbox to reset your password.",
+      });
+    } catch (error: any) {
+      toast({
+        title: "Reset failed",
+        description: error?.message || "Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleDeleteAccount = async () => {
+    setIsDeletingAccount(true);
+    try {
+      const { error } = await supabase.functions.invoke("delete-account");
+      if (error) throw error;
+      await supabase.auth.signOut();
+      toast({
+        title: "Account deleted",
+        description: "Your data has been removed.",
+      });
+      navigate("/");
+    } catch (error: any) {
+      toast({
+        title: "Delete failed",
+        description: error?.message || "Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsDeletingAccount(false);
+      setShowDeleteDialog(false);
+    }
+  };
+
   return (
     <AppShell showNavigation showBottomNav contentClassName="px-4 py-6 md:py-10">
       <PageHeader>
@@ -172,7 +239,7 @@ const Settings = () => {
                 </span>
               </div>
               <div className="text-sm text-muted-foreground">
-                Initials avatar for now. Photo uploads coming soon.
+                Photo avatar coming soon.
               </div>
             </div>
             <div className="grid gap-4 md:grid-cols-2">
@@ -226,6 +293,13 @@ const Settings = () => {
             <Button onClick={handlePasswordUpdate} disabled={isUpdatingPassword}>
               {isUpdatingPassword ? "Updating..." : "Update password"}
             </Button>
+            <Button
+              variant="outline"
+              type="button"
+              onClick={handlePasswordResetEmail}
+            >
+              Send password reset email
+            </Button>
           </CardContent>
         </Card>
 
@@ -239,7 +313,11 @@ const Settings = () => {
                 <p className="font-medium text-foreground">Skin insights tips</p>
                 <p className="text-sm text-muted-foreground">Monthly tips and routine suggestions.</p>
               </div>
-              <Switch checked={emailTips} onCheckedChange={setEmailTips} />
+              <Switch
+                checked={emailTips}
+                onCheckedChange={setEmailTips}
+                disabled={unsubscribeAll}
+              />
             </div>
             <Separator />
             <div className="flex items-center justify-between">
@@ -247,11 +325,65 @@ const Settings = () => {
                 <p className="font-medium text-foreground">Product updates</p>
                 <p className="text-sm text-muted-foreground">New features and beta updates.</p>
               </div>
-              <Switch checked={productUpdates} onCheckedChange={setProductUpdates} />
+              <Switch
+                checked={productUpdates}
+                onCheckedChange={setProductUpdates}
+                disabled={unsubscribeAll}
+              />
+            </div>
+            <Separator />
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="font-medium text-foreground">Unsubscribe from all emails</p>
+                <p className="text-sm text-muted-foreground">
+                  This only updates your in-app preferences. TODO: connect to the email provider.
+                </p>
+              </div>
+              <Switch checked={unsubscribeAll} onCheckedChange={setUnsubscribeAll} />
             </div>
           </CardContent>
         </Card>
+
+        <SubscriptionSection />
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Delete Account</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <p className="text-sm text-muted-foreground">
+              Permanently remove your account and all associated data from SkinLytix.
+            </p>
+            <Button
+              variant="destructive"
+              onClick={() => setShowDeleteDialog(true)}
+            >
+              Delete my account
+            </Button>
+          </CardContent>
+        </Card>
       </div>
+
+      <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete your account?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This action cannot be undone. Your profile, scans, routines, and saved dupes will be deleted.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isDeletingAccount}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteAccount}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              disabled={isDeletingAccount}
+            >
+              {isDeletingAccount ? "Deleting..." : "Delete account"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </AppShell>
   );
 };

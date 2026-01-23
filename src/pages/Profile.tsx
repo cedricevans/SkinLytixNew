@@ -14,7 +14,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { useTracking, trackEvent } from "@/hooks/useTracking";
 import { DemoModeToggle } from "@/components/DemoModeToggle";
 import { useSubscription } from "@/hooks/useSubscription";
-import { SubscriptionSection, TrialBanner } from "@/components/subscription";
+import { TrialBanner } from "@/components/subscription";
 import AppShell from "@/components/AppShell";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 
@@ -272,7 +272,10 @@ const Profile = () => {
         .order('analyzed_at', { ascending: false });
 
       if (error) throw error;
-      setAllAnalyses(data || []);
+      const uniqueAnalyses = Array.from(
+        new Map((data || []).map((analysis: any) => [analysis.id, analysis])).values()
+      );
+      setAllAnalyses(uniqueAnalyses);
     } catch (error) {
       console.error('Error fetching analyses:', error);
     } finally {
@@ -904,9 +907,6 @@ const Profile = () => {
                 )}
               </div>
             </Card>
-
-            {/* Subscription Section */}
-            <SubscriptionSection />
 
             {/* Quick Actions */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">

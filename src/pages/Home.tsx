@@ -16,12 +16,14 @@ type AnalysisSummary = {
   category?: string | null;
   epiq_score?: number | null;
   created_at?: string | null;
+  analyzed_at?: string | null;
   recommendations_json?: any;
 };
 
-const formatDate = (dateString?: string | null) => {
-  if (!dateString) return "Recent";
-  const date = new Date(dateString);
+const formatDate = (dateString?: string | null, fallback?: string | null) => {
+  const source = dateString || fallback;
+  if (!source) return "Recent";
+  const date = new Date(source);
   if (Number.isNaN(date.getTime())) return "Recent";
   return date.toLocaleDateString();
 };
@@ -45,9 +47,9 @@ const Home = () => {
 
         const { data: analyses } = await supabase
           .from("user_analyses")
-          .select("id, product_name, brand, category, epiq_score, created_at, recommendations_json")
+          .select("id, product_name, brand, category, epiq_score, created_at, analyzed_at, recommendations_json")
           .eq("user_id", user.id)
-          .order("created_at", { ascending: false })
+          .order("analyzed_at", { ascending: false })
           .limit(6);
 
         const { count } = await supabase
@@ -56,7 +58,7 @@ const Home = () => {
           .eq("user_id", user.id);
 
         setRecentAnalyses(analyses || []);
-        setTotalAnalyses(count || 0);
+        setTotalAnalyses(count ?? analyses?.length ?? 0);
       } catch (error: any) {
         toast({
           title: "Dashboard unavailable",
@@ -106,7 +108,17 @@ const Home = () => {
 
       <div className="max-w-5xl mx-auto space-y-8">
         <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          <Card className="p-4 md:p-5">
+            <Card
+              className="p-4 md:p-5 cursor-pointer transition hover:bg-accent/10"
+              onClick={() => navigate("/profile")}
+              role="button"
+              tabIndex={0}
+              onKeyDown={(event) => {
+                if (event.key === "Enter" || event.key === " ") {
+                  navigate("/profile");
+                }
+              }}
+            >
             <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Total scans</p>
             <p className="mt-2 text-2xl font-semibold text-foreground">{totalAnalyses}</p>
             <p className="mt-1 text-xs text-muted-foreground">Across all your products</p>
@@ -119,7 +131,7 @@ const Home = () => {
           <Card className="p-4 md:p-5">
             <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Latest scan</p>
             <p className="mt-2 text-2xl font-semibold text-foreground">
-              {formatDate(recentAnalyses[0]?.created_at)}
+              {formatDate(recentAnalyses[0]?.analyzed_at, recentAnalyses[0]?.created_at)}
             </p>
             <p className="mt-1 text-xs text-muted-foreground">Most recent product update</p>
           </Card>
@@ -158,7 +170,7 @@ const Home = () => {
                     <div>
                       <p className="font-medium text-foreground">{analysis.product_name}</p>
                       <p className="text-xs text-muted-foreground">
-                        {analysis.brand || "Brand pending"} · {formatDate(analysis.created_at)}
+                        {analysis.brand || "Brand pending"} · {formatDate(analysis.analyzed_at, analysis.created_at)}
                       </p>
                     </div>
                     <div className="text-right">

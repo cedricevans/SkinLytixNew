@@ -354,6 +354,9 @@ export default function Routine() {
       });
 
       if (error) throw error;
+      if (!data?.optimizationId) {
+        throw new Error("Optimization completed but no result was returned.");
+      }
 
       // Increment usage for premium users
       if (effectiveTier === 'premium') {
@@ -374,7 +377,8 @@ export default function Routine() {
       navigate(`/routine/optimization/${data.optimizationId}`);
     } catch (error) {
       console.error("Error optimizing routine:", error);
-      toast.error("Failed to optimize routine");
+      const message = error instanceof Error ? error.message : "Failed to optimize routine";
+      toast.error(message);
     } finally {
       setOptimizing(false);
     }

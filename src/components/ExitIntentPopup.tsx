@@ -37,14 +37,14 @@ const ExitIntentPopup = () => {
     return () => document.removeEventListener('mouseleave', handleMouseLeave);
   }, [location.pathname, hasTriggered]);
 
-  const handleViewDemo = () => {
+  const handleGetStarted = () => {
     trackEvent({
       eventName: 'exit_intent_accepted',
       eventCategory: 'conversion',
-      eventProperties: { action: 'view_demo' }
+      eventProperties: { action: 'get_started' }
     });
     setIsOpen(false);
-    navigate('/demo-analysis');
+    navigate('/auth');
   };
 
   return (
@@ -57,16 +57,16 @@ const ExitIntentPopup = () => {
         </DialogHeader>
         <div className="space-y-4 py-4">
           <p className="text-center text-muted-foreground">
-            Before you go, check out a real product analysis. Takes just 30 seconds.
+            Before you go, create your free account to unlock personalized analysis.
           </p>
           <div className="flex flex-col gap-3">
             <Button 
               variant="cta" 
               size="lg" 
-              onClick={handleViewDemo}
+              onClick={handleGetStarted}
               className="w-full"
             >
-              Show Me the Demo
+              Get Started Free
             </Button>
             <Button 
               variant="ghost" 

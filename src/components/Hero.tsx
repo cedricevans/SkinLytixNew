@@ -72,16 +72,16 @@ const Hero = () => {
             className="touch-target text-base px-6 sm:px-8 py-5 md:py-6 sm:py-5 h-auto w-full sm:w-auto text-lg sm:text-base"
             onClick={() => {
               trackEvent({
-                eventName: 'demo_cta_clicked',
+                eventName: 'cta_clicked',
                 eventCategory: 'engagement',
                 eventProperties: { location: 'hero' }
               });
-              navigate('/demo-analysis');
+              navigate('/auth');
             }}
           >
             <span className="text-xl mr-2">🔬</span>
-            <span className="hidden sm:inline">Try Demo Analysis - No Sign-Up</span>
-            <span className="sm:hidden">Try Demo - No Sign-Up</span>
+            <span className="hidden sm:inline">Get Started Free</span>
+            <span className="sm:hidden">Get Started Free</span>
           </Button>
         </div>
 

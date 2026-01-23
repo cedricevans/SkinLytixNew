@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -9,9 +9,12 @@ import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { AlertCircle } from "lucide-react";
+import Navigation from "@/components/Navigation";
+import BrandName from "@/components/landing/BrandName";
 
 const Auth = () => {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
   
@@ -86,7 +89,7 @@ const Auth = () => {
       } else if (!profile?.has_seen_walkthrough) {
         navigate('/walkthrough');
       } else {
-        navigate('/upload');
+        navigate('/profile');
       }
     } catch (error: any) {
       toast({
@@ -99,9 +102,26 @@ const Auth = () => {
     }
   };
 
+  const defaultTab = searchParams.get('tab') === 'signup' ? 'signup' : 'signin';
+
   return (
-    <main className="min-h-screen bg-gradient-to-b from-background to-muted flex items-center justify-center py-12 px-4">
-      <Card className="w-full max-w-md p-6">
+    <div className="min-h-screen bg-gradient-to-b from-background to-muted flex flex-col">
+      <header className="w-full bg-primary text-primary-foreground shadow-soft">
+        <div className="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between">
+          <button
+            type="button"
+            onClick={() => navigate('/')}
+            className="font-heading text-lg font-bold text-primary-foreground hover:opacity-80 transition-opacity"
+            aria-label="SkinLytix home"
+          >
+            <BrandName />
+          </button>
+          <Navigation />
+        </div>
+      </header>
+
+      <main className="flex-1 flex items-center justify-center py-12 px-4">
+        <Card className="w-full max-w-md p-6">
         <div className="text-center mb-6">
           <h1 className="text-3xl font-bold mb-2">Welcome to SkinLytix</h1>
           <p className="text-muted-foreground">
@@ -116,7 +136,7 @@ const Auth = () => {
           </AlertDescription>
         </Alert>
 
-        <Tabs defaultValue="signin" className="w-full">
+        <Tabs defaultValue={defaultTab} className="w-full">
           <TabsList className="grid w-full grid-cols-2">
             <TabsTrigger value="signin">Sign In</TabsTrigger>
             <TabsTrigger value="signup">Sign Up</TabsTrigger>
@@ -197,8 +217,9 @@ const Auth = () => {
             </form>
           </TabsContent>
         </Tabs>
-      </Card>
-    </main>
+        </Card>
+      </main>
+    </div>
   );
 };
 

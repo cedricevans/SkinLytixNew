@@ -2,7 +2,9 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route, useLocation } from "react-router-dom";
+import { useEffect } from "react";
+import { supabase } from "@/integrations/supabase/client";
 import Index from "./pages/Index";
 import Home from "./pages/Home";
 import Upload from "./pages/Upload";
@@ -15,7 +17,7 @@ import Walkthrough from "./pages/Walkthrough";
 import Profile from "./pages/Profile";
 import Routine from "./pages/Routine";
 import RoutineOptimization from "./pages/RoutineOptimization";
-import DemoAnalysis from "./pages/DemoAnalysis";
+import Quiz from "./pages/Quiz";
 import InstagramLanding from "./pages/InstagramLanding";
 import Analytics from "./pages/Analytics";
 import BetaFeedback from "./pages/BetaFeedback";
@@ -33,6 +35,33 @@ import AppProtectedRoute from "@/components/AppProtectedRoute";
 
 const queryClient = new QueryClient();
 
+const FeedbackWidgetGate = () => {
+  const location = useLocation();
+  if (location.pathname === "/") return null;
+  return <FeedbackWidget />;
+};
+
+const SessionRefreshGate = () => {
+  useEffect(() => {
+    const handleVisibility = async () => {
+      if (document.visibilityState !== "visible") return;
+      try {
+        const { data } = await supabase.auth.getSession();
+        if (!data.session) {
+          await supabase.auth.refreshSession();
+        }
+      } catch (error) {
+        console.error("Session refresh failed:", error);
+      }
+    };
+
+    document.addEventListener("visibilitychange", handleVisibility);
+    return () => document.removeEventListener("visibilitychange", handleVisibility);
+  }, []);
+
+  return null;
+};
+
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
@@ -41,11 +70,12 @@ const App = () => (
       <TrialCountdown />
       <BrowserRouter>
         <ScrollToTop />
+        <SessionRefreshGate />
         <Routes>
           <Route path="/" element={<Index />} />
           <Route path="/home" element={<AppProtectedRoute><Home /></AppProtectedRoute>} />
           <Route path="/ig" element={<InstagramLanding />} />
-          <Route path="/demo-analysis" element={<DemoAnalysis />} />
+          <Route path="/quiz" element={<Quiz />} />
           <Route path="/upload" element={<AppProtectedRoute><Upload /></AppProtectedRoute>} />
           <Route path="/analysis/:id" element={<AppProtectedRoute><Analysis /></AppProtectedRoute>} />
           <Route path="/analysis-fast" element={<AppProtectedRoute><AnalysisFast /></AppProtectedRoute>} />
@@ -66,7 +96,7 @@ const App = () => (
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>
-        <FeedbackWidget />
+        <FeedbackWidgetGate />
       </BrowserRouter>
     </TooltipProvider>
   </QueryClientProvider>

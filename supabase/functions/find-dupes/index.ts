@@ -52,15 +52,17 @@ serve(async (req: Request): Promise<Response> => {
 
     // Validate required fields early.
     if (!productName || typeof productName !== 'string') {
-      return new Response(JSON.stringify({ error: 'productName is required' }), {
-        status: 400,
+      return new Response(JSON.stringify({ dupes: [], error: 'productName is required' }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
 
     const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
-    if (!LOVABLE_API_KEY) {
-      throw new Error('LOVABLE_API_KEY is not configured');
+    const GEMINI_API_KEY = Deno.env.get('GEMINI_API_KEY');
+    if (!LOVABLE_API_KEY && !GEMINI_API_KEY) {
+      return new Response(JSON.stringify({ dupes: [], error: 'AI provider is not configured' }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
     }
     // Normalise the user‑supplied ingredient list to at most 40 items.
     const promptIngredients: string[] = Array.isArray(ingredients)
@@ -129,44 +131,60 @@ Return ONLY the JSON array, no other text.`;
     if (cachedDupes) {
       dupes = cachedDupes;
     } else {
-      // Call the AI API to get candidate products.
-      const aiResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${LOVABLE_API_KEY}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          model: 'google/gemini-2.5-flash',
-          messages: [
-            { role: 'system', content: systemPrompt.trim() },
-            { role: 'user', content: userPrompt.trim() },
-          ],
-          temperature: 0.7,
-        }),
-      });
+      const callLovable = async () => {
+        if (!LOVABLE_API_KEY) return null;
+        const aiResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${LOVABLE_API_KEY}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            model: 'google/gemini-2.5-flash',
+            messages: [
+              { role: 'system', content: systemPrompt.trim() },
+              { role: 'user', content: userPrompt.trim() },
+            ],
+            temperature: 0.7,
+          }),
+        });
 
-      if (!aiResponse.ok) {
-        const errorText = await aiResponse.text();
-        console.error('AI Gateway error:', aiResponse.status, errorText);
-        // Map common status codes to friendly messages.
-        if (aiResponse.status === 429) {
-          return new Response(JSON.stringify({ error: 'Rate limit exceeded. Please try again later.' }), {
-            status: 429,
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          });
+        if (!aiResponse.ok) {
+          const errorText = await aiResponse.text();
+          console.error('AI Gateway error:', aiResponse.status, errorText);
+          return null;
         }
-        if (aiResponse.status === 402) {
-          return new Response(JSON.stringify({ error: 'Service temporarily unavailable.' }), {
-            status: 402,
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          });
-        }
-        throw new Error(`AI Gateway error: ${aiResponse.status}`);
-      }
 
-      const aiData = await aiResponse.json();
-      const aiContent = aiData.choices?.[0]?.message?.content ?? '[]';
+        const aiData = await aiResponse.json();
+        return aiData.choices?.[0]?.message?.content ?? null;
+      };
+
+      const callGeminiDirect = async () => {
+        if (!GEMINI_API_KEY) return null;
+        const prompt = `${systemPrompt.trim()}\n\n${userPrompt.trim()}`;
+        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contents: [{
+              role: 'user',
+              parts: [{ text: prompt }],
+            }],
+            generationConfig: { temperature: 0.7 },
+          }),
+        });
+
+        if (!response.ok) {
+          const errorText = await response.text();
+          console.error('Gemini direct error:', response.status, errorText);
+          return null;
+        }
+
+        const dataJson = await response.json();
+        return dataJson?.candidates?.[0]?.content?.parts?.[0]?.text ?? null;
+      };
+
+      const aiContent = (await callLovable()) ?? (await callGeminiDirect()) ?? '[]';
 
       // Parse the AI response, stripping away any accidental Markdown formatting.
       try {
@@ -403,11 +421,12 @@ Return ONLY the JSON array, no other text.`;
       productUrl: string | null;
       ingredients: string[] | null;
       brand: string | null;
+      productName: string | null;
     } | null> => {
       const termsList = buildSearchTerms(name, brandName);
       if (!termsList.length) return null;
 
-      let bestResult: { imageUrl: string | null; productUrl: string | null; ingredients: string[] | null; brand: string | null } | null = null;
+      let bestResult: { imageUrl: string | null; productUrl: string | null; ingredients: string[] | null; brand: string | null; productName: string | null } | null = null;
       let bestScore = -1;
 
       for (const terms of termsList) {
@@ -456,7 +475,20 @@ Return ONLY the JSON array, no other text.`;
             null;
           const productUrl = chosen.url || null;
           const chosenBrand = chosen.brands || chosen.brands_tags?.join(' ') || null;
-          const result = { imageUrl, productUrl, ingredients: chosenIngredients ?? null, brand: chosenBrand };
+          const chosenName =
+            chosen.product_name ||
+            chosen.product_name_en ||
+            chosen.product_name_fr ||
+            chosen.product_name_es ||
+            chosen.product_name_it ||
+            null;
+          const result = {
+            imageUrl,
+            productUrl,
+            ingredients: chosenIngredients ?? null,
+            brand: chosenBrand,
+            productName: chosenName,
+          };
           setCache(obfCache, cacheKey, result, 6 * 60 * 60 * 1000);
 
           const overlapStats = chosenIngredients ? computeOverlapStats(sourceList, chosenIngredients) : null;
@@ -485,12 +517,22 @@ Return ONLY the JSON array, no other text.`;
         .split(' ')
         .filter((token) => token.length > 1);
 
-    const isBrandMatch = (obfBrand: string | null | undefined, dupeBrand: string | null | undefined) => {
+    const hasAllBrandTokens = (candidate: string, expected: string) => {
+      const expectedTokens = brandTokens(expected);
+      const candidateTokens = new Set(brandTokens(candidate));
+      if (!expectedTokens.length || candidateTokens.size === 0) return false;
+      return expectedTokens.every((token) => candidateTokens.has(token));
+    };
+
+    const isBrandMatch = (
+      obfBrand: string | null | undefined,
+      obfName: string | null | undefined,
+      dupeBrand: string | null | undefined
+    ) => {
       if (!obfBrand || !dupeBrand) return false;
-      const obfTokens = new Set(brandTokens(obfBrand));
-      const dupeTokens = brandTokens(dupeBrand);
-      if (!obfTokens.size || !dupeTokens.length) return false;
-      return dupeTokens.some((token) => obfTokens.has(token));
+      if (hasAllBrandTokens(obfBrand, dupeBrand)) return true;
+      if (obfName && hasAllBrandTokens(obfName, dupeBrand)) return true;
+      return false;
     };
 
     // Normalise the source ingredients once.
@@ -555,7 +597,8 @@ Return ONLY the JSON array, no other text.`;
         if (isPlaceholderImage(imageUrl)) {
           imageUrl = undefined;
         }
-        if (!isBrandMatch(obf?.brand, dupeBrand)) {
+        const obfName = obf?.productName ?? null;
+        if (!isBrandMatch(obf?.brand, obfName, dupeBrand)) {
           imageUrl = undefined;
         }
 
@@ -601,8 +644,7 @@ Return ONLY the JSON array, no other text.`;
   } catch (error) {
     console.error('Error in find-dupes:', error);
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-    return new Response(JSON.stringify({ error: errorMessage }), {
-      status: 500,
+    return new Response(JSON.stringify({ dupes: [], error: errorMessage }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   }

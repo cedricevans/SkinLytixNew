@@ -18,7 +18,7 @@ const PricingPreview = () => {
       period: '/month',
       description: 'Most popular',
       features: ['Unlimited everything', 'Batch analysis', 'Priority support'],
-      cta: 'Try Free',
+      cta: 'Upgrade to Pro',
       variant: 'outline' as const,
       href: '/auth',
       popular: true,
@@ -30,7 +30,7 @@ const PricingPreview = () => {
       period: '/month',
       description: 'For dedicated routines',
       features: ['Full score breakdown', '30 AI chats/mo', '5 routines'],
-      cta: 'Try Free',
+      cta: 'Upgrade to Premium',
       variant: 'default' as const,
       href: '/auth',
     },
@@ -41,9 +41,9 @@ const PricingPreview = () => {
       period: '/forever',
       description: 'Get started',
       features: ['Unlimited analyses', 'Basic EpiQ Score', '1 routine'],
-      cta: 'Start Free',
+      cta: 'Get Started Free',
       variant: 'outline' as const,
-      href: '/demo-analysis',
+      href: '/auth',
     },
   ];
 
@@ -139,7 +139,7 @@ const PricingPreview = () => {
 
                   <Button 
                     variant={tier.variant}
-                    className="w-full"
+                    className="w-full whitespace-normal text-center"
                     onClick={() => navigate(tier.href)}
                   >
                     {tier.cta}

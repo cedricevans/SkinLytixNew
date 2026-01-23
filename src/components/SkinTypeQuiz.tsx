@@ -204,8 +204,8 @@ export const SkinTypeQuiz = ({ open, onClose, onComplete, quizType }: SkinTypeQu
               <div className="space-y-1">
                 <p className="text-sm font-medium">What this means for you:</p>
                 <p className="text-sm text-muted-foreground">
-                  Your EpiQ scores will now be personalized based on {result} skin characteristics. 
-                  Products will be evaluated for their suitability to your specific needs.
+                  Sign up or log in to save this result and personalize your EpiQ scores. 
+                  We will evaluate products for their suitability to your specific needs.
                 </p>
               </div>
             </div>

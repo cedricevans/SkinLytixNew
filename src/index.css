@@ -34,6 +34,7 @@ All colors MUST be HSL.
     /* Accent Colors - Guidance & Engagement */
     --accent: 192 51% 48%; /* Soft Teal */
     --accent-foreground: 0 0% 98%;
+    --accent-hover: 192 51% 44%;
 
     --success: 162 41% 72%; /* Sage Green */
     --success-foreground: 197 75% 24%;
@@ -51,6 +52,7 @@ All colors MUST be HSL.
     --border: 238 14% 88%;
     --input: 238 14% 93%;
     --ring: 192 51% 48%;
+    --azure: 197 81% 24%;
 
     --radius: 0.75rem;
 
@@ -62,6 +64,7 @@ All colors MUST be HSL.
     --shadow-soft: 0 2px 8px hsla(197, 75%, 24%, 0.08);
     --shadow-medium: 0 4px 16px hsla(197, 75%, 24%, 0.12);
     --shadow-strong: 0 8px 24px hsla(197, 75%, 24%, 0.16);
+    --shadow-hover: 0 8px 20px rgba(255, 92, 124, 0.4);
     
     /* Animations */
     --transition-smooth: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);

@@ -19,9 +19,9 @@ const InstagramLanding = () => {
       }
     });
 
-    // Auto-load demo analysis after 2 seconds
+    // Auto-redirect to sign-up after 2 seconds
     const timer = setTimeout(() => {
-      navigate('/demo-analysis');
+      navigate('/auth');
     }, 2000);
 
     return () => clearTimeout(timer);
@@ -74,7 +74,7 @@ const InstagramLanding = () => {
           
           <div>
             <h2 className="text-2xl font-heading font-semibold mb-2">
-              Loading Your Demo Analysis...
+              Preparing your account...
             </h2>
             <p className="text-muted-foreground">
               Get ready to see what's really in your products
@@ -84,21 +84,21 @@ const InstagramLanding = () => {
           {/* Quick Actions */}
           <div className="pt-4 space-y-3">
             <Button 
-              variant="cta" 
+              variant="cta"
               size="lg"
-              onClick={() => navigate('/demo-analysis')}
+              onClick={() => navigate('/auth')}
               className="w-full"
             >
-              View Demo Now
+              Get Started Free
               <ArrowRight className="ml-2 w-5 h-5" />
             </Button>
             <Button 
               variant="outline" 
               size="lg"
-              onClick={() => navigate('/auth')}
+              onClick={() => navigate('/pricing')}
               className="w-full"
             >
-              Sign Up Free Instead
+              View Pricing
             </Button>
           </div>
         </div>

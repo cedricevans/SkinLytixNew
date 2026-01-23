@@ -1,5 +1,8 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
+import {
+  lookupIngredientKnowledge,
+} from "../_shared/ingredient-knowledge.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -1525,6 +1528,8 @@ serve(async (req) => {
     
     // Helper to classify ingredient role based on name and PubChem data
     const classifyIngredientRole = (name: string, pubchemData: any): string => {
+      const knowledge = lookupIngredientKnowledge(name);
+      if (knowledge?.role) return knowledge.role;
       const nameLower = name.toLowerCase();
       if (/acid|retinol|peptide|vitamin c|ascorbic/i.test(nameLower)) return 'active';
       if (/hyaluronic|glycerin|aloe|aqua|water/i.test(nameLower)) return 'humectant';
@@ -1538,6 +1543,8 @@ serve(async (req) => {
 
     const getFallbackIngredientExplanation = (name: string, role: string): string => {
       const lower = name.toLowerCase();
+      const knowledge = lookupIngredientKnowledge(name);
+      if (knowledge?.description) return knowledge.description;
       const specific: Record<string, string> = {
         'sodium levulinate': 'A plant-derived preservative helper that supports formula freshness and can feel gentle on skin.',
         'potassium sorbate': 'A mild preservative used to keep formulas fresh, often found in sensitive-skin products.',
@@ -1825,6 +1832,7 @@ serve(async (req) => {
         image_url,
         recommendations_json: {
           ...recommendations,
+          scan_mode,
           safe_ingredients: finalSafeIngredients,
           problematic_ingredients: finalProblematicIngredients,
           beneficial_ingredients: finalBeneficialIngredients,

@@ -7,13 +7,10 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { AlertCircle, CheckCircle2, Sparkles, Home, ScanLine, Plus, Info, HelpCircle, AlertTriangle, Download, Loader2 } from "lucide-react";
 import PostAnalysisFeedback from "@/components/PostAnalysisFeedback";
-import { PostAnalysisFeedbackCard } from "@/components/PostAnalysisFeedbackCard";
-import { FrictionFeedbackBanner } from "@/components/FrictionFeedbackBanner";
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from "@/components/ui/tooltip";
 import { useTracking, trackEvent } from "@/hooks/useTracking";
 import ReactMarkdown from 'react-markdown';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { AnimatedScoreGauge } from "@/components/AnimatedScoreGauge";
 import { SafetyLevelMeter } from "@/components/SafetyLevelMeter";
 import { ProfessionalReferralBanner } from "@/components/ProfessionalReferralBanner";
 import { IngredientRiskHeatmap } from "@/components/IngredientRiskHeatmap";
@@ -378,7 +375,14 @@ const Analysis = () => {
     return `ingredient-${name.replace(/\s+/g, '-')}`;
   };
   const getIngredientKey = (name: string) => name.trim().toLowerCase();
-  const getAiExplanation = (name: string) => aiExplanations[getIngredientKey(name)];
+  const isEmptyIngredientDetail = (value?: string) =>
+    !value || /no detailed information available/i.test(value);
+  const normalizeIngredientDetail = (value: string | undefined, fallback: string) =>
+    isEmptyIngredientDetail(value) ? fallback : value;
+  const getAiExplanation = (name: string) => {
+    const value = aiExplanations[getIngredientKey(name)];
+    return isEmptyIngredientDetail(value) ? undefined : value;
+  };
 
   const explanationBatchSize = 8;
   const loadIngredientExplanations = async (
@@ -450,6 +454,9 @@ const Analysis = () => {
     if (!analysis || hasAutoLoadedInitial) return;
     setHasAutoLoadedInitial(true);
     const loadInitial = async () => {
+      if (safeInputs.length > 0) {
+        await loadIngredientExplanations(safeInputs, "safe");
+      }
       if (concernInputs.length > 0) {
         await loadIngredientExplanations(concernInputs, "concerns");
       }
@@ -458,7 +465,7 @@ const Analysis = () => {
       }
     };
     loadInitial();
-  }, [analysis, concernInputs, needsInputs, hasAutoLoadedInitial]);
+  }, [analysis, safeInputs, concernInputs, needsInputs, hasAutoLoadedInitial]);
 
   useEffect(() => {
     if (!canLoadIngredientExplanations) return;
@@ -504,9 +511,9 @@ const Analysis = () => {
   const productType = productMetadata?.product_type || 'face';
 
   const getScoreColor = (score: number) => {
-    if (score >= 70) return "text-green-600 dark:text-green-400";
-    if (score >= 50) return "text-yellow-600 dark:text-yellow-400";
-    return "text-red-600 dark:text-red-400";
+    if (score >= 70) return "text-emerald-500 dark:text-emerald-400";
+    if (score >= 50) return "text-amber-500 dark:text-amber-400";
+    return "text-rose-500 dark:text-rose-400";
   };
 
   const getScoreLabel = (score: number) => {
@@ -655,6 +662,11 @@ const Analysis = () => {
             <Badge variant="secondary">{getScoreLabel(analysis.epiq_score)}</Badge>
           </div>
           <div className="space-y-3 text-sm text-muted-foreground">
+            {analysis.recommendations_json.fast_mode && (
+              <p className="text-xs font-medium text-amber-900/80">
+                Quick scan preview shown first. We’re upgrading to a detailed scan in the background.
+              </p>
+            )}
             <p>
               <span className="font-semibold text-foreground">EpiQ Score:</span> {analysis.epiq_score}/100 — {analysis.recommendations_json.summary}
             </p>
@@ -671,6 +683,45 @@ const Analysis = () => {
               </p>
             ) : null}
           </div>
+          {analysis.recommendations_json.fast_mode && (
+            <Alert className="mt-4 border-amber-200 bg-amber-50 text-amber-900">
+              <AlertDescription>
+                Quick scan results are shown first. We’re upgrading to a detailed scan in the background.
+                For deeper insights, run a detailed scan.
+              </AlertDescription>
+              {isUpgradingScan && (
+                <div className="mt-3 space-y-2">
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="font-medium">Detailed scan</span>
+                    <span>{detailProgress}%</span>
+                  </div>
+                  <Progress value={detailProgress} />
+                  <p className="text-xs text-amber-900">{detailStatus}</p>
+                  <p className="text-xs text-amber-900/80">
+                    Keep browsing—your full report will load automatically when it’s ready.
+                  </p>
+                </div>
+              )}
+              <div className="mt-3">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleRunDetailedScan}
+                  disabled={isUpgradingScan}
+                  className="border-amber-300 text-amber-900 hover:bg-amber-100"
+                >
+                  {isUpgradingScan ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      Upgrading to detailed scan...
+                    </>
+                  ) : (
+                    "Run detailed scan"
+                  )}
+                </Button>
+              </div>
+            </Alert>
+          )}
           <div className="flex flex-wrap gap-2 mt-5">
             <Button
               variant="cta"
@@ -749,10 +800,24 @@ const Analysis = () => {
               </TooltipContent>
             </Tooltip>
           </div>
-          
-          <AnimatedScoreGauge score={analysis.epiq_score} />
-          
-          <p className="mt-4 text-muted-foreground max-w-2xl mx-auto">
+
+          <div className={`text-7xl font-bold mb-4 ${getScoreColor(analysis.epiq_score)}`}>
+            {analysis.epiq_score}
+          </div>
+          <Badge variant="secondary" className="text-lg px-4 py-2">
+            {getScoreLabel(analysis.epiq_score)}
+          </Badge>
+          {analysis.recommendations_json?.scan_mode === "quick" && (
+            <div className="mt-4 space-y-2">
+              <Badge variant="outline" className="text-xs uppercase tracking-[0.2em]">
+                Quick Scan Estimate
+              </Badge>
+              <p className="text-xs text-muted-foreground">
+                Quick scan results are an estimate. Run a detailed scan for the full breakdown.
+              </p>
+            </div>
+          )}
+          <p className="mt-6 text-muted-foreground max-w-2xl mx-auto">
             {analysis.recommendations_json.summary}
           </p>
         </Card>
@@ -821,42 +886,7 @@ const Analysis = () => {
             </p>
           </div>
           {analysis.recommendations_json.fast_mode && (
-            <Alert className="border-amber-200 bg-amber-50 text-amber-900 sticky top-2 z-30">
-              <AlertDescription>
-                Quick scan results are shown first. We’re upgrading to a detailed scan in the background.
-              </AlertDescription>
-              {isUpgradingScan && (
-                <div className="mt-3 space-y-2">
-                  <div className="flex items-center justify-between text-xs">
-                    <span className="font-medium">Detailed scan</span>
-                    <span>{detailProgress}%</span>
-                  </div>
-                  <Progress value={detailProgress} />
-                  <p className="text-xs text-amber-900">{detailStatus}</p>
-                  <p className="text-xs text-amber-900/80">
-                    Keep browsing—your full report will load automatically when it’s ready.
-                  </p>
-                </div>
-              )}
-              <div className="mt-3">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={handleRunDetailedScan}
-                  disabled={isUpgradingScan}
-                  className="border-amber-300 text-amber-900 hover:bg-amber-100"
-                >
-                  {isUpgradingScan ? (
-                    <>
-                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                      Upgrading to detailed scan...
-                    </>
-                  ) : (
-                    "Run detailed scan"
-                  )}
-                </Button>
-              </div>
-            </Alert>
+            <div className="hidden" aria-hidden="true" />
           )}
 
         {/* Ingredient Risk Heatmap */}
@@ -978,6 +1008,9 @@ const Analysis = () => {
                   ];
 
                   const limit = 8;
+                  const missingDetailCopy = analysis.recommendations_json.fast_mode
+                    ? "Quick scan uses limited ingredient notes. Run a detailed scan for full details."
+                    : "We don't have additional notes for this ingredient yet.";
                   const visible = showAllSafe ? safeItems : safeItems.slice(0, limit);
                   return (
                     <>
@@ -993,9 +1026,9 @@ const Analysis = () => {
                               {item.risk !== undefined && item.risk !== null && <span>Risk {item.risk}</span>}
                             </div>
                           </summary>
-                          {item.details && (
-                            <p className="mt-2 text-sm text-muted-foreground">{item.details}</p>
-                          )}
+                          <p className="mt-2 text-sm text-muted-foreground">
+                            {normalizeIngredientDetail(item.details, missingDetailCopy)}
+                          </p>
                           {getAiExplanation(item.name) && getAiExplanation(item.name) !== item.details && (
                             <p className="mt-2 text-sm text-muted-foreground">
                               <span className="font-medium text-foreground">AI explanation:</span>{" "}
@@ -1042,7 +1075,9 @@ const Analysis = () => {
                               <span className="text-xs text-muted-foreground">Risk {item.risk_score}</span>
                             )}
                           </summary>
-                          <p className="mt-2 text-sm text-muted-foreground">{item.reason}</p>
+                          <p className="mt-2 text-sm text-muted-foreground">
+                            {item.reason || "This ingredient may not align with sensitive skin or certain concerns."}
+                          </p>
                           {getAiExplanation(item.name) && (
                             <p className="mt-2 text-sm text-muted-foreground">
                               <span className="font-medium text-foreground">AI explanation:</span>{" "}
@@ -1080,9 +1115,14 @@ const Analysis = () => {
                     <>
                       {visible.map((ingredient: any, index: number) => {
                         const name = getIngredientName(ingredient);
-                        const details = typeof ingredient === "object"
-                          ? ingredient.explanation
+                        const aiDetail = getAiExplanation(name);
+                        const fallbackDetail = analysis.recommendations_json.fast_mode
+                          ? "Quick scan couldn't validate this ingredient yet. Run a detailed scan for deeper verification."
                           : "Not found in PubChem or Open Beauty Facts databases. May be a proprietary blend or trade name.";
+                        const details = normalizeIngredientDetail(
+                          (typeof ingredient === "object" ? ingredient.explanation : undefined) || aiDetail,
+                          fallbackDetail
+                        );
                         const role = typeof ingredient === "object" ? ingredient.role : undefined;
                         return (
                           <details key={`${name}-${index}`} id={getIngredientId(name)} className="rounded-lg border border-border/60 bg-background/50 px-3 py-2">
@@ -1094,10 +1134,10 @@ const Analysis = () => {
                               {role && <span className="text-xs text-muted-foreground">Role: {role}</span>}
                             </summary>
                             <p className="mt-2 text-sm text-muted-foreground">{details}</p>
-                            {getAiExplanation(name) && getAiExplanation(name) !== details && (
+                            {aiDetail && aiDetail !== details && (
                               <p className="mt-2 text-sm text-muted-foreground">
                                 <span className="font-medium text-foreground">AI explanation:</span>{" "}
-                                {getAiExplanation(name)}
+                                {aiDetail}
                               </p>
                             )}
                           </details>
@@ -1173,21 +1213,8 @@ const Analysis = () => {
             </p>
           </div>
 
-          {/* Friction Feedback Banner - Show for low EpiQ scores */}
-          {analysis.epiq_score < 50 && (
-            <div>
-              <FrictionFeedbackBanner trigger="low_score" context={`EpiQ Score: ${analysis.epiq_score}`} />
-            </div>
-          )}
-
-          {/* Post-Analysis Feedback */}
           <div>
             <PostAnalysisFeedback analysisId={analysis.id} />
-          </div>
-
-          {/* Post-Analysis Feedback Card */}
-          <div>
-            <PostAnalysisFeedbackCard />
           </div>
         </section>
 
