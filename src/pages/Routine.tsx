@@ -663,7 +663,7 @@ export default function Routine() {
               )
               .map((analysis) => (
                 <Card key={analysis.id} className="p-4">
-                  <div className="flex items-center justify-between">
+                  <div className="flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:justify-between">
                     <div>
                       <h3 className="font-semibold">{analysis.product_name}</h3>
                       <p className="text-sm text-muted-foreground">
@@ -673,6 +673,7 @@ export default function Routine() {
                     <Button
                       onClick={() => openPriceDialog(analysis.id)}
                       size="sm"
+                      className="w-full sm:w-auto whitespace-nowrap shrink-0"
                     >
                       <Plus className="w-4 h-4 mr-2" />
                       Add to Routine
@@ -836,7 +837,7 @@ export default function Routine() {
               <Button variant="outline" onClick={() => setShowManualEntryDialog(false)}>
                 Cancel
               </Button>
-              <Button onClick={handleAddManualProduct}>
+              <Button onClick={handleAddManualProduct} className="whitespace-nowrap">
                 Add to Routine
               </Button>
             </DialogFooter>
@@ -904,7 +905,7 @@ export default function Routine() {
                     const isInRoutine = routineProducts.some((rp) => rp.analysis_id === analysis.id);
                     return (
                       <Card key={analysis.id} className="p-4">
-                        <div className="flex items-center justify-between gap-4">
+                        <div className="flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:justify-between">
                           <div className="flex-1">
                             <h3 className="font-semibold mb-1">{analysis.product_name}</h3>
                             <div className="flex items-center gap-2">
@@ -927,6 +928,7 @@ export default function Routine() {
                                 openPriceDialog(analysis.id);
                               }}
                               size="sm"
+                              className="w-full sm:w-auto whitespace-nowrap shrink-0"
                             >
                               <Plus className="w-4 h-4 mr-2" />
                               Add to Routine

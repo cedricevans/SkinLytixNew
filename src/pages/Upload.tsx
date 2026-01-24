@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Camera, Upload as UploadIcon, Loader2, Info, Home, User } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -15,19 +15,39 @@ import OCRLoadingTips from "@/components/OCRLoadingTips";
 import { FrictionFeedbackBanner } from "@/components/FrictionFeedbackBanner";
 import AppShell from "@/components/AppShell";
 import PageHeader from "@/components/PageHeader";
-import { getQuickScanSummary } from "@/lib/quick-scan";
+
+// Helper: Downscale image for faster AI extraction & OCR
+const downscaleImage = (imageDataUrl: string, maxSize = 1600, quality = 0.82): Promise<string> => {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => {
+      const maxDim = Math.max(img.width, img.height);
+      const scale = maxDim > maxSize ? maxSize / maxDim : 1;
+      const canvas = document.createElement('canvas');
+      canvas.width = Math.round(img.width * scale);
+      canvas.height = Math.round(img.height * scale);
+      const ctx = canvas.getContext('2d')!;
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+      resolve(canvas.toDataURL('image/jpeg', quality));
+    };
+    img.onerror = () => resolve(imageDataUrl);
+    img.src = imageDataUrl;
+  });
+};
 
 // Helper: Preprocess image for better OCR accuracy
-const preprocessImage = (imageDataUrl: string): Promise<string> => {
+const preprocessImage = async (imageDataUrl: string): Promise<string> => {
+  const resized = await downscaleImage(imageDataUrl, 1800, 0.9);
   return new Promise((resolve) => {
     const img = new Image();
     img.onload = () => {
       const canvas = document.createElement('canvas');
       const ctx = canvas.getContext('2d')!;
       
-      canvas.width = img.width;
-      canvas.height = img.height;
-      ctx.drawImage(img, 0, 0);
+      const upscale = Math.max(1, 1400 / Math.max(img.width, img.height));
+      canvas.width = Math.round(img.width * upscale);
+      canvas.height = Math.round(img.height * upscale);
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
       
       const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
       const data = imageData.data;
@@ -42,9 +62,9 @@ const preprocessImage = (imageDataUrl: string): Promise<string> => {
       }
       
       ctx.putImageData(imageData, 0, 0);
-      resolve(canvas.toDataURL());
+      resolve(canvas.toDataURL('image/png'));
     };
-    img.src = imageDataUrl;
+    img.src = resized;
   });
 };
 
@@ -72,6 +92,8 @@ const buildAnalysisSignature = (name: string, ingredients: string) => {
   return `${normalizedName}::${normalizedIngredients}`;
 };
 
+const ANALYSIS_CACHE_TTL_MS = 1000 * 60 * 60 * 24;
+
 const getAnalysisCacheKey = (userId: string | null, signature: string) => {
   if (!userId || !signature) return null;
   return `sl_analysis_cache_${userId}_${signature}`;
@@ -86,12 +108,43 @@ const readAnalysisCache = (userId: string | null, signature: string) => {
       const value = source();
       if (!value) continue;
       const parsed = JSON.parse(value);
-      if (parsed?.analysisId) return parsed.analysisId as string;
+      if (parsed?.analysisId) {
+        const cachedAt = typeof parsed.cachedAt === "number" ? parsed.cachedAt : 0;
+        if (cachedAt && Date.now() - cachedAt > ANALYSIS_CACHE_TTL_MS) {
+          continue;
+        }
+        return parsed.analysisId as string;
+      }
     } catch {
       continue;
     }
   }
   return null;
+};
+
+const invalidateAnalysisCache = (userId: string | null, signature: string) => {
+  const key = getAnalysisCacheKey(userId, signature);
+  if (!key) return;
+  try {
+    sessionStorage.removeItem(key);
+  } catch {
+    // ignore storage errors
+  }
+  try {
+    localStorage.removeItem(key);
+  } catch {
+    // ignore storage errors
+  }
+};
+
+const isAnalysisComplete = (analysis: any) => {
+  const rec = analysis?.recommendations_json;
+  if (!rec) return false;
+  if (rec.fast_mode) return false;
+  const safeCount = rec.safe_ingredients?.length ?? 0;
+  const concernCount = rec.concern_ingredients?.length ?? 0;
+  const routineCount = rec.routine_suggestions?.length ?? 0;
+  return safeCount + concernCount > 0 && routineCount > 0;
 };
 
 const writeAnalysisCache = (userId: string | null, signature: string, analysisId: string) => {
@@ -135,12 +188,6 @@ const Upload = () => {
   const [analysisReady, setAnalysisReady] = useState(false);
   const analysisStartRef = useRef<number | null>(null);
   const [lastCacheSignature, setLastCacheSignature] = useState<string | null>(null);
-  const [scanMode, setScanMode] = useState<"quick" | "detailed">("quick");
-  const quickScanSummary = useMemo(() => {
-    if (!ingredientsList.trim()) return null;
-    const type = productType === "auto" ? "face" : productType;
-    return getQuickScanSummary(ingredientsList, type);
-  }, [ingredientsList, productType]);
 
   const handleImageUpload = async (file: File) => {
     trackEvent({
@@ -176,10 +223,15 @@ const Upload = () => {
           if (m.status === 'recognizing text') {
             setOcrProgress(Math.round(m.progress * 100));
           }
-        }
+        },
+        tessedit_char_whitelist: "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789(),.-/% ",
+        preserve_interword_spaces: "1",
       });
       
       const fullText = result.data.text;
+      const avgConfidence = result.data.words && result.data.words.length > 0
+        ? Math.round(result.data.words.reduce((sum, w) => sum + (w.confidence || 0), 0) / result.data.words.length)
+        : 0;
       const lines = fullText.split('\n').map(l => l.trim()).filter(l => l);
       
       // Extract brand
@@ -212,7 +264,15 @@ const Upload = () => {
       // Extract and clean ingredients
       const ingredientsMatch = fullText.match(/ingredients?[:\s]+(.+?)(?:\n\n|$)/is);
       const rawIngredients = ingredientsMatch ? ingredientsMatch[1].trim() : extractIngredientSection(fullText);
-      setIngredientsList(cleanIngredientText(rawIngredients));
+      if (avgConfidence < 45) {
+        toast({
+          title: "Low OCR Confidence",
+          description: "We couldn't read the label clearly. Please type ingredients manually for best results.",
+          variant: "destructive",
+        });
+      } else {
+        setIngredientsList(cleanIngredientText(rawIngredients));
+      }
       
       toast({
         title: "OCR Complete",
@@ -236,9 +296,10 @@ const Upload = () => {
     setOcrProgress(50);
     
     try {
+      const compressedImage = await downscaleImage(imageDataUrl, 1600, 0.82);
       const { data, error } = await supabase.functions.invoke('extract-ingredients', {
         body: { 
-          image: imageDataUrl,
+          image: compressedImage,
           productType: productType === 'auto' ? null : productType
         }
       });
@@ -303,15 +364,24 @@ const Upload = () => {
     const signature = buildAnalysisSignature(productName, ingredientsList);
     const cachedAnalysisId = readAnalysisCache(user.id, signature);
     if (cachedAnalysisId) {
-      setAnalysisId(cachedAnalysisId);
-      setAnalysisReady(true);
-      setAnalysisStatus("Results ready. Review ingredients, then continue.");
-      return;
+      const { data: cachedAnalysis } = await supabase
+        .from("user_analyses")
+        .select("id, recommendations_json")
+        .eq("id", cachedAnalysisId)
+        .eq("user_id", user.id)
+        .maybeSingle();
+      if (isAnalysisComplete(cachedAnalysis)) {
+        setAnalysisId(cachedAnalysisId);
+        setAnalysisReady(true);
+        setAnalysisStatus("Results ready. Review ingredients, then continue.");
+        return;
+      }
+      invalidateAnalysisCache(user.id, signature);
     }
 
     const { data: existingAnalysis } = await supabase
       .from("user_analyses")
-      .select("id")
+      .select("id, recommendations_json")
       .eq("user_id", user.id)
       .eq("product_name", productName)
       .eq("ingredients_list", ingredientsList)
@@ -319,7 +389,7 @@ const Upload = () => {
       .limit(1)
       .maybeSingle();
 
-    if (existingAnalysis?.id) {
+    if (existingAnalysis?.id && isAnalysisComplete(existingAnalysis)) {
       writeAnalysisCache(user.id, signature, existingAnalysis.id);
       setAnalysisId(existingAnalysis.id);
       setAnalysisReady(true);
@@ -332,8 +402,7 @@ const Upload = () => {
     setAnalysisId(null);
     analysisStartRef.current = Date.now();
     setAnalysisProgress(5);
-    const modeLabel = scanMode === "quick" ? "Quick scan" : "Detailed scan";
-    setAnalysisStatus(source === "auto" ? `${modeLabel} is running...` : `Preparing ${modeLabel.toLowerCase()}...`);
+    setAnalysisStatus(source === "auto" ? "Detailed scan is running..." : "Preparing detailed scan...");
 
     try {
       const payload = {
@@ -345,9 +414,9 @@ const Upload = () => {
         product_price: productPrice ? parseFloat(productPrice) : null,
         user_id: user.id,
         image_url: productImage || null,
-        skip_ingredient_ai_explanations: scanMode === "quick",
-        scan_mode: scanMode,
-        skip_ai_explanation: scanMode === "quick",
+        skip_ingredient_ai_explanations: false,
+        scan_mode: "detailed",
+        skip_ai_explanation: false,
       };
 
       const useProxy = import.meta.env.DEV && import.meta.env.VITE_USE_FUNCTIONS_PROXY === "true";
@@ -388,7 +457,7 @@ const Upload = () => {
           productType,
           hasBarcode: !!barcode,
           hasBrand: !!brand,
-          scanMode
+          scanMode: "detailed"
         }
       });
 
@@ -478,21 +547,30 @@ const Upload = () => {
       setLastCacheSignature(signature);
       const cachedId = readAnalysisCache(user.id, signature);
       if (cachedId) {
-        setAnalysisId(cachedId);
-        setAnalysisReady(true);
-        setAnalysisStatus("Results ready. Review ingredients, then continue.");
-        return;
+        const { data: cachedAnalysis } = await supabase
+          .from("user_analyses")
+          .select("id, recommendations_json")
+          .eq("id", cachedId)
+          .eq("user_id", user.id)
+          .maybeSingle();
+        if (isAnalysisComplete(cachedAnalysis)) {
+          setAnalysisId(cachedId);
+          setAnalysisReady(true);
+          setAnalysisStatus("Results ready. Review ingredients, then continue.");
+          return;
+        }
+        invalidateAnalysisCache(user.id, signature);
       }
       const { data: existingAnalysis } = await supabase
         .from("user_analyses")
-        .select("id")
+        .select("id, recommendations_json")
         .eq("user_id", user.id)
         .eq("product_name", productName)
         .eq("ingredients_list", ingredientsList)
         .order("created_at", { ascending: false })
         .limit(1)
         .maybeSingle();
-      if (existingAnalysis?.id) {
+      if (existingAnalysis?.id && isAnalysisComplete(existingAnalysis)) {
         writeAnalysisCache(user.id, signature, existingAnalysis.id);
         setAnalysisId(existingAnalysis.id);
         setAnalysisReady(true);
@@ -588,34 +666,6 @@ const Upload = () => {
             </div>
             <p className="text-xs text-muted-foreground">
               Helps optimize ingredient analysis for your product type
-            </p>
-          </div>
-
-          {/* Scan Mode Selector */}
-          <div className="space-y-2">
-            <Label>Scan Speed</Label>
-            <div className="flex flex-wrap gap-2">
-              <Button
-                type="button"
-                variant={scanMode === 'quick' ? 'default' : 'outline'}
-                size="sm"
-                onClick={() => setScanMode('quick')}
-                className="touch-target w-full sm:w-auto"
-              >
-                Quick Scan (estimate)
-              </Button>
-              <Button
-                type="button"
-                variant={scanMode === 'detailed' ? 'default' : 'outline'}
-                size="sm"
-                onClick={() => setScanMode('detailed')}
-                className="touch-target w-full sm:w-auto"
-              >
-                Detailed Scan (full report)
-              </Button>
-            </div>
-            <p className="text-xs text-muted-foreground">
-              Quick scan returns a fast estimate. Detailed scan verifies more ingredients and may adjust your score.
             </p>
           </div>
 
@@ -834,23 +884,6 @@ const Upload = () => {
               <p className="text-xs text-muted-foreground mt-2">
                 Review and correct the extracted text as needed
               </p>
-              {quickScanSummary && (
-                <div className="mt-4 rounded-lg border border-border bg-muted/30 p-4">
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="font-medium text-foreground">Quick scan preview</span>
-                    <span className="text-muted-foreground">{quickScanSummary.total} ingredients</span>
-                  </div>
-                  <div className="mt-2 grid grid-cols-2 gap-2 text-xs text-muted-foreground">
-                    <span>Known safe: {quickScanSummary.safeKnown}</span>
-                    <span>Potential concerns: {quickScanSummary.potentialConcerns}</span>
-                    <span>Beneficial: {quickScanSummary.beneficial}</span>
-                    <span>Needs verification: {quickScanSummary.unknown}</span>
-                  </div>
-                  <p className="mt-2 text-xs text-muted-foreground">
-                    This quick scan uses common ingredient patterns. Detailed scans verify more ingredients.
-                  </p>
-                </div>
-              )}
             </div>
           </div>
 

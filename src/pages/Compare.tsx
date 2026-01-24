@@ -190,6 +190,8 @@ export default function Compare() {
   const [activeTab, setActiveTab] = useState("market");
   const [analysisIngredients, setAnalysisIngredients] = useState<Record<string, string>>({});
   const [skinProfile, setSkinProfile] = useState<{ skinType: string; concerns: string[] }>({ skinType: 'normal', concerns: [] });
+  const [marketDupesHydratedFor, setMarketDupesHydratedFor] = useState<string | null>(null);
+  const autoDupeStartedRef = useRef<Set<string>>(new Set());
   const { effectiveTier } = useSubscription();
 
   const dupeLimit = effectiveTier === 'pro' ? Infinity : effectiveTier === 'premium' ? 5 : 2;
@@ -570,6 +572,7 @@ export default function Compare() {
     setDupeError(null);
     setDupeProgress(0);
     setDupeStage("Preparing search");
+    setMarketDupesHydratedFor(null);
   }, [selectedProductId]);
 
   useEffect(() => {
@@ -580,6 +583,7 @@ export default function Compare() {
       const cached = readMarketDupeCache(userId, selectedProductId);
       if (cached && cached.length > 0) {
         setMarketDupes(cached);
+        setMarketDupesHydratedFor(selectedProductId);
         return;
       }
 
@@ -595,10 +599,12 @@ export default function Compare() {
       if (dbDupes.length > 0) {
         setMarketDupes(dbDupes);
         writeMarketDupeCache(userId, selectedProductId, dbDupes);
+        setMarketDupesHydratedFor(selectedProductId);
         return;
       }
 
       setMarketDupes([]);
+      setMarketDupesHydratedFor(selectedProductId);
     };
 
     hydrateMarketDupes();
@@ -607,6 +613,16 @@ export default function Compare() {
       isCancelled = true;
     };
   }, [selectedProductId, userId]);
+
+  useEffect(() => {
+    if (!selectedProductId || !userId) return;
+    if (marketDupesHydratedFor !== selectedProductId) return;
+    if (findingDupes || dupeError) return;
+    if (marketDupes.length > 0) return;
+    if (autoDupeStartedRef.current.has(selectedProductId)) return;
+    autoDupeStartedRef.current.add(selectedProductId);
+    findMarketDupes();
+  }, [selectedProductId, userId, marketDupesHydratedFor, marketDupes.length, findingDupes, dupeError]);
 
   useEffect(() => {
     if (!selectedProductId || !userId) return;

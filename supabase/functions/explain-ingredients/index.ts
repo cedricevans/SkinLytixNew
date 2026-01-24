@@ -55,9 +55,15 @@ const getFallbackIngredientExplanation = (name: string, role: string): string =>
   return "Supports the formula’s texture, stability, or overall performance.";
 };
 
+const isLowQualityExplanation = (value?: string | null): boolean => {
+  if (!value) return true;
+  return /supports the formula|no detailed information available|not found/i.test(value);
+};
+
 async function generateBatchExplanations(
   items: Array<{ name: string; role: string; context: string }>,
-  lovableApiKey: string
+  lovableApiKey: string | null,
+  geminiApiKey: string | null
 ): Promise<Record<string, string>> {
   const fallback: Record<string, string> = {};
   items.forEach((item) => {
@@ -75,31 +81,11 @@ Ingredients:
 ${items.map((item) => `- ${item.name} (role: ${item.role}) ${item.context}` ).join("\n")}
 `;
 
-  try {
-    const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${lovableApiKey}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: "google/gemini-2.5-flash",
-        messages: [
-          { role: "system", content: systemPrompt },
-          { role: "user", content: userMessage },
-        ],
-        max_tokens: 600,
-        temperature: 0.3,
-      }),
-    });
-
-    if (!response.ok) return fallback;
-    const data = await response.json();
-    const content = data?.choices?.[0]?.message?.content ?? "";
+  const parseResponse = (content: string) => {
     const match = content.match(/\[.*\]/s);
-    if (!match) return fallback;
+    if (!match) return null;
     const parsed = JSON.parse(match[0]);
-    if (!Array.isArray(parsed)) return fallback;
+    if (!Array.isArray(parsed)) return null;
     const mapped: Record<string, string> = { ...fallback };
     parsed.forEach((item: any) => {
       if (item?.name && item?.explanation) {
@@ -107,10 +93,75 @@ ${items.map((item) => `- ${item.name} (role: ${item.role}) ${item.context}` ).jo
       }
     });
     return mapped;
-  } catch (error) {
-    console.error("Error generating batch explanations:", error);
-    return fallback;
+  };
+
+  if (lovableApiKey) {
+    try {
+      const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${lovableApiKey}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          model: "google/gemini-2.5-flash-lite",
+          messages: [
+            { role: "system", content: systemPrompt },
+            { role: "user", content: userMessage },
+          ],
+          max_tokens: 600,
+          temperature: 0.3,
+        }),
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        const content = data?.choices?.[0]?.message?.content ?? "";
+        const parsed = parseResponse(content);
+        if (parsed) return parsed;
+      }
+    } catch (error) {
+      console.error("Lovable batch explanation error:", error);
+    }
   }
+
+  if (geminiApiKey) {
+    try {
+      const response = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key=${geminiApiKey}`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            contents: [
+              {
+                role: "user",
+                parts: [
+                  { text: systemPrompt },
+                  { text: userMessage },
+                ],
+              },
+            ],
+            generationConfig: {
+              temperature: 0.3,
+              maxOutputTokens: 600,
+            },
+          }),
+        }
+      );
+
+      if (response.ok) {
+        const data = await response.json();
+        const content = data?.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
+        const parsed = parseResponse(content);
+        if (parsed) return parsed;
+      }
+    } catch (error) {
+      console.error("Gemini batch explanation error:", error);
+    }
+  }
+
+  return fallback;
 }
 
 serve(async (req) => {
@@ -137,6 +188,7 @@ serve(async (req) => {
     const supabase = createClient(supabaseUrl, supabaseKey);
 
     const lovableApiKey = Deno.env.get("LOVABLE_API_KEY");
+    const geminiApiKey = Deno.env.get("GEMINI_API_KEY");
 
     const normalizedInputs = ingredients.map((ingredient) => ({
       ...ingredient,
@@ -154,7 +206,7 @@ serve(async (req) => {
 
     const cachedMap = new Map<string, { role: string | null; explanation: string }>();
     (cachedRows || []).forEach((row: any) => {
-      if (row?.normalized_name && row?.explanation) {
+      if (row?.normalized_name && row?.explanation && !isLowQualityExplanation(row.explanation)) {
         cachedMap.set(row.normalized_name, {
           role: row.role,
           explanation: row.explanation,
@@ -198,8 +250,12 @@ serve(async (req) => {
         return { name: ingredient.name, role, context };
       });
 
-      if (lovableApiKey) {
-        const batchExplanations = await generateBatchExplanations(items, lovableApiKey);
+      if (lovableApiKey || geminiApiKey) {
+        const batchExplanations = await generateBatchExplanations(
+          items,
+          lovableApiKey,
+          geminiApiKey
+        );
         Object.assign(explanations, batchExplanations);
       } else {
         items.forEach((item) => {

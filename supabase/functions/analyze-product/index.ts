@@ -217,14 +217,14 @@ async function generateIngredientExplanation(
   lovableApiKey: string
 ): Promise<string> {
   try {
-    const systemPrompt = `You are an ingredient expert. Explain this skincare ingredient in 2-3 friendly sentences for consumers.
-Focus on: what it does (role/function), why it's used, and any key safety notes.
-Keep it conversational and non-technical. No medical claims.`;
+    const systemPrompt = `You are an ingredient expert. Explain this skincare ingredient in 4-6 friendly sentences for consumers.
+Focus on: what it does (role/function), why it's used, texture/feel or formulation benefits, and any gentle safety notes.
+Keep it conversational, specific, and non-technical. No medical claims. Avoid repeating the same point.`;
 
     const context = pubchemData?.data
       ? `Molecular weight: ${pubchemData.data.molecular_weight || 'unknown'}`
       : 'Limited scientific data available';
-    const userMessage = `Explain ${ingredientName} (category: ${category}) for a consumer. ${context}`;
+    const userMessage = `Explain ${ingredientName} (category: ${category}) for a consumer. ${context}. If the ingredient is a clay, mineral, preservative, or colorant, mention its formulation role (e.g., stability, suspension, texture, oil absorption) in plain language.`;
 
     const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
       method: 'POST',
@@ -238,7 +238,7 @@ Keep it conversational and non-technical. No medical claims.`;
           { role: 'system', content: systemPrompt },
           { role: 'user', content: userMessage }
         ],
-        max_tokens: 150,
+        max_tokens: 320,
         temperature: 0.7,
       }),
     });
@@ -606,9 +606,11 @@ serve(async (req) => {
     const detectionSource = category ? 'user-provided' : cachedProductData ? 'OBF-cache' : 'auto-detected';
     console.log(`Product categorization: "${extractedCategory}" (${extractedBrand}) → productType: "${productType}" | Source: ${detectionSource}`);
 
+    const INGREDIENT_SPLIT_REGEX = /[,\n;]/;
+
     // Parse ingredients list
     const ingredientsArray = ingredients_list
-      .split(/[,\n]/)
+      .split(INGREDIENT_SPLIT_REGEX)
       .map((i: string) => i.trim())
       .filter((i: string) => i.length > 0);
 
@@ -1789,7 +1791,7 @@ serve(async (req) => {
         productName: product_name,
         brand: extractedBrand,
         category: extractedCategory,
-        ingredients: ingredients_list.split(',').map((i: string) => i.trim()),
+        ingredients: ingredients_list.split(INGREDIENT_SPLIT_REGEX).map((i: string) => i.trim()),
         epiqScore,
         scoreLabel,
         recommendations

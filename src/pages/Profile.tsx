@@ -1079,16 +1079,18 @@ const Profile = () => {
                                       </div>
                                     )}
                                     
-                                    <div className="flex gap-2">
+                                    <div className="grid gap-2 sm:flex sm:items-center">
                                       <Button 
                                         variant="outline" 
                                         size="sm"
+                                        className="w-full sm:w-auto whitespace-nowrap"
                                         onClick={() => navigate(`/analysis/${product.id}`)}
                                       >
                                         View Full Analysis
                                       </Button>
                                       <Button 
                                         size="sm"
+                                        className="w-full sm:w-auto whitespace-nowrap shrink-0"
                                         onClick={() => handleQuickAddToRoutine(product.id)}
                                       >
                                         <Plus className="w-4 h-4 mr-1" />
@@ -1097,6 +1099,7 @@ const Profile = () => {
                                       <Button
                                         variant="destructive"
                                         size="sm"
+                                        className="w-full sm:w-auto whitespace-nowrap"
                                         onClick={() => confirmDeleteAnalysis(product.id)}
                                       >
                                         <Trash2 className="w-4 h-4 mr-1" />

@@ -36,7 +36,8 @@ Important:
 - Remove all special characters except commas, hyphens, and parentheses
 - Separate ingredients with commas
 - If a field is not visible, set it to empty string
-- Do not include product descriptions, warnings, or marketing text`;
+- Do not include product descriptions, warnings, or marketing text
+- Return JSON only (no markdown, no extra text)`;
 
     const callLovable = async () => {
       if (!LOVABLE_API_KEY) return null;
@@ -47,14 +48,20 @@ Important:
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          model: 'google/gemini-2.5-flash',
-          messages: [{
-            role: 'user',
-            content: [
-              { type: 'text', text: buildPrompt() },
-              { type: 'image_url', image_url: { url: image } }
-            ]
-          }]
+          model: 'google/gemini-2.5-flash-lite',
+          messages: [
+            {
+              role: 'system',
+              content: 'You are a precise extraction engine. Return ONLY valid JSON that matches the schema.',
+            },
+            {
+              role: 'user',
+              content: [
+                { type: 'text', text: buildPrompt() },
+                { type: 'image_url', image_url: { url: image } },
+              ],
+            },
+          ],
         })
       });
 
@@ -71,7 +78,7 @@ Important:
     const callGeminiDirect = async () => {
       if (!GEMINI_API_KEY) return null;
       const { mimeType, data } = await getImageData(image);
-      const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`, {
+      const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key=${GEMINI_API_KEY}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -80,6 +87,7 @@ Important:
           contents: [{
             role: 'user',
             parts: [
+              { text: "You are a precise extraction engine. Return ONLY valid JSON that matches the schema." },
               { text: buildPrompt() },
               {
                 inline_data: {
@@ -89,6 +97,10 @@ Important:
               },
             ],
           }],
+          generationConfig: {
+            temperature: 0.2,
+            maxOutputTokens: 800,
+          },
         }),
       });
 
@@ -108,13 +120,29 @@ Important:
       throw new Error('No content returned from AI');
     }
 
-    // Parse JSON from AI response
+    const tryParseJson = (raw: string) => {
+      try {
+        return JSON.parse(raw);
+      } catch {
+        return null;
+      }
+    };
+
+    const extractFromText = (raw: string) => {
+      const ingredients = raw.match(/"ingredients"\s*:\s*"([^"]*)"/i)?.[1] ?? "";
+      const brand = raw.match(/"brand"\s*:\s*"([^"]*)"/i)?.[1] ?? "";
+      const category = raw.match(/"category"\s*:\s*"([^"]*)"/i)?.[1] ?? "";
+      const productName = raw.match(/"productName"\s*:\s*"([^"]*)"/i)?.[1] ?? "";
+      return { ingredients, brand, category, productName };
+    };
+
     const jsonMatch = content.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) {
+    const parsed = tryParseJson(jsonMatch ? jsonMatch[0] : content);
+    const extractedData = parsed ?? extractFromText(content);
+
+    if (!extractedData || typeof extractedData !== 'object') {
       throw new Error('Could not parse JSON from AI response');
     }
-
-    const extractedData = JSON.parse(jsonMatch[0]);
 
     return new Response(
       JSON.stringify(extractedData),

@@ -354,6 +354,7 @@ const Analysis = () => {
   const isProcessingDetails =
     !!analysis &&
     !analysis.recommendations_json?.ai_explanation &&
+    !analysis.recommendations_json?.fast_mode &&
     refreshAttempts < maxRefreshAttempts;
   const refreshProgress = Math.min(100, Math.round((refreshAttempts / maxRefreshAttempts) * 100));
 
@@ -727,7 +728,7 @@ const Analysis = () => {
               variant="cta"
               onClick={handleAddToRoutine}
               disabled={addingToRoutine}
-              className="touch-target"
+              className="touch-target whitespace-nowrap shrink-0"
             >
               <Plus className="w-4 h-4 mr-2" />
               {addingToRoutine ? "Adding..." : "Add to Routine"}
@@ -762,7 +763,7 @@ const Analysis = () => {
             variant="cta"
             onClick={handleAddToRoutine}
             disabled={addingToRoutine}
-            className="w-full touch-target"
+            className="w-full touch-target whitespace-nowrap"
             size="lg"
           >
             <Plus className="w-4 h-4 mr-2" />
@@ -1026,15 +1027,23 @@ const Analysis = () => {
                               {item.risk !== undefined && item.risk !== null && <span>Risk {item.risk}</span>}
                             </div>
                           </summary>
-                          <p className="mt-2 text-sm text-muted-foreground">
-                            {normalizeIngredientDetail(item.details, missingDetailCopy)}
-                          </p>
-                          {getAiExplanation(item.name) && getAiExplanation(item.name) !== item.details && (
-                            <p className="mt-2 text-sm text-muted-foreground">
-                              <span className="font-medium text-foreground">AI explanation:</span>{" "}
-                              {getAiExplanation(item.name)}
-                            </p>
-                          )}
+                          {(() => {
+                            const aiDetail = getAiExplanation(item.name);
+                            const baseDetail = item.details;
+                            const preferredDetail = isEmptyIngredientDetail(baseDetail) ? aiDetail : baseDetail;
+                            const details = normalizeIngredientDetail(preferredDetail || aiDetail, missingDetailCopy);
+                            return (
+                              <>
+                                <p className="mt-2 text-sm text-muted-foreground">{details}</p>
+                                {aiDetail && aiDetail !== details && (
+                                  <p className="mt-2 text-sm text-muted-foreground">
+                                    <span className="font-medium text-foreground">AI explanation:</span>{" "}
+                                    {aiDetail}
+                                  </p>
+                                )}
+                              </>
+                            );
+                          })()}
                         </details>
                       ))}
                       {safeItems.length > limit && (
@@ -1075,15 +1084,24 @@ const Analysis = () => {
                               <span className="text-xs text-muted-foreground">Risk {item.risk_score}</span>
                             )}
                           </summary>
-                          <p className="mt-2 text-sm text-muted-foreground">
-                            {item.reason || "This ingredient may not align with sensitive skin or certain concerns."}
-                          </p>
-                          {getAiExplanation(item.name) && (
-                            <p className="mt-2 text-sm text-muted-foreground">
-                              <span className="font-medium text-foreground">AI explanation:</span>{" "}
-                              {getAiExplanation(item.name)}
-                            </p>
-                          )}
+                          {(() => {
+                            const aiDetail = getAiExplanation(item.name);
+                            const details =
+                              item.reason ||
+                              aiDetail ||
+                              "This ingredient may not align with sensitive skin or certain concerns.";
+                            return (
+                              <>
+                                <p className="mt-2 text-sm text-muted-foreground">{details}</p>
+                                {aiDetail && aiDetail !== details && (
+                                  <p className="mt-2 text-sm text-muted-foreground">
+                                    <span className="font-medium text-foreground">AI explanation:</span>{" "}
+                                    {aiDetail}
+                                  </p>
+                                )}
+                              </>
+                            );
+                          })()}
                         </details>
                       ))}
                       {items.length > limit && (
@@ -1119,10 +1137,9 @@ const Analysis = () => {
                         const fallbackDetail = analysis.recommendations_json.fast_mode
                           ? "Quick scan couldn't validate this ingredient yet. Run a detailed scan for deeper verification."
                           : "Not found in PubChem or Open Beauty Facts databases. May be a proprietary blend or trade name.";
-                        const details = normalizeIngredientDetail(
-                          (typeof ingredient === "object" ? ingredient.explanation : undefined) || aiDetail,
-                          fallbackDetail
-                        );
+                        const baseDetail = typeof ingredient === "object" ? ingredient.explanation : undefined;
+                        const preferredDetail = isEmptyIngredientDetail(baseDetail) ? aiDetail : baseDetail;
+                        const details = normalizeIngredientDetail(preferredDetail || aiDetail, fallbackDetail);
                         const role = typeof ingredient === "object" ? ingredient.role : undefined;
                         return (
                           <details key={`${name}-${index}`} id={getIngredientId(name)} className="rounded-lg border border-border/60 bg-background/50 px-3 py-2">

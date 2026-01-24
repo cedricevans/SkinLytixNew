@@ -129,6 +129,27 @@ All colors MUST be HSL.
   h1, h2, h3, h4, h5, h6 {
     @apply font-heading;
   }
+
+  button,
+  [role="button"],
+  a[role="button"],
+  input[type="button"],
+  input[type="submit"],
+  input[type="reset"] {
+    @apply whitespace-nowrap;
+  }
+}
+
+@media (pointer: coarse) {
+  button,
+  [role="button"],
+  a[role="button"],
+  input[type="button"],
+  input[type="submit"],
+  input[type="reset"] {
+    min-height: 44px;
+    min-width: 44px;
+  }
 }
 
 /* Custom Utilities */
