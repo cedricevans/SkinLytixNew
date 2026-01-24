@@ -89,7 +89,7 @@ const Auth = () => {
       } else if (!profile?.has_seen_walkthrough) {
         navigate('/walkthrough');
       } else {
-        navigate('/profile');
+        navigate('/home');
       }
     } catch (error: any) {
       toast({
@@ -107,7 +107,7 @@ const Auth = () => {
   return (
     <div className="min-h-screen bg-gradient-to-b from-background to-muted flex flex-col">
       <header className="w-full bg-primary text-primary-foreground shadow-soft">
-        <div className="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between">
+        <div className="max-w-6xl mx-auto px-[10px] lg:px-6 py-3 flex items-center justify-between">
           <button
             type="button"
             onClick={() => navigate('/')}

@@ -77,11 +77,11 @@ const WaitlistDialog = ({ open, onOpenChange }: WaitlistDialogProps) => {
         reset();
         onOpenChange(false);
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error joining waitlist:", error);
       toast({
         title: "Something went wrong",
-        description: "Please try again later.",
+        description: error?.message || "Please try again later.",
         variant: "destructive",
       });
     } finally {

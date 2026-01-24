@@ -153,11 +153,11 @@ const BetaFeedback = () => {
       });
 
       setSubmitted(true);
-    } catch (error) {
+    } catch (error: any) {
       console.error('BETA_FEEDBACK_ERROR:', error);
       toast({
         title: "Submission Failed",
-        description: "Could not submit feedback. Please try again.",
+        description: error?.message || "Could not submit feedback. Please try again.",
         variant: "destructive",
       });
     } finally {
@@ -167,7 +167,7 @@ const BetaFeedback = () => {
 
   if (submitted) {
     return (
-      <AppShell showNavigation showBottomNav contentClassName="px-4 py-12">
+      <AppShell showNavigation showBottomNav contentClassName="px-[5px] lg:px-4 py-12">
         <div className="flex items-center justify-center">
           <Card className="max-w-2xl w-full p-8 text-center">
             <CheckCircle2 className="w-16 h-16 text-primary mx-auto mb-4" />
@@ -190,7 +190,7 @@ const BetaFeedback = () => {
   }
 
   return (
-    <AppShell showNavigation showBottomNav contentClassName="px-4 py-12">
+    <AppShell showNavigation showBottomNav contentClassName="px-[5px] lg:px-4 py-12">
       <div className="container max-w-3xl mx-auto">
         {/* Header */}
         <div className="mb-8">

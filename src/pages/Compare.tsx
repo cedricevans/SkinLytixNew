@@ -14,6 +14,7 @@ import { useSubscription } from "@/hooks/useSubscription";
 import { PaywallModal } from "@/components/paywall/PaywallModal";
 import { DupeCard } from "@/components/DupeCard";
 import { toast } from "@/hooks/use-toast";
+import { invokeFunction } from '@/lib/functions-client';
 
 interface Analysis {
   id: string;
@@ -424,22 +425,26 @@ export default function Compare() {
         .map(i => i.trim())
         .filter(Boolean);
 
-      const { data, error } = await supabase.functions.invoke('find-dupes', {
-        body: {
+      let data: any;
+      try {
+        data = await invokeFunction('find-dupes', {
           productName: selectedProduct.product_name,
           brand: selectedProduct.brand,
           ingredients,
           category: selectedProduct.category || 'face',
           skinType: skinProfile.skinType,
           concerns: skinProfile.concerns,
-        }
-      });
+        });
+      } catch (err) {
+        console.error('find-dupes error:', err);
+        setDupeError('Failed to find dupes');
+        return;
+      }
 
-      if (error) throw error;
       if (data?.error) {
         setDupeError(data.error);
       }
-      
+
       if (data?.dupes && Array.isArray(data.dupes)) {
         const normalizedDupes = data.dupes
           .map((dupe: any) => normalizeDupe(dupe, selectedProduct.category || "face"))
@@ -655,6 +660,9 @@ export default function Compare() {
           return next;
         });
         toast({ title: "Removed from favorites" });
+      } else {
+        console.error('Error removing saved dupe:', error);
+        toast({ title: 'Failed to remove favorite', description: error.message || 'Try again later.', variant: 'destructive' });
       }
     } else {
       const { error } = await supabase
@@ -675,6 +683,9 @@ export default function Compare() {
       if (!error) {
         setSavedDupes(prev => new Set(prev).add(key));
         toast({ title: "Saved to favorites ❤️" });
+      } else {
+        console.error('Error saving dupe:', error);
+        toast({ title: 'Failed to save favorite', description: error.message || 'Try again later.', variant: 'destructive' });
       }
     }
   };
@@ -699,6 +710,9 @@ export default function Compare() {
           return next;
         });
         toast({ title: "Removed from favorites" });
+      } else {
+        console.error('Error removing saved my-product dupe:', error);
+        toast({ title: 'Failed to remove favorite', description: error.message || 'Try again later.', variant: 'destructive' });
       }
     } else {
       const { error } = await supabase
@@ -716,6 +730,9 @@ export default function Compare() {
       if (!error) {
         setSavedDupes(prev => new Set(prev).add(key));
         toast({ title: "Saved to favorites ❤️" });
+      } else {
+        console.error('Error saving my-product dupe:', error);
+        toast({ title: 'Failed to save favorite', description: error.message || 'Try again later.', variant: 'destructive' });
       }
     }
   };
@@ -734,7 +751,7 @@ export default function Compare() {
 
   if (loading) {
     return (
-      <AppShell showNavigation showBottomNav contentClassName="px-4 py-8">
+      <AppShell showNavigation showBottomNav contentClassName="px-[5px] lg:px-4 py-8">
         <div className="container mx-auto pb-24 lg:pb-8">
           <Skeleton className="h-10 w-48 mb-6" />
           <Skeleton className="h-12 w-full mb-8" />
@@ -754,7 +771,7 @@ export default function Compare() {
   }
 
   return (
-    <AppShell showNavigation showBottomNav contentClassName="px-4 py-6">
+    <AppShell showNavigation showBottomNav contentClassName="px-[5px] lg:px-4 py-6">
       <main className="container mx-auto pb-24 lg:pb-8">
         <Button 
           variant="ghost" 
@@ -789,7 +806,8 @@ export default function Compare() {
             </CardContent>
           </Card>
         ) : (
-          <>
+          <div className="lg:grid lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)] gap-6">
+            <div className="space-y-6">
             {/* Product Picker */}
             <Card className="mb-6">
               <CardHeader className="pb-3">
@@ -1006,7 +1024,43 @@ export default function Compare() {
                 </TabsContent>
               </Tabs>
             )}
-          </>
+            </div>
+            <aside className="space-y-4">
+              <Card>
+                <CardHeader className="pb-0">
+                  <CardTitle className="text-base font-medium">Quick Overview</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <p className="text-sm text-muted-foreground">Market dupes</p>
+                    <p className="font-semibold">{filteredMarketDupes.length}</p>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <p className="text-sm text-muted-foreground">Saved favorites</p>
+                    <p className="font-semibold">{savedDupes.size}</p>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <p className="text-sm text-muted-foreground">Active filter</p>
+                    <p className="font-semibold capitalize">{categoryFilter}</p>
+                  </div>
+                  {selectedProduct && (
+                    <div className="pt-3 border-t border-border text-sm text-muted-foreground">
+                      <p>Comparing:</p>
+                      <p className="font-semibold">{selectedProduct.product_name}</p>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+              <Card>
+                <CardContent className="space-y-3 text-sm text-muted-foreground">
+                  <p>Log your best finds.</p>
+                  <Button variant="outline" className="w-full" onClick={() => navigate("/favorites")}>
+                    View Saved Favorites
+                  </Button>
+                </CardContent>
+              </Card>
+            </aside>
+          </div>
         )}
       </main>
 

@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import AppShell from "@/components/AppShell";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ArrowLeft, Heart, Search, Sparkles } from "lucide-react";
@@ -37,27 +37,38 @@ export default function Favorites() {
   const [priceFilter, setPriceFilter] = useState<PriceFilter>('all');
 
   useEffect(() => {
+    const fetchSavedDupes = async () => {
+      setLoading(true);
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) {
+          navigate("/auth");
+          return;
+        }
+
+        const { data, error } = await supabase
+          .from("saved_dupes")
+          .select("*")
+          .eq("user_id", user.id)
+          .order("saved_at", { ascending: false });
+
+        if (!error && data) {
+          setSavedDupes(data);
+        }
+      } catch (error: any) {
+        console.error("Unable to load favorites:", error);
+        toast({
+          title: "Favorites unavailable",
+          description: error?.message || "Please try again later.",
+          variant: "destructive",
+        });
+      } finally {
+        setLoading(false);
+      }
+    };
+
     fetchSavedDupes();
-  }, []);
-
-  const fetchSavedDupes = async () => {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) {
-      navigate("/auth");
-      return;
-    }
-
-    const { data, error } = await supabase
-      .from("saved_dupes")
-      .select("*")
-      .eq("user_id", user.id)
-      .order("saved_at", { ascending: false });
-
-    if (!error && data) {
-      setSavedDupes(data);
-    }
-    setLoading(false);
-  };
+  }, [navigate, toast]);
 
   const handleUnsave = async (dupeId: string) => {
     const { error } = await supabase
@@ -68,6 +79,9 @@ export default function Favorites() {
     if (!error) {
       setSavedDupes(prev => prev.filter(d => d.id !== dupeId));
       toast({ title: "Removed from favorites" });
+    } else {
+      console.error('Error removing favorite:', error);
+      toast({ title: 'Failed to remove favorite', description: error.message || 'Please try again later.', variant: 'destructive' });
     }
   };
 
@@ -116,7 +130,7 @@ export default function Favorites() {
     return result;
   }, [savedDupes, sortBy, priceFilter]);
 
-  const uniqueBrands = useMemo(() => {
+  const brandOptions = useMemo(() => {
     const brands = savedDupes
       .map(d => d.brand)
       .filter((b): b is string => !!b);
@@ -125,7 +139,7 @@ export default function Favorites() {
 
   if (loading) {
     return (
-      <AppShell showNavigation showBottomNav contentClassName="px-4 py-8">
+      <AppShell showNavigation showBottomNav contentClassName="px-[5px] lg:px-4 py-8">
         <div className="container mx-auto pb-24 lg:pb-8">
           <Skeleton className="h-10 w-48 mb-6" />
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
@@ -137,7 +151,7 @@ export default function Favorites() {
   }
 
   return (
-    <AppShell showNavigation showBottomNav contentClassName="px-4 py-6">
+    <AppShell showNavigation showBottomNav contentClassName="px-[5px] lg:px-4 py-6">
       <main className="container mx-auto pb-24 lg:pb-8">
         <Button 
           variant="ghost" 
@@ -173,100 +187,134 @@ export default function Favorites() {
             </CardContent>
           </Card>
         ) : (
-          <>
-            {/* Filters and Sort */}
-            <div className="flex flex-col sm:flex-row gap-3 mb-6">
-              <Select value={sortBy} onValueChange={(v) => setSortBy(v as SortOption)}>
-                <SelectTrigger className="w-full sm:w-[180px]">
-                  <SelectValue placeholder="Sort by" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="recent">Recently Saved</SelectItem>
-                  <SelectItem value="price-low">Price: Low to High</SelectItem>
-                  <SelectItem value="price-high">Price: High to Low</SelectItem>
-                  <SelectItem value="brand-az">Brand A-Z</SelectItem>
-                </SelectContent>
-              </Select>
+          <div className="lg:grid lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)] gap-6">
+            <div className="space-y-6">
+              {/* Filters and Sort */}
+              <div className="flex flex-wrap items-center gap-3 mb-6">
+                <Select value={sortBy} onValueChange={(v) => setSortBy(v as SortOption)}>
+                  <SelectTrigger className="w-full sm:w-[200px]">
+                    <SelectValue placeholder="Sort by" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="recent">Recently Saved</SelectItem>
+                    <SelectItem value="price-low">Price: Low to High</SelectItem>
+                    <SelectItem value="price-high">Price: High to Low</SelectItem>
+                    <SelectItem value="brand-az">Brand A-Z</SelectItem>
+                  </SelectContent>
+                </Select>
 
-              <Select value={priceFilter} onValueChange={(v) => setPriceFilter(v as PriceFilter)}>
-                <SelectTrigger className="w-full sm:w-[160px]">
-                  <SelectValue placeholder="Price range" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Prices</SelectItem>
-                  <SelectItem value="under15">Under $15</SelectItem>
-                  <SelectItem value="15-30">$15 - $30</SelectItem>
-                  <SelectItem value="30-50">$30 - $50</SelectItem>
-                  <SelectItem value="50plus">$50+</SelectItem>
-                </SelectContent>
-              </Select>
+                <Select value={priceFilter} onValueChange={(v) => setPriceFilter(v as PriceFilter)}>
+                  <SelectTrigger className="w-full sm:w-[200px]">
+                    <SelectValue placeholder="Price range" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Prices</SelectItem>
+                    <SelectItem value="under15">Under $15</SelectItem>
+                    <SelectItem value="15-30">$15 - $30</SelectItem>
+                    <SelectItem value="30-50">$30 - $50</SelectItem>
+                    <SelectItem value="50plus">$50+</SelectItem>
+                  </SelectContent>
+                </Select>
 
-              <Button 
-                variant="outline" 
-                onClick={() => navigate("/compare")}
-                className="gap-2 ml-auto"
-              >
-                <Search className="w-4 h-4" />
-                Find More Dupes
-              </Button>
-            </div>
-
-            {/* Grid of saved dupes */}
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-              {filteredAndSortedDupes.map((dupe, idx) => (
-                <div 
-                  key={dupe.id}
-                  className="animate-fade-in"
-                  style={{ animationDelay: `${idx * 30}ms` }}
-                >
-                  <DupeCard
-                    name={dupe.product_name}
-                    brand={dupe.brand || "Unknown"}
-                    imageUrl={dupe.image_url || undefined}
-                    reasons={dupe.reasons || []}
-                    sharedIngredients={dupe.shared_ingredients || []}
-                    priceEstimate={dupe.price_estimate || undefined}
-                    whereToBuy={dupe.where_to_buy || undefined}
-                    purchaseUrl={dupe.purchase_url || undefined}
-                    isSaved={true}
-                    onToggleSave={() => handleUnsave(dupe.id)}
-                    category="skincare"
-                    showPlaceholder={true}
-                  />
-                  <Button
-                    variant="link"
-                    className="mt-2 px-0 text-xs"
-                    onClick={() => {
-                      if (dupe.source_product_id) {
-                        navigate(`/compare?productId=${dupe.source_product_id}`);
-                      } else {
-                        navigate("/compare");
-                      }
-                    }}
-                  >
-                    Find more dupes like this
-                  </Button>
-                </div>
-              ))}
-            </div>
-
-            {filteredAndSortedDupes.length === 0 && savedDupes.length > 0 && (
-              <div className="text-center py-12">
-                <p className="text-muted-foreground">
-                  No favorites match the current filters
-                </p>
                 <Button 
-                  variant="link" 
-                  onClick={() => {
-                    setSortBy('recent');
-                    setPriceFilter('all');
-                  }}
+                  variant="outline" 
+                  onClick={() => navigate("/compare")}
+                  className="gap-2 ml-auto sm:ml-0 flex-shrink-0"
                 >
-                  Clear filters
+                  <Search className="w-4 h-4" />
+                  Find More Dupes
                 </Button>
               </div>
-            )}
-          </>
+
+              {/* Grid of saved dupes */}
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                {filteredAndSortedDupes.map((dupe, idx) => (
+                  <div 
+                    key={dupe.id}
+                    className="animate-fade-in"
+                    style={{ animationDelay: `${idx * 30}ms` }}
+                  >
+                    <DupeCard
+                      name={dupe.product_name}
+                      brand={dupe.brand || "Unknown"}
+                      imageUrl={dupe.image_url || undefined}
+                      reasons={dupe.reasons || []}
+                      sharedIngredients={dupe.shared_ingredients || []}
+                      priceEstimate={dupe.price_estimate || undefined}
+                      whereToBuy={dupe.where_to_buy || undefined}
+                      purchaseUrl={dupe.purchase_url || undefined}
+                      isSaved={true}
+                      onToggleSave={() => handleUnsave(dupe.id)}
+                      category="skincare"
+                      showPlaceholder={true}
+                    />
+                    <Button
+                      variant="link"
+                      className="mt-2 px-0 text-xs"
+                      onClick={() => {
+                        if (dupe.source_product_id) {
+                          navigate(`/compare?productId=${dupe.source_product_id}`);
+                        } else {
+                          navigate("/compare");
+                        }
+                      }}
+                    >
+                      Find more dupes like this
+                    </Button>
+                  </div>
+                ))}
+              </div>
+
+              {filteredAndSortedDupes.length === 0 && savedDupes.length > 0 && (
+                <div className="text-center py-12">
+                  <p className="text-muted-foreground">
+                    No favorites match the current filters
+                  </p>
+                  <Button 
+                    variant="link" 
+                    onClick={() => {
+                      setSortBy('recent');
+                      setPriceFilter('all');
+                    }}
+                  >
+                    Clear filters
+                  </Button>
+                </div>
+              )}
+            </div>
+
+            <aside className="space-y-4">
+              <Card>
+                <CardHeader className="pb-0">
+                  <CardTitle className="text-base font-medium">Favorites Stats</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <p className="text-sm text-muted-foreground">Total saved</p>
+                    <p className="font-semibold">{savedDupes.length}</p>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <p className="text-sm text-muted-foreground">Brands saved</p>
+                    <p className="font-semibold">{brandOptions.length}</p>
+                  </div>
+                  <Button variant="secondary" className="w-full" onClick={() => navigate("/compare")}>
+                    Find more dupes
+                  </Button>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardContent className="space-y-3">
+                  <h4 className="text-sm font-semibold">Need to organize?</h4>
+                  <p className="text-xs text-muted-foreground">
+                    Rate your favorites or export your list to share.
+                  </p>
+                  <Button variant="outline" className="w-full">
+                    Export List
+                  </Button>
+                </CardContent>
+              </Card>
+            </aside>
+          </div>
         )}
       </main>
     </AppShell>

@@ -100,11 +100,13 @@ export default function Routine() {
 
       // Load or create routine
       // Load all routines for count check
-      const { data: routines } = await supabase
+      const { data: routines, error: routinesError } = await supabase
         .from("routines")
         .select("*")
         .eq("user_id", user.id)
         .order("created_at", { ascending: false });
+
+      if (routinesError) throw routinesError;
 
       setAllRoutines(routines || []);
       setRoutineCount(routines?.length || 0);
@@ -115,19 +117,22 @@ export default function Routine() {
         currentRoutineId = routines[0].id;
         setRoutineName(routines[0].routine_name);
       } else {
-        const { data: newRoutine } = await supabase
+        const { data: newRoutine, error: newRoutineError } = await supabase
           .from("routines")
           .insert({ user_id: user.id, routine_name: "My Skincare Routine" })
           .select()
           .single();
-        currentRoutineId = newRoutine!.id;
+
+        if (newRoutineError) throw newRoutineError;
+
+        currentRoutineId = (newRoutine as any).id;
         setRoutineCount(1);
       }
 
       setRoutineId(currentRoutineId);
 
       // Load routine products
-      const { data: products } = await supabase
+      const { data: products, error: productsError } = await supabase
         .from("routine_products")
         .select(`
           *,
@@ -141,14 +146,18 @@ export default function Routine() {
         `)
         .eq("routine_id", currentRoutineId);
 
+      if (productsError) throw productsError;
+
       setRoutineProducts(products || []);
 
       // Load available analyses
-      const { data: analyses } = await supabase
+      const { data: analyses, error: analysesError } = await supabase
         .from("user_analyses")
         .select("id, product_name, epiq_score, analyzed_at")
         .eq("user_id", user.id)
         .order("analyzed_at", { ascending: false });
+
+      if (analysesError) throw analysesError;
 
       setAvailableAnalyses(analyses || []);
     } catch (error) {
@@ -349,11 +358,13 @@ export default function Routine() {
 
     setOptimizing(true);
     try {
-      const { data, error } = await supabase.functions.invoke("optimize-routine", {
-        body: { routineId },
-      });
+      let data: any;
+      try {
+        data = await (await import('@/lib/functions-client')).invokeFunction('optimize-routine', { routineId });
+      } catch (err) {
+        throw err;
+      }
 
-      if (error) throw error;
       if (!data?.optimizationId) {
         throw new Error("Optimization completed but no result was returned.");
       }
@@ -391,12 +402,19 @@ export default function Routine() {
     }
 
     try {
-      const { data: optimizations } = await supabase
+      const { data: optimizations, error } = await supabase
         .from("routine_optimizations")
         .select("id")
         .eq("routine_id", routineId)
         .order("created_at", { ascending: false })
         .limit(1);
+
+      if (error) {
+        // Log full error object and context to help debugging PostgREST 400/permission issues
+        console.error('routine_optimizations query error', { routineId, error });
+        toast.error(error?.message || 'Failed to load cost analysis');
+        return;
+      }
 
       if (optimizations && optimizations.length > 0) {
         navigate(`/routine/optimization/${optimizations[0].id}`);
@@ -457,7 +475,7 @@ export default function Routine() {
             </div>
           </PageHeader>
         }
-        contentClassName="px-4 py-8"
+        contentClassName="px-[5px] lg:px-4 py-8"
       >
         <div className="container mx-auto max-w-6xl">
 

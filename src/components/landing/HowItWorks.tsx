@@ -39,7 +39,7 @@ const HowItWorks = ({ id }: HowItWorksProps) => {
 
   return (
     <section id={id} className="py-20 bg-[rgb(60,160,185)] text-primary-foreground">
-      <div className="container mx-auto px-6">
+      <div className="container mx-auto px-[5px] lg:px-6">
         <h2 className="font-heading text-3xl md:text-4xl text-center mb-3">
           How <BrandName /> Works
         </h2>

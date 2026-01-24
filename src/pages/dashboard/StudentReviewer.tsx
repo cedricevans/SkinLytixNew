@@ -262,7 +262,7 @@ export default function StudentReviewer() {
 
   if (loading) {
     return (
-      <AppShell showNavigation showBottomNav contentClassName="px-4 py-8">
+      <AppShell showNavigation showBottomNav contentClassName="px-[5px] lg:px-4 py-8">
         <div className="flex items-center justify-center min-h-[50vh]">
           <div className="text-center">
             <div className="w-16 h-16 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-4" />
@@ -284,7 +284,7 @@ export default function StudentReviewer() {
     const currentValidation = selectedIngredient ? ingredientValidations.get(selectedIngredient) : null;
     
     return (
-      <AppShell showNavigation showBottomNav contentClassName="px-4 py-8">
+      <AppShell showNavigation showBottomNav contentClassName="px-[5px] lg:px-4 py-8">
         <div className="container max-w-6xl mx-auto">
           {/* Header with back button */}
           <div className="flex items-center gap-4 mb-6">
@@ -385,7 +385,7 @@ export default function StudentReviewer() {
 
   // Products list view
   return (
-    <AppShell showNavigation showBottomNav contentClassName="px-4 py-8">
+    <AppShell showNavigation showBottomNav contentClassName="px-[5px] lg:px-4 py-8">
       <div className="container max-w-6xl mx-auto">
         {/* Header */}
         <div className="flex items-center justify-between mb-8">

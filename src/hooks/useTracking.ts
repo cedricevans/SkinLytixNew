@@ -28,8 +28,8 @@ export const trackEvent = async ({
       user_agent: navigator.userAgent,
     });
   } catch (error) {
-    // Silently fail - don't disrupt user experience
-    console.debug('Tracking event failed:', error);
+    // Silently fail - don't disrupt user experience, but log for debugging
+    console.error('Tracking event failed:', error);
   }
 };
 

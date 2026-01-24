@@ -1,5 +1,5 @@
 import { useParams, useNavigate, useLocation } from "react-router-dom";
-import { useEffect, useState } from "react";
+import React, { useEffect, useState, Suspense } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Card } from "@/components/ui/card";
@@ -13,11 +13,9 @@ import ReactMarkdown from 'react-markdown';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { SafetyLevelMeter } from "@/components/SafetyLevelMeter";
 import { ProfessionalReferralBanner } from "@/components/ProfessionalReferralBanner";
-import { IngredientRiskHeatmap } from "@/components/IngredientRiskHeatmap";
+// IngredientRiskHeatmap will be lazy-loaded below to reduce initial bundle
 import { ScoreBreakdownAccordion } from "@/components/ScoreBreakdownAccordion";
-import { AIExplanationAccordion } from "@/components/AIExplanationAccordion";
 import { AIExplanationLoader } from "@/components/AIExplanationLoader";
-import { SkinLytixGPTChat } from "@/components/SkinLytixGPTChat";
 import { DemoModeToggle } from "@/components/DemoModeToggle";
 import { ExportAnalysisButton } from "@/components/ExportAnalysisButton";
 import { ExpertReviewBadge } from "@/components/ExpertReviewBadge";
@@ -27,6 +25,11 @@ import PageHeader from "@/components/PageHeader";
 import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { fetchIngredientExplanations, IngredientExplanationInput } from "@/lib/ingredient-explanations";
+
+// Lazy-load heavier, below-the-fold components
+const AIExplanationAccordion = React.lazy(() => import('@/components/AIExplanationAccordion').then(m => ({ default: m.AIExplanationAccordion })));
+const SkinLytixGPTChat = React.lazy(() => import('@/components/SkinLytixGPTChat').then(m => ({ default: m.SkinLytixGPTChat })));
+const IngredientRiskHeatmap = React.lazy(() => import('@/components/IngredientRiskHeatmap').then(m => ({ default: m.IngredientRiskHeatmap })));
 
 interface AnalysisData {
   id: string;
@@ -191,11 +194,7 @@ const Analysis = () => {
         scan_mode: "detailed",
       };
 
-      const { data, error } = await supabase.functions.invoke("analyze-product", {
-        body: payload,
-      });
-
-      if (error) throw error;
+      const data: any = await (await import('@/lib/functions-client')).invokeFunction('analyze-product', payload);
 
       toast({
         title: "Detailed scan started",
@@ -286,23 +285,28 @@ const Analysis = () => {
       }
 
       // Get or create routine
-      const { data: routines } = await supabase
+      // Get or create routine (use helper to surface any Supabase errors)
+      const { data: routines, error: routinesError } = await supabase
         .from("routines")
         .select("id")
         .eq("user_id", user.id)
         .limit(1);
+
+      if (routinesError) throw routinesError;
 
       let routineId: string;
 
       if (routines && routines.length > 0) {
         routineId = routines[0].id;
       } else {
-        const { data: newRoutine } = await supabase
+        const { data: newRoutine, error: newRoutineError } = await supabase
           .from("routines")
           .insert({ user_id: user.id, routine_name: "My Skincare Routine" })
           .select("id")
           .single();
-        routineId = newRoutine!.id;
+
+        if (newRoutineError) throw newRoutineError;
+        routineId = (newRoutine as any).id;
       }
 
       // Add product to routine (no price needed - stored in user_analyses)
@@ -533,7 +537,7 @@ const Analysis = () => {
       )}
       <AppShell
         className="bg-gradient-to-b from-background to-muted"
-        contentClassName="px-4 py-6 md:py-10"
+        contentClassName="px-[5px] lg:px-4 py-6 md:py-10"
         showNavigation
         showBottomNav
         onAskGpt={() => setIsChatOpen(true)}
@@ -864,7 +868,9 @@ const Analysis = () => {
 
           {/* AI Explanation Section - SkinLytix GPT */}
           {analysis.recommendations_json.ai_explanation && (
-            <AIExplanationAccordion aiExplanation={analysis.recommendations_json.ai_explanation} />
+            <Suspense fallback={<AIExplanationLoader />}>
+              <AIExplanationAccordion aiExplanation={analysis.recommendations_json.ai_explanation} />
+            </Suspense>
           )}
 
           {/* Chat Promo Card */}
@@ -916,13 +922,15 @@ const Analysis = () => {
           ];
 
           return allIngredients.length > 0 ? (
-            <IngredientRiskHeatmap
-              ingredients={allIngredients}
-              onIngredientClick={(ingredientName) => {
-                const element = document.getElementById(`ingredient-${ingredientName.replace(/\s+/g, '-')}`);
-                element?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-              }}
-            />
+            <Suspense fallback={<div /> }>
+              <IngredientRiskHeatmap
+                ingredients={allIngredients}
+                onIngredientClick={(ingredientName) => {
+                  const element = document.getElementById(`ingredient-${ingredientName.replace(/\s+/g, '-')}`);
+                  element?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                }}
+              />
+            </Suspense>
           ) : null;
         })()}
 
@@ -1239,13 +1247,15 @@ const Analysis = () => {
 
         {/* SkinLytixGPT Chat with Voice */}
         {/* SkinLytixGPT Chat with Voice */}
-        <SkinLytixGPTChat 
-          analysisId={analysis.id}
-          productName={analysis.product_name}
-          skinType={analysis.recommendations_json?.product_metadata?.product_type}
-          isOpen={isChatOpen}
-          onOpenChange={setIsChatOpen}
-        />
+        <Suspense fallback={<div />}>
+          <SkinLytixGPTChat 
+            analysisId={analysis.id}
+            productName={analysis.product_name}
+            skinType={analysis.recommendations_json?.product_metadata?.product_type}
+            isOpen={isChatOpen}
+            onOpenChange={setIsChatOpen}
+          />
+        </Suspense>
 
         {/* Demo Mode Toggle - Admin Only */}
         <DemoModeToggle />

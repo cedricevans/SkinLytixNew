@@ -94,11 +94,11 @@ const PostAnalysisFeedback = ({ analysisId }: PostAnalysisFeedbackProps) => {
 
       setHasSubmitted(true);
       setShowDialog(false);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error submitting feedback:", error);
       toast({
         title: "Submission Failed",
-        description: "Please try again later.",
+        description: error?.message || "Please try again later.",
         variant: "destructive",
       });
     } finally {

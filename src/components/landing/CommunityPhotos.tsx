@@ -9,7 +9,7 @@ const CommunityPhotos = () => {
 
   return (
     <section className="py-12 bg-background">
-      <div className="container mx-auto px-6">
+      <div className="container mx-auto px-[5px] lg:px-6">
         <div className="flex justify-center items-center gap-4 md:gap-6 flex-wrap">
           {photos.map((photo, index) => (
             <img

@@ -86,19 +86,16 @@ const Pricing = () => {
         return;
       }
 
-      const { data, error } = await supabase.functions.invoke('create-checkout', {
-        body: { plan, billingCycle },
-      });
-
-      if (error) {
-        console.error('Checkout error:', error);
+      try {
+        const data: any = await (await import('@/lib/functions-client')).invokeFunction('create-checkout', { plan, billingCycle });
+        if (data?.url) {
+          window.open(data.url, '_blank');
+          toast.success('Checkout opened in new tab');
+        }
+      } catch (err) {
+        console.error('Checkout error:', err);
         toast.error('Failed to start checkout. Please try again.');
         return;
-      }
-
-      if (data?.url) {
-        window.open(data.url, '_blank');
-        toast.success('Checkout opened in new tab');
       }
     } catch (err) {
       console.error('Checkout error:', err);
@@ -123,7 +120,7 @@ const Pricing = () => {
     <div className="min-h-screen bg-background">
       {/* Header */}
       <header className="sticky top-0 z-50 w-full bg-primary text-primary-foreground">
-        <div className="max-w-6xl mx-auto px-4 flex items-center justify-between h-16">
+        <div className="max-w-6xl mx-auto px-[10px] lg:px-6 flex items-center justify-between h-16">
           <button
             type="button"
             onClick={() => navigate('/')}

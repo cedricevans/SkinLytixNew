@@ -34,7 +34,7 @@ const Testimonials = ({ id }: TestimonialsProps) => {
 
   return (
     <section id={id} className="py-20 bg-secondary">
-      <div className="container mx-auto px-6">
+      <div className="container mx-auto px-[5px] lg:px-6">
         <h2 className="font-heading text-3xl md:text-4xl text-center mb-3">
           <span className="text-gradient">What people are saying</span>
         </h2>

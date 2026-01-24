@@ -31,7 +31,7 @@ const InstagramLanding = () => {
     <div className="min-h-screen bg-gradient-to-br from-background via-accent/5 to-background">
       {/* Header */}
       <header className="w-full bg-primary shadow-soft">
-        <div className="max-w-6xl mx-auto px-4 md:px-6 py-3 md:py-4 flex justify-between items-center">
+        <div className="max-w-6xl mx-auto px-[10px] lg:px-6 xl:px-6 py-3 md:py-4 flex justify-between items-center">
           <h2 className="text-xl md:text-2xl font-heading font-bold text-primary-foreground">
             SkinLytix
           </h2>

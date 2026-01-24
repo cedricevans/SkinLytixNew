@@ -20,15 +20,12 @@ export const fetchIngredientExplanations = async (ingredients: IngredientExplana
   }
 
   try {
-    const { data, error } = await supabase.functions.invoke("explain-ingredients", {
-      body: { ingredients },
-    });
-
-    if (error) {
+    try {
+      const data: any = await (await import('@/lib/functions-client')).invokeFunction('explain-ingredients', { ingredients });
+      return (data?.results || []) as IngredientExplanationResult[];
+    } catch (err) {
       return [];
     }
-
-    return (data?.results || []) as IngredientExplanationResult[];
   } catch {
     return [];
   }

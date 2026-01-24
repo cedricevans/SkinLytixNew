@@ -25,7 +25,7 @@ const Analytics = () => {
   const avgSignupCTR = totalHomepageViews > 0 ? ((totalSignupClicks / totalHomepageViews) * 100).toFixed(2) : '0';
 
   return (
-    <AppShell showNavigation showBottomNav contentClassName="px-4 py-8">
+    <AppShell showNavigation showBottomNav contentClassName="px-[5px] lg:px-4 py-8">
       <div className="container mx-auto">
         <div className="flex items-center gap-4 mb-8">
           <Button variant="ghost" size="icon" onClick={() => navigate('/home')}>

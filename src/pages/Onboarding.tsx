@@ -175,7 +175,7 @@ const Onboarding = () => {
   };
 
   return (
-    <AppShell showNavigation showBottomNav contentClassName="px-4 py-12">
+    <AppShell showNavigation showBottomNav contentClassName="px-[5px] lg:px-4 py-12">
       <Card className="w-full max-w-3xl mx-auto p-8">
         <div className="mb-8">
           <div className="flex justify-between items-center mb-4">

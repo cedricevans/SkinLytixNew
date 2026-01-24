@@ -7,7 +7,7 @@ interface MissionProps {
 const Mission = ({ id }: MissionProps) => {
   return (
     <section id={id} className="py-16 bg-background">
-      <div className="container mx-auto px-6">
+      <div className="container mx-auto px-[5px] lg:px-6">
         <div className="max-w-3xl mx-auto text-center">
           <div className="flex justify-center mb-4">
             <Microscope className="w-12 h-12 text-primary" strokeWidth={1.5} />

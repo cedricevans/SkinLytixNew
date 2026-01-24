@@ -117,7 +117,7 @@ const ResetPassword = () => {
   return (
     <div className="min-h-screen bg-gradient-to-b from-background to-muted flex flex-col">
       <header className="w-full bg-primary text-primary-foreground shadow-soft">
-        <div className="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between">
+        <div className="max-w-6xl mx-auto px-[10px] lg:px-6 py-3 flex items-center justify-between">
           <button
             type="button"
             onClick={() => navigate('/')}

@@ -5,6 +5,7 @@ import { Card } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
+import invokeFunction from '@/lib/functions-client';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Badge } from "@/components/ui/badge";
@@ -225,32 +226,28 @@ const Profile = () => {
   const handleDeleteAnalysis = async () => {
     if (!analysisToDelete) return;
     setIsDeleting(true);
+    toast({ title: 'Deleting scan...', description: 'Please wait.' });
+
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) {
-        navigate("/auth");
-        return;
-      }
+      // Call the server-side cascade delete function which verifies ownership
+      await invokeFunction('delete-analysis', { analysisId: analysisToDelete });
 
-      const { error } = await supabase
-        .from("user_analyses")
-        .delete()
-        .eq("id", analysisToDelete)
-        .eq("user_id", user.id);
-
-      if (error) throw error;
-
+      // On success, update local UI state
       setAllAnalyses((prev) => prev.filter((analysis) => analysis.id !== analysisToDelete));
       setStats((prev) => ({
         ...prev,
         totalAnalyses: Math.max(0, prev.totalAnalyses - 1),
       }));
-      toast({ title: "Scan deleted" });
+      fetchAllAnalyses();
+      fetchStats();
+      fetchAllRoutines();
+      toast({ title: 'Scan deleted' });
     } catch (error: any) {
+      console.error('delete-analysis function failed', error);
       toast({
-        title: "Delete failed",
-        description: error?.message || "Try removing it from your routine first.",
-        variant: "destructive",
+        title: 'Delete failed',
+        description: error?.message || 'Try removing it from your routine first.',
+        variant: 'destructive',
       });
     } finally {
       setIsDeleting(false);
@@ -313,13 +310,19 @@ const Profile = () => {
       // Get optimization data for each routine
       const routinesWithOptimizations = await Promise.all(
         (routinesData || []).map(async (routine) => {
-          const { data: optData } = await supabase
+          const { data: optData, error: optError } = await supabase
             .from('routine_optimizations')
             .select('*')
             .eq('routine_id', routine.id)
-            .order('optimized_at', { ascending: false })
+            // 'optimized_at' column does not exist; order by created_at instead
+            .order('created_at', { ascending: false })
             .limit(1)
             .maybeSingle();
+
+          if (optError) {
+            // Log details to help diagnose the 400 / PostgREST error
+            console.error('Error fetching routine_optimizations for routine', routine.id, optError);
+          }
 
         return {
           ...routine,
@@ -539,7 +542,7 @@ const Profile = () => {
 
   if (isLoading) {
     return (
-      <AppShell showNavigation showBottomNav contentClassName="px-4 py-8">
+      <AppShell showNavigation showBottomNav contentClassName="px-[5px] lg:px-4 py-6 sm:py-8">
         <div className="flex items-center justify-center min-h-[50vh]">
           <div className="text-center">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
@@ -551,10 +554,10 @@ const Profile = () => {
   }
 
   return (
-    <AppShell showNavigation showBottomNav contentClassName="px-4 py-8">
-      <div className="container mx-auto max-w-6xl">
+    <AppShell showNavigation showBottomNav contentClassName="px-[5px] lg:px-4 py-6 sm:py-8">
+      <div className="mx-auto w-full max-w-6xl">
         {/* Navigation Header */}
-        <div className="flex items-center justify-between mb-8">
+        <div className="flex items-center justify-between mb-6">
           <div className="flex gap-2">
             <Button variant="ghost" onClick={() => navigate('/home')}>
               <Home className="w-4 h-4 mr-2" />
@@ -620,7 +623,7 @@ const Profile = () => {
               <button
                 type="button"
                 onClick={() => setActiveTab("products")}
-                className="text-left"
+                className="text-left w-full"
               >
                 <Card className="p-6 transition hover:border-primary/40 hover:bg-primary/5 cursor-pointer">
                   <div className="flex items-center gap-4">
@@ -642,7 +645,7 @@ const Profile = () => {
               <button
                 type="button"
                 onClick={() => setActiveTab("routines")}
-                className="text-left"
+                className="text-left w-full"
               >
                 <Card className="p-6 transition hover:border-primary/40 hover:bg-primary/5 cursor-pointer">
                   <div className="flex items-center gap-4">
@@ -669,7 +672,7 @@ const Profile = () => {
               <button
                 type="button"
                 onClick={() => setActiveTab("routines")}
-                className="text-left"
+                className="text-left w-full"
               >
                 <Card className="p-6 transition hover:border-primary/40 hover:bg-primary/5 cursor-pointer">
                   <div className="flex items-center gap-4">
@@ -705,7 +708,7 @@ const Profile = () => {
               <button
                 type="button"
                 onClick={() => setActiveTab("routines")}
-                className="text-left"
+                className="text-left w-full"
               >
                 <Card className="p-6 transition hover:border-primary/40 hover:bg-primary/5 cursor-pointer">
                   <div className="flex items-center gap-4">
@@ -729,7 +732,7 @@ const Profile = () => {
               <button
                 type="button"
                 onClick={() => navigate("/beta-feedback")}
-                className="text-left"
+                className="text-left w-full"
               >
                 <Card className="p-6 bg-gradient-to-br from-primary/5 to-accent/5 border-primary/20 transition hover:border-primary/40 hover:bg-primary/10 cursor-pointer">
                   <div className="flex items-center gap-4">
@@ -753,21 +756,21 @@ const Profile = () => {
             </div>
 
             {/* Profile Card */}
-            <Card className="p-8">
-              <div className="flex items-center justify-between mb-8">
+            <Card className="p-6 sm:p-8">
+              <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between mb-6 sm:mb-8">
                 <div className="flex items-center gap-3">
                   <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center">
                     <User className="w-6 h-6 text-primary" />
                   </div>
                   <div>
-                    <h1 className="text-3xl font-bold">My Skin Profile</h1>
+                    <h1 className="text-2xl sm:text-3xl font-bold">My Skin Profile</h1>
                     <p className="text-muted-foreground">
                       Manage your skin type and concerns
                     </p>
                   </div>
                 </div>
                 {!isEditing && (
-                  <Button onClick={() => setIsEditing(true)}>
+                  <Button onClick={() => setIsEditing(true)} className="w-full sm:w-auto">
                     <Edit2 className="w-4 h-4 mr-2" />
                     Edit Profile
                   </Button>

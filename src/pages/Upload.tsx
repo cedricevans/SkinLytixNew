@@ -9,7 +9,12 @@ import { Card } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import Tesseract from "tesseract.js";
-import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from "@/components/ui/tooltip";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+  TooltipProvider,
+} from "@/components/ui/tooltip";
 import { useTracking, trackEvent } from "@/hooks/useTracking";
 import OCRLoadingTips from "@/components/OCRLoadingTips";
 import { FrictionFeedbackBanner } from "@/components/FrictionFeedbackBanner";
@@ -17,18 +22,18 @@ import AppShell from "@/components/AppShell";
 import PageHeader from "@/components/PageHeader";
 
 // Helper: Downscale image for faster AI extraction & OCR
-const downscaleImage = (imageDataUrl: string, maxSize = 1600, quality = 0.82): Promise<string> => {
+const downscaleImage = (imageDataUrl, maxSize = 1600, quality = 0.82) => {
   return new Promise((resolve) => {
     const img = new Image();
     img.onload = () => {
       const maxDim = Math.max(img.width, img.height);
       const scale = maxDim > maxSize ? maxSize / maxDim : 1;
-      const canvas = document.createElement('canvas');
+      const canvas = document.createElement("canvas");
       canvas.width = Math.round(img.width * scale);
       canvas.height = Math.round(img.height * scale);
-      const ctx = canvas.getContext('2d')!;
+      const ctx = canvas.getContext("2d");
       ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-      resolve(canvas.toDataURL('image/jpeg', quality));
+      resolve(canvas.toDataURL("image/jpeg", quality));
     };
     img.onerror = () => resolve(imageDataUrl);
     img.src = imageDataUrl;
@@ -36,22 +41,22 @@ const downscaleImage = (imageDataUrl: string, maxSize = 1600, quality = 0.82): P
 };
 
 // Helper: Preprocess image for better OCR accuracy
-const preprocessImage = async (imageDataUrl: string): Promise<string> => {
+const preprocessImage = async (imageDataUrl) => {
   const resized = await downscaleImage(imageDataUrl, 1800, 0.9);
   return new Promise((resolve) => {
     const img = new Image();
     img.onload = () => {
-      const canvas = document.createElement('canvas');
-      const ctx = canvas.getContext('2d')!;
-      
+      const canvas = document.createElement("canvas");
+      const ctx = canvas.getContext("2d");
+
       const upscale = Math.max(1, 1400 / Math.max(img.width, img.height));
       canvas.width = Math.round(img.width * upscale);
       canvas.height = Math.round(img.height * upscale);
       ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-      
+
       const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
       const data = imageData.data;
-      
+
       // Convert to grayscale and increase contrast
       for (let i = 0; i < data.length; i += 4) {
         const gray = data[i] * 0.299 + data[i + 1] * 0.587 + data[i + 2] * 0.114;
@@ -60,49 +65,50 @@ const preprocessImage = async (imageDataUrl: string): Promise<string> => {
         data[i + 1] = enhanced;
         data[i + 2] = enhanced;
       }
-      
+
       ctx.putImageData(imageData, 0, 0);
-      resolve(canvas.toDataURL('image/png'));
+      resolve(canvas.toDataURL("image/png"));
     };
     img.src = resized;
   });
 };
 
 // Helper: Extract and clean ingredient text
-const extractIngredientSection = (text: string): string => {
+const extractIngredientSection = (text) => {
   const lower = text.toLowerCase();
   const ingredientIndex = lower.search(/ingredients?\b/);
   let section = ingredientIndex >= 0 ? text.slice(ingredientIndex) : text;
-  section = section.replace(/ingredients?\s*[:\-]?\s*/i, '');
+  section = section.replace(/ingredients?\s*[:\-]?\s*/i, "");
   section = section.split(/\bmay contain\b|\bcontains\b|\bwarning\b|\bdirections\b|\buse\b/i)[0] || section;
   return section;
 };
 
-const cleanIngredientText = (text: string): string => {
-  let cleaned = text.replace(/[^a-zA-Z0-9\s,\-\(\)\/\.]/g, '');
-  cleaned = cleaned.replace(/\s+/g, ' ');
-  cleaned = cleaned.replace(/\b\d+\b/g, '');
+const cleanIngredientText = (text) => {
+  let cleaned = text.replace(/[^a-zA-Z0-9\s,\-\(\)\/\.]/g, "");
+  cleaned = cleaned.replace(/\s+/g, " ");
+  cleaned = cleaned.replace(/\b\d+\b/g, "");
   cleaned = cleaned.trim();
   return cleaned;
 };
 
-const buildAnalysisSignature = (name: string, ingredients: string) => {
+const buildAnalysisSignature = (name, ingredients) => {
   const normalizedName = name.trim().toLowerCase();
-  const normalizedIngredients = ingredients.trim().toLowerCase().replace(/\s+/g, ' ');
+  const normalizedIngredients = ingredients.trim().toLowerCase().replace(/\s+/g, " ");
   return `${normalizedName}::${normalizedIngredients}`;
 };
 
 const ANALYSIS_CACHE_TTL_MS = 1000 * 60 * 60 * 24;
 
-const getAnalysisCacheKey = (userId: string | null, signature: string) => {
+const getAnalysisCacheKey = (userId, signature) => {
   if (!userId || !signature) return null;
   return `sl_analysis_cache_${userId}_${signature}`;
 };
 
-const readAnalysisCache = (userId: string | null, signature: string) => {
+const readAnalysisCache = (userId, signature) => {
   const key = getAnalysisCacheKey(userId, signature);
   if (!key) return null;
   const sources = [() => sessionStorage.getItem(key), () => localStorage.getItem(key)];
+
   for (const source of sources) {
     try {
       const value = source();
@@ -110,10 +116,8 @@ const readAnalysisCache = (userId: string | null, signature: string) => {
       const parsed = JSON.parse(value);
       if (parsed?.analysisId) {
         const cachedAt = typeof parsed.cachedAt === "number" ? parsed.cachedAt : 0;
-        if (cachedAt && Date.now() - cachedAt > ANALYSIS_CACHE_TTL_MS) {
-          continue;
-        }
-        return parsed.analysisId as string;
+        if (cachedAt && Date.now() - cachedAt > ANALYSIS_CACHE_TTL_MS) continue;
+        return parsed.analysisId;
       }
     } catch {
       continue;
@@ -122,22 +126,18 @@ const readAnalysisCache = (userId: string | null, signature: string) => {
   return null;
 };
 
-const invalidateAnalysisCache = (userId: string | null, signature: string) => {
+const invalidateAnalysisCache = (userId, signature) => {
   const key = getAnalysisCacheKey(userId, signature);
   if (!key) return;
   try {
     sessionStorage.removeItem(key);
-  } catch {
-    // ignore storage errors
-  }
+  } catch {}
   try {
     localStorage.removeItem(key);
-  } catch {
-    // ignore storage errors
-  }
+  } catch {}
 };
 
-const isAnalysisComplete = (analysis: any) => {
+const isAnalysisComplete = (analysis) => {
   const rec = analysis?.recommendations_json;
   if (!rec) return false;
   if (rec.fast_mode) return false;
@@ -147,30 +147,27 @@ const isAnalysisComplete = (analysis: any) => {
   return safeCount + concernCount > 0 && routineCount > 0;
 };
 
-const writeAnalysisCache = (userId: string | null, signature: string, analysisId: string) => {
+const writeAnalysisCache = (userId, signature, analysisId) => {
   const key = getAnalysisCacheKey(userId, signature);
   if (!key) return;
   const payload = JSON.stringify({ analysisId, cachedAt: Date.now() });
   try {
     sessionStorage.setItem(key, payload);
-  } catch {
-    // ignore storage errors
-  }
+  } catch {}
   try {
     localStorage.setItem(key, payload);
-  } catch {
-    // ignore storage errors
-  }
+  } catch {}
 };
 
 const Upload = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
-  useTracking('upload');
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const cameraInputRef = useRef<HTMLInputElement>(null);
-  
-  const [productImage, setProductImage] = useState<string | null>(null);
+  useTracking("upload");
+
+  const fileInputRef = useRef(null);
+  const cameraInputRef = useRef(null);
+
+  const [productImage, setProductImage] = useState(null);
   const [productName, setProductName] = useState("");
   const [barcode, setBarcode] = useState("");
   const [brand, setBrand] = useState("");
@@ -179,110 +176,110 @@ const Upload = () => {
   const [isProcessingOCR, setIsProcessingOCR] = useState(false);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [ocrProgress, setOcrProgress] = useState(0);
-  const [productType, setProductType] = useState<'face' | 'body' | 'hair' | 'auto'>('auto');
+  const [productType, setProductType] = useState("auto"); // 'face' | 'body' | 'hair' | 'auto'
   const [productPrice, setProductPrice] = useState("");
   const [showFrictionBanner, setShowFrictionBanner] = useState(false);
   const [analysisProgress, setAnalysisProgress] = useState(0);
   const [analysisStatus, setAnalysisStatus] = useState("Preparing analysis...");
-  const [analysisId, setAnalysisId] = useState<string | null>(null);
+  const [analysisId, setAnalysisId] = useState(null);
   const [analysisReady, setAnalysisReady] = useState(false);
-  const analysisStartRef = useRef<number | null>(null);
-  const [lastCacheSignature, setLastCacheSignature] = useState<string | null>(null);
+  const analysisStartRef = useRef(null);
+  const [lastCacheSignature, setLastCacheSignature] = useState(null);
 
-  const handleImageUpload = async (file: File) => {
+  const handleImageUpload = async (file) => {
     trackEvent({
-      eventName: 'image_uploaded',
-      eventCategory: 'upload',
-      eventProperties: { 
-        productType 
-      }
+      eventName: "image_uploaded",
+      eventCategory: "upload",
+      eventProperties: { productType },
     });
 
     const reader = new FileReader();
     reader.onload = async (e) => {
-      const imageDataUrl = e.target?.result as string;
+      const imageDataUrl = e.target?.result;
       setProductImage(imageDataUrl);
-      
-      // Always attempt AI extraction first (automatic fallback to OCR on failure)
+
+      // Always attempt AI extraction first (fallback to OCR on failure)
       await handleAIExtraction(imageDataUrl);
     };
     reader.readAsDataURL(file);
   };
 
-  const handleTesseractOCR = async (imageDataUrl: string) => {
+  const handleTesseractOCR = async (imageDataUrl) => {
     setIsProcessingOCR(true);
     setOcrProgress(0);
-    
+
     try {
-      // Phase 2: Preprocess image
       const preprocessedImage = await preprocessImage(imageDataUrl);
-      
-      // Phase 1: Use enhanced Tesseract OCR
-      const result = await Tesseract.recognize(preprocessedImage, 'eng', {
+
+      const result = await Tesseract.recognize(preprocessedImage, "eng", {
         logger: (m) => {
-          if (m.status === 'recognizing text') {
+          if (m.status === "recognizing text") {
             setOcrProgress(Math.round(m.progress * 100));
           }
         },
         tessedit_char_whitelist: "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789(),.-/% ",
         preserve_interword_spaces: "1",
       });
-      
-      const fullText = result.data.text;
-      const avgConfidence = result.data.words && result.data.words.length > 0
-        ? Math.round(result.data.words.reduce((sum, w) => sum + (w.confidence || 0), 0) / result.data.words.length)
-        : 0;
-      const lines = fullText.split('\n').map(l => l.trim()).filter(l => l);
-      
-      // Extract brand
+
+      const fullText = result.data.text || "";
+      const avgConfidence =
+        result.data.words && result.data.words.length > 0
+          ? Math.round(
+              result.data.words.reduce((sum, w) => sum + (w.confidence || 0), 0) /
+                result.data.words.length
+            )
+          : 0;
+
+      const lines = fullText
+        .split("\n")
+        .map((l) => l.trim())
+        .filter(Boolean);
+
       if (lines.length > 0 && !brand) {
         const potentialBrand = lines[0];
-        if (potentialBrand.length < 30) {
-          setBrand(cleanIngredientText(potentialBrand));
-        }
+        if (potentialBrand.length < 30) setBrand(cleanIngredientText(potentialBrand));
       }
-      
-      // Detect category
+
       const textLower = fullText.toLowerCase();
-      const categoryKeywords: Record<string, string[]> = {
-        'cleanser': ['cleanser', 'cleansing', 'wash'],
-        'serum': ['serum'],
-        'moisturizer': ['moisturizer', 'cream', 'lotion'],
-        'toner': ['toner'],
-        'sunscreen': ['sunscreen', 'spf', 'sun protection'],
-        'mask': ['mask'],
-        'treatment': ['treatment', 'spot']
+      const categoryKeywords = {
+        cleanser: ["cleanser", "cleansing", "wash"],
+        serum: ["serum"],
+        moisturizer: ["moisturizer", "cream", "lotion"],
+        toner: ["toner"],
+        sunscreen: ["sunscreen", "spf", "sun protection"],
+        mask: ["mask"],
+        treatment: ["treatment", "spot"],
       };
-      
+
       for (const [cat, keywords] of Object.entries(categoryKeywords)) {
-        if (keywords.some(kw => textLower.includes(kw))) {
+        if (keywords.some((kw) => textLower.includes(kw))) {
           setCategory(cat);
           break;
         }
       }
-      
-      // Extract and clean ingredients
+
       const ingredientsMatch = fullText.match(/ingredients?[:\s]+(.+?)(?:\n\n|$)/is);
       const rawIngredients = ingredientsMatch ? ingredientsMatch[1].trim() : extractIngredientSection(fullText);
+
       if (avgConfidence < 45) {
         toast({
           title: "Low OCR Confidence",
-          description: "We couldn't read the label clearly. Please type ingredients manually for best results.",
+          description: "We could not read the label clearly. Type ingredients manually for best results.",
           variant: "destructive",
         });
       } else {
         setIngredientsList(cleanIngredientText(rawIngredients));
       }
-      
+
       toast({
         title: "OCR Complete",
-        description: "Product info extracted! Please review and edit.",
+        description: "Product info extracted. Review and edit.",
       });
     } catch (error) {
-      console.error('OCR error:', error);
+      console.error("OCR error:", error);
       toast({
         title: "OCR Failed",
-        description: "Could not extract text. Please enter ingredients manually.",
+        description: "Could not extract text. Enter ingredients manually.",
         variant: "destructive",
       });
     } finally {
@@ -291,39 +288,38 @@ const Upload = () => {
     }
   };
 
-  const handleAIExtraction = async (imageDataUrl: string) => {
+  const handleAIExtraction = async (imageDataUrl) => {
     setIsProcessingOCR(true);
     setOcrProgress(50);
-    
+
     try {
       const compressedImage = await downscaleImage(imageDataUrl, 1600, 0.82);
-      const { data, error } = await supabase.functions.invoke('extract-ingredients', {
-        body: { 
+      const { data, error } = await supabase.functions.invoke("extract-ingredients", {
+        body: {
           image: compressedImage,
-          productType: productType === 'auto' ? null : productType
-        }
+          productType: productType === "auto" ? null : productType,
+        },
       });
 
       if (error) throw error;
 
-      setIngredientsList(data.ingredients);
-      if (data.brand) setBrand(data.brand);
-      if (data.category) setCategory(data.category);
-      if (data.productName) setProductName(data.productName);
-      
+      setIngredientsList(data?.ingredients || "");
+      if (data?.brand) setBrand(data.brand);
+      if (data?.category) setCategory(data.category);
+      if (data?.productName) setProductName(data.productName);
+
       setOcrProgress(100);
       toast({
         title: "AI Extraction Complete",
-        description: "Ingredients extracted with 99% accuracy!",
+        description: "Ingredients extracted. Review and edit.",
       });
     } catch (error) {
-      console.error('AI extraction error:', error);
+      console.error("AI extraction error:", error);
       toast({
         title: "AI Extraction Failed",
-        description: "Falling back to standard OCR...",
+        description: "Falling back to standard OCR.",
         variant: "destructive",
       });
-      // Fallback to Tesseract
       await handleTesseractOCR(imageDataUrl);
     } finally {
       setIsProcessingOCR(false);
@@ -331,18 +327,16 @@ const Upload = () => {
     }
   };
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = (e) => {
     const file = e.target.files?.[0];
-    if (file) {
-      handleImageUpload(file);
-    }
+    if (file) handleImageUpload(file);
   };
 
-  const handleAnalyze = async (source: "manual" | "auto" = "manual") => {
+  const handleAnalyze = async (source = "manual") => {
     if (!productName.trim() || !ingredientsList.trim()) {
       toast({
         title: "Missing Information",
-        description: "Please provide product name and ingredients list.",
+        description: "Add product name and ingredients list.",
         variant: "destructive",
       });
       return;
@@ -350,18 +344,22 @@ const Upload = () => {
 
     if (isAnalyzing) return;
 
-    const { data: { user } } = await supabase.auth.getUser();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
     if (!user) {
       toast({
         title: "Authentication Required",
-        description: "Please sign in to analyze products.",
+        description: "Sign in to analyze products.",
         variant: "destructive",
       });
-      navigate('/auth');
+      navigate("/auth");
       return;
     }
 
     const signature = buildAnalysisSignature(productName, ingredientsList);
+
     const cachedAnalysisId = readAnalysisCache(user.id, signature);
     if (cachedAnalysisId) {
       const { data: cachedAnalysis } = await supabase
@@ -370,22 +368,25 @@ const Upload = () => {
         .eq("id", cachedAnalysisId)
         .eq("user_id", user.id)
         .maybeSingle();
+
       if (isAnalysisComplete(cachedAnalysis)) {
         setAnalysisId(cachedAnalysisId);
         setAnalysisReady(true);
         setAnalysisStatus("Results ready. Review ingredients, then continue.");
         return;
       }
+
       invalidateAnalysisCache(user.id, signature);
     }
 
+    // FIX 1: use analyzed_at (this column exists in your Profile page)
     const { data: existingAnalysis } = await supabase
       .from("user_analyses")
       .select("id, recommendations_json")
       .eq("user_id", user.id)
       .eq("product_name", productName)
       .eq("ingredients_list", ingredientsList)
-      .order("created_at", { ascending: false })
+      .order("analyzed_at", { ascending: false })
       .limit(1)
       .maybeSingle();
 
@@ -420,11 +421,12 @@ const Upload = () => {
       };
 
       const useProxy = import.meta.env.DEV && import.meta.env.VITE_USE_FUNCTIONS_PROXY === "true";
-      let data: any;
+      let data;
 
       if (useProxy) {
         const { data: sessionData } = await supabase.auth.getSession();
         const accessToken = sessionData.session?.access_token;
+
         const response = await fetch("/functions/analyze-product", {
           method: "POST",
           headers: {
@@ -439,51 +441,52 @@ const Upload = () => {
           const errorText = await response.text();
           throw new Error(errorText || "Failed to analyze product");
         }
+
         data = await response.json();
       } else {
-        const { data: invokeData, error } = await supabase.functions.invoke('analyze-product', {
-          body: payload
+        const { data: invokeData, error } = await supabase.functions.invoke("analyze-product", {
+          body: payload,
         });
-
         if (error) throw error;
         data = invokeData;
       }
 
       trackEvent({
-        eventName: 'product_analyzed',
-        eventCategory: 'upload',
+        eventName: "product_analyzed",
+        eventCategory: "upload",
         eventProperties: {
-          epiq_score: data.epiq_score,
+          epiq_score: data?.epiq_score,
           productType,
           hasBarcode: !!barcode,
           hasBrand: !!brand,
-          scanMode: "detailed"
-        }
+          scanMode: "detailed",
+        },
       });
 
       const resolvedAnalysisId = data?.analysis_id || data?.analysisId || data?.id || null;
-      if (!resolvedAnalysisId) {
-        throw new Error("Analysis completed but no report ID was returned.");
-      }
+      if (!resolvedAnalysisId) throw new Error("Analysis completed but no report ID was returned.");
 
       writeAnalysisCache(user.id, signature, resolvedAnalysisId);
+
       setAnalysisProgress(100);
       setAnalysisStatus("Analysis ready. Review ingredients, then continue.");
       toast({
         title: "Analysis Ready",
         description: "Review your details, then open the report.",
       });
+
       setAnalysisId(resolvedAnalysisId);
       setAnalysisReady(true);
+
       window.requestAnimationFrame(() => {
         document.getElementById("analysis-ready")?.scrollIntoView({ behavior: "smooth", block: "center" });
       });
     } catch (error) {
-      console.error('Analysis error:', error);
+      console.error("Analysis error:", error);
       setShowFrictionBanner(true);
       toast({
         title: "Analysis Failed",
-        description: "Could not analyze product. Please try again.",
+        description: typeof error?.message === "string" ? error.message : "Could not analyze product. Try again.",
         variant: "destructive",
       });
     } finally {
@@ -509,10 +512,12 @@ const Upload = () => {
       } else if (progressValue < 95) {
         progressValue = Math.min(95, progressValue + Math.random() * 1.2 + 0.5);
       }
+
       setAnalysisProgress(Math.round(progressValue));
 
       const total = Math.max(ingredientCount, 1);
       const scanned = Math.min(total, Math.max(1, Math.round((progressValue / 95) * total)));
+
       if (progressValue >= 95) {
         setAnalysisStatus("Finalizing your report...");
       } else {
@@ -524,12 +529,11 @@ const Upload = () => {
   }, [isAnalyzing, ingredientsList]);
 
   useEffect(() => {
-    if (isProcessingOCR || isAnalyzing) {
-      return;
-    }
+    if (isProcessingOCR || isAnalyzing) return;
 
     const name = productName.trim();
     const ingredients = ingredientsList.trim();
+
     if (!name || !ingredients) {
       setAnalysisReady(false);
       setAnalysisId(null);
@@ -537,14 +541,16 @@ const Upload = () => {
     }
 
     const signature = buildAnalysisSignature(name, ingredients);
-    if (lastCacheSignature === signature) {
-      return;
-    }
+    if (lastCacheSignature === signature) return;
 
     const checkCache = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
       if (!user) return;
+
       setLastCacheSignature(signature);
+
       const cachedId = readAnalysisCache(user.id, signature);
       if (cachedId) {
         const { data: cachedAnalysis } = await supabase
@@ -553,23 +559,28 @@ const Upload = () => {
           .eq("id", cachedId)
           .eq("user_id", user.id)
           .maybeSingle();
+
         if (isAnalysisComplete(cachedAnalysis)) {
           setAnalysisId(cachedId);
           setAnalysisReady(true);
           setAnalysisStatus("Results ready. Review ingredients, then continue.");
           return;
         }
+
         invalidateAnalysisCache(user.id, signature);
       }
+
+      // FIX 2: use analyzed_at here too
       const { data: existingAnalysis } = await supabase
         .from("user_analyses")
         .select("id, recommendations_json")
         .eq("user_id", user.id)
         .eq("product_name", productName)
         .eq("ingredients_list", ingredientsList)
-        .order("created_at", { ascending: false })
+        .order("analyzed_at", { ascending: false })
         .limit(1)
         .maybeSingle();
+
       if (existingAnalysis?.id && isAnalysisComplete(existingAnalysis)) {
         writeAnalysisCache(user.id, signature, existingAnalysis.id);
         setAnalysisId(existingAnalysis.id);
@@ -578,7 +589,12 @@ const Upload = () => {
       }
     };
 
-    checkCache();
+    // FIX 3: debounce to avoid hammering Supabase while typing
+    const t = window.setTimeout(() => {
+      checkCache();
+    }, 500);
+
+    return () => window.clearTimeout(t);
   }, [productName, ingredientsList, isProcessingOCR, isAnalyzing, lastCacheSignature]);
 
   return (
@@ -591,19 +607,11 @@ const Upload = () => {
           <PageHeader>
             <div className="flex flex-col gap-3">
               <div className="flex flex-wrap gap-2">
-                <Button
-                  variant="ghost"
-                  onClick={() => navigate('/home')}
-                  className="gap-2"
-                >
+                <Button variant="ghost" onClick={() => navigate("/home")} className="gap-2">
                   <Home className="w-4 h-4" />
                   Home
                 </Button>
-                <Button
-                  variant="ghost"
-                  onClick={() => navigate('/profile')}
-                  className="gap-2"
-                >
+                <Button variant="ghost" onClick={() => navigate("/profile")} className="gap-2">
                   <User className="w-4 h-4" />
                   Profile
                 </Button>
@@ -612,10 +620,9 @@ const Upload = () => {
             </div>
           </PageHeader>
         }
-        contentClassName="px-4 py-10 overflow-x-hidden"
+        contentClassName="px-[5px] lg:px-4 py-10 overflow-x-hidden"
       >
         <div className="container max-w-3xl mx-auto w-full">
-          {/* Friction Feedback Banner */}
           {showFrictionBanner && (
             <div className="mb-6">
               <FrictionFeedbackBanner trigger="error" context="Analysis failed" />
@@ -623,297 +630,271 @@ const Upload = () => {
           )}
 
           <Card className="p-6 space-y-6">
-          {/* Product Type Selector */}
-          <div className="space-y-2">
-            <Label>Product Type</Label>
-            <div className="flex flex-wrap gap-2">
-              <Button
-                type="button"
-                variant={productType === 'auto' ? 'default' : 'outline'}
-                size="sm"
-                onClick={() => setProductType('auto')}
-                className="touch-target w-full sm:w-auto"
-              >
-                Auto-Detect
-              </Button>
-              <Button
-                type="button"
-                variant={productType === 'face' ? 'default' : 'outline'}
-                size="sm"
-                onClick={() => setProductType('face')}
-                className="touch-target w-full sm:w-auto"
-              >
-                👤 Face
-              </Button>
-              <Button
-                type="button"
-                variant={productType === 'body' ? 'default' : 'outline'}
-                size="sm"
-                onClick={() => setProductType('body')}
-                className="touch-target w-full sm:w-auto"
-              >
-                🧴 Body
-              </Button>
-              <Button
-                type="button"
-                variant={productType === 'hair' ? 'default' : 'outline'}
-                size="sm"
-                onClick={() => setProductType('hair')}
-                className="touch-target w-full sm:w-auto"
-              >
-                💆 Hair
-              </Button>
-            </div>
-            <p className="text-xs text-muted-foreground">
-              Helps optimize ingredient analysis for your product type
-            </p>
-          </div>
-
-          {/* Instructional Banner - What to Photograph */}
-          <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4 space-y-3">
-            <div className="flex items-start gap-3">
-              <Camera className="w-5 h-5 text-blue-600 dark:text-blue-400 flex-shrink-0 mt-0.5" />
-              <div className="flex-1 space-y-2">
-                <p className="text-sm font-semibold text-blue-900 dark:text-blue-100">
-                  📸 Photograph the Ingredient List Label
-                </p>
-                <p className="text-xs text-blue-700 dark:text-blue-300 leading-relaxed">
-                  Find where the ingredients are listed on your product packaging (back label, side of tube, box flap, bottle, etc.) and take a clear, well-lit photo of that text.
-                </p>
-                <p className="text-xs text-blue-600 dark:text-blue-400 italic">
-                  💡 We analyze the ingredient text you photograph — we don't look up products by name or barcode.
-                </p>
-              </div>
-            </div>
-            
-            {/* Collapsible Tips Section */}
-            <details className="text-xs text-blue-700 dark:text-blue-300">
-              <summary className="cursor-pointer font-medium hover:text-blue-900 dark:hover:text-blue-100 select-none">
-                💡 Tips for best results (tap to expand)
-              </summary>
-              <ul className="mt-2 space-y-1 pl-4 list-disc marker:text-blue-500">
-                <li><strong>Good lighting</strong> — Avoid shadows and glare</li>
-                <li><strong>Hold steady</strong> — Focus on the ingredient text</li>
-                <li><strong>Full list</strong> — Include the complete ingredient list in frame</li>
-                <li><strong>Common locations:</strong> Back of bottle, side of tube, inside box flap, bottom of jar</li>
-                <li><strong>Multiple languages?</strong> Photograph the English ingredient list if available</li>
-              </ul>
-            </details>
-          </div>
-
-          {/* Image Upload */}
-          <div className="space-y-4">
-            <Label className="flex items-center gap-2 flex-wrap mb-2">
-              <span className="flex items-center gap-1.5">
-                📋 Ingredient List Photo
-              </span>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Info className="w-4 h-4 text-muted-foreground cursor-help" />
-                </TooltipTrigger>
-                <TooltipContent className="max-w-xs">
-                  <p className="text-xs leading-relaxed">
-                    Take a photo of <strong>where the ingredients are listed</strong> on your product packaging. We'll automatically extract the ingredient text using AI (with OCR fallback if needed).
-                  </p>
-                </TooltipContent>
-              </Tooltip>
-            </Label>
-            <div className="flex flex-col sm:flex-row gap-4">
-              <Button
-                variant="outline"
-                onClick={() => fileInputRef.current?.click()}
-                className="flex-1 w-full touch-target"
-              >
-                <UploadIcon className="w-4 h-4 mr-2" />
-                Upload Photo
-              </Button>
-              <Button
-                variant="outline"
-                onClick={() => cameraInputRef.current?.click()}
-                className="flex-1 w-full touch-target"
-              >
-                <Camera className="w-4 h-4 mr-2" />
-                Take Photo
-              </Button>
-            </div>
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept="image/*"
-              onChange={handleFileChange}
-              className="hidden"
-            />
-            <input
-              ref={cameraInputRef}
-              type="file"
-              accept="image/*"
-              capture="environment"
-              onChange={handleFileChange}
-              className="hidden"
-            />
-          </div>
-
-          {/* Image Preview */}
-          {productImage && (
             <div className="space-y-2">
-              <div className="rounded-lg overflow-hidden border">
-                <img src={productImage} alt="Ingredient list preview" className="w-full h-auto" />
+              <Label>Product Type</Label>
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  type="button"
+                  variant={productType === "auto" ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => setProductType("auto")}
+                  className="touch-target w-full sm:w-auto"
+                >
+                  Auto-Detect
+                </Button>
+                <Button
+                  type="button"
+                  variant={productType === "face" ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => setProductType("face")}
+                  className="touch-target w-full sm:w-auto"
+                >
+                  👤 Face
+                </Button>
+                <Button
+                  type="button"
+                  variant={productType === "body" ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => setProductType("body")}
+                  className="touch-target w-full sm:w-auto"
+                >
+                  🧴 Body
+                </Button>
+                <Button
+                  type="button"
+                  variant={productType === "hair" ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => setProductType("hair")}
+                  className="touch-target w-full sm:w-auto"
+                >
+                  💆 Hair
+                </Button>
               </div>
-              <div className="flex items-start gap-2 p-3 bg-green-50 dark:bg-green-950/30 border border-green-200 dark:border-green-800 rounded-lg">
-                <div className="w-5 h-5 rounded-full bg-green-500 text-white flex items-center justify-center flex-shrink-0 text-xs font-bold">
-                  ✓
-                </div>
-                <div className="flex-1">
-                  <p className="text-xs font-medium text-green-900 dark:text-green-100">
-                    Ingredient list photo uploaded
+              <p className="text-xs text-muted-foreground">Helps optimize ingredient analysis for your product type</p>
+            </div>
+
+            <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4 space-y-3">
+              <div className="flex items-start gap-3">
+                <Camera className="w-5 h-5 text-blue-600 dark:text-blue-400 flex-shrink-0 mt-0.5" />
+                <div className="flex-1 space-y-2">
+                  <p className="text-sm font-semibold text-blue-900 dark:text-blue-100">📸 Photograph the Ingredient List Label</p>
+                  <p className="text-xs text-blue-700 dark:text-blue-300 leading-relaxed">
+                    Find where the ingredients are listed on your product packaging and take a clear, well-lit photo of that text.
                   </p>
-                  <p className="text-xs text-green-700 dark:text-green-300 mt-0.5">
-                    Review the extracted text below and make any corrections before analyzing.
+                  <p className="text-xs text-blue-600 dark:text-blue-400 italic">
+                    💡 We analyze the ingredient text you photograph, we do not look up products by name or barcode.
                   </p>
                 </div>
               </div>
-            </div>
-          )}
 
-          {/* OCR Progress */}
-          {isProcessingOCR && (
-            <OCRLoadingTips 
-              progress={ocrProgress}
-              message="Extracting ingredients with AI..."
-            />
-          )}
-
-          {/* Product Details */}
-          <div className="space-y-4">
-            <div>
-              <Label htmlFor="productName">Product Name</Label>
-              <Input
-                id="productName"
-                value={productName}
-                onChange={(e) => setProductName(e.target.value)}
-                placeholder="e.g., Glow Serum SPF 30"
-                className="placeholder:text-muted-foreground/60"
-              />
-            </div>
-
-            <div>
-              <Label htmlFor="barcode">Barcode (Optional)</Label>
-              <Input
-                id="barcode"
-                value={barcode}
-                onChange={(e) => setBarcode(e.target.value)}
-                placeholder="e.g., 012345678901"
-                className="placeholder:text-muted-foreground/60"
-              />
+              <details className="text-xs text-blue-700 dark:text-blue-300">
+                <summary className="cursor-pointer font-medium hover:text-blue-900 dark:hover:text-blue-100 select-none">
+                  💡 Tips for best results (tap to expand)
+                </summary>
+                <ul className="mt-2 space-y-1 pl-4 list-disc marker:text-blue-500">
+                  <li>
+                    <strong>Good lighting</strong> Avoid shadows and glare
+                  </li>
+                  <li>
+                    <strong>Hold steady</strong> Focus on the ingredient text
+                  </li>
+                  <li>
+                    <strong>Full list</strong> Include the complete ingredient list in frame
+                  </li>
+                  <li>
+                    <strong>Common locations</strong> Back of bottle, side of tube, inside box flap, bottom of jar
+                  </li>
+                  <li>
+                    <strong>Multiple languages</strong> Photograph the English ingredient list if available
+                  </li>
+                </ul>
+              </details>
             </div>
 
-            <div>
-              <Label htmlFor="brand">Brand (Optional)</Label>
-              <Input
-                id="brand"
-                value={brand}
-                onChange={(e) => setBrand(e.target.value)}
-                placeholder="e.g., CeraVe, The Ordinary"
-                className="placeholder:text-muted-foreground/60"
-              />
-            </div>
-
-            <div>
-              <Label htmlFor="category">Category (Optional)</Label>
-              <Input
-                id="category"
-                value={category}
-                onChange={(e) => setCategory(e.target.value)}
-                placeholder="e.g., serum, moisturizer, cleanser"
-                className="placeholder:text-muted-foreground/60"
-              />
-            </div>
-
-            <div>
-              <div className="flex items-center gap-2 mb-2">
-                <Label htmlFor="price">Price (Optional)</Label>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Info className="w-4 h-4 text-muted-foreground cursor-help" />
-                  </TooltipTrigger>
-                  <TooltipContent className="max-w-xs">
-                    <p>How much did this product cost? This helps track your routine expenses and find budget-friendly alternatives.</p>
-                  </TooltipContent>
-                </Tooltip>
-              </div>
-              <div className="relative">
-                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">
-                  $
-                </span>
-                <Input
-                  id="price"
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  value={productPrice}
-                  onChange={(e) => setProductPrice(e.target.value)}
-                  placeholder="24.99"
-                  className="pl-7 placeholder:text-muted-foreground/60"
-                />
-              </div>
-            </div>
-
-            <div>
-              <div className="flex items-center gap-2 mb-2">
-                <Label htmlFor="ingredients">Ingredients List</Label>
+            <div className="space-y-4">
+              <Label className="flex items-center gap-2 flex-wrap mb-2">
+                <span className="flex items-center gap-1.5">📋 Ingredient List Photo</span>
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <Info className="w-4 h-4 text-muted-foreground cursor-help" />
                   </TooltipTrigger>
                   <TooltipContent className="max-w-xs">
                     <p className="text-xs leading-relaxed">
-                      <strong>From photo:</strong> We extract the ingredient text automatically.<br/>
-                      <strong>Manual entry:</strong> Type ingredients separated by commas.<br/><br/>
-                      We analyze each ingredient for safety and compatibility with your skin profile.
+                      Take a photo of where the ingredients are listed. We extract the text using AI, with OCR fallback.
                     </p>
                   </TooltipContent>
                 </Tooltip>
-              </div>
-              <Textarea
-                id="ingredients"
-                value={ingredientsList}
-                onChange={(e) => setIngredientsList(e.target.value)}
-                placeholder="Water, Glycerin, Niacinamide, ..."
-                className="min-h-[200px] placeholder:text-muted-foreground/60"
-              />
-              <p className="text-xs text-muted-foreground mt-2">
-                Review and correct the extracted text as needed
-              </p>
-            </div>
-          </div>
+              </Label>
 
-          {/* Analyze Button */}
-          <Button
-            onClick={analysisReady && analysisId ? () => navigate(`/analysis/${analysisId}`) : handleAnalyze}
-            disabled={isAnalyzing || isProcessingOCR}
-            className={analysisReady && analysisId
-              ? "w-full bg-emerald-600 hover:bg-emerald-700 text-white"
-              : "w-full"}
-            variant={analysisReady && analysisId ? "default" : "cta"}
-            size="lg"
-          >
-            {isAnalyzing ? (
-              <>
-                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                Analyzing...
-              </>
-            ) : analysisReady && analysisId ? (
-              "Results Ready - View Report"
-            ) : (
-              "Analyze Product"
+              <div className="flex flex-col sm:flex-row gap-4">
+                <Button
+                  variant="outline"
+                  onClick={() => fileInputRef.current?.click()}
+                  className="flex-1 w-full touch-target"
+                >
+                  <UploadIcon className="w-4 h-4 mr-2" />
+                  Upload Photo
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={() => cameraInputRef.current?.click()}
+                  className="flex-1 w-full touch-target"
+                >
+                  <Camera className="w-4 h-4 mr-2" />
+                  Take Photo
+                </Button>
+              </div>
+
+              <input ref={fileInputRef} type="file" accept="image/*" onChange={handleFileChange} className="hidden" />
+              <input
+                ref={cameraInputRef}
+                type="file"
+                accept="image/*"
+                capture="environment"
+                onChange={handleFileChange}
+                className="hidden"
+              />
+            </div>
+
+            {productImage && (
+              <div className="space-y-2">
+                <div className="rounded-lg overflow-hidden border">
+                  <img src={productImage} alt="Ingredient list preview" className="w-full h-auto" />
+                </div>
+                <div className="flex items-start gap-2 p-3 bg-green-50 dark:bg-green-950/30 border border-green-200 dark:border-green-800 rounded-lg">
+                  <div className="w-5 h-5 rounded-full bg-green-500 text-white flex items-center justify-center flex-shrink-0 text-xs font-bold">
+                    ✓
+                  </div>
+                  <div className="flex-1">
+                    <p className="text-xs font-medium text-green-900 dark:text-green-100">Ingredient list photo uploaded</p>
+                    <p className="text-xs text-green-700 dark:text-green-300 mt-0.5">
+                      Review the extracted text below and correct anything before analyzing.
+                    </p>
+                  </div>
+                </div>
+              </div>
             )}
-          </Button>
-          {analysisStatus && isAnalyzing && (
-            <p className="text-xs text-muted-foreground mt-2">
-              {analysisStatus}
-            </p>
-          )}
-        </Card>
+
+            {isProcessingOCR && <OCRLoadingTips progress={ocrProgress} message="Extracting ingredients with AI..." />}
+
+            <div className="space-y-4">
+              <div>
+                <Label htmlFor="productName">Product Name</Label>
+                <Input
+                  id="productName"
+                  value={productName}
+                  onChange={(e) => setProductName(e.target.value)}
+                  placeholder="e.g., Glow Serum SPF 30"
+                  className="placeholder:text-muted-foreground/60"
+                />
+              </div>
+
+              <div>
+                <Label htmlFor="barcode">Barcode (Optional)</Label>
+                <Input
+                  id="barcode"
+                  value={barcode}
+                  onChange={(e) => setBarcode(e.target.value)}
+                  placeholder="e.g., 012345678901"
+                  className="placeholder:text-muted-foreground/60"
+                />
+              </div>
+
+              <div>
+                <Label htmlFor="brand">Brand (Optional)</Label>
+                <Input
+                  id="brand"
+                  value={brand}
+                  onChange={(e) => setBrand(e.target.value)}
+                  placeholder="e.g., CeraVe, The Ordinary"
+                  className="placeholder:text-muted-foreground/60"
+                />
+              </div>
+
+              <div>
+                <Label htmlFor="category">Category (Optional)</Label>
+                <Input
+                  id="category"
+                  value={category}
+                  onChange={(e) => setCategory(e.target.value)}
+                  placeholder="e.g., serum, moisturizer, cleanser"
+                  className="placeholder:text-muted-foreground/60"
+                />
+              </div>
+
+              <div>
+                <div className="flex items-center gap-2 mb-2">
+                  <Label htmlFor="price">Price (Optional)</Label>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Info className="w-4 h-4 text-muted-foreground cursor-help" />
+                    </TooltipTrigger>
+                    <TooltipContent className="max-w-xs">
+                      <p>Helps track your routine expenses and find budget-friendly alternatives.</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </div>
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">$</span>
+                  <Input
+                    id="price"
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    value={productPrice}
+                    onChange={(e) => setProductPrice(e.target.value)}
+                    placeholder="24.99"
+                    className="pl-7 placeholder:text-muted-foreground/60"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <div className="flex items-center gap-2 mb-2">
+                  <Label htmlFor="ingredients">Ingredients List</Label>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Info className="w-4 h-4 text-muted-foreground cursor-help" />
+                    </TooltipTrigger>
+                    <TooltipContent className="max-w-xs">
+                      <p className="text-xs leading-relaxed">
+                        From photo, we extract the ingredient text automatically. Manual entry, type ingredients separated by commas.
+                      </p>
+                    </TooltipContent>
+                  </Tooltip>
+                </div>
+                <Textarea
+                  id="ingredients"
+                  value={ingredientsList}
+                  onChange={(e) => setIngredientsList(e.target.value)}
+                  placeholder="Water, Glycerin, Niacinamide, ..."
+                  className="min-h-[200px] placeholder:text-muted-foreground/60"
+                />
+                <p className="text-xs text-muted-foreground mt-2">Review and correct the extracted text as needed</p>
+              </div>
+            </div>
+
+            <Button
+              onClick={analysisReady && analysisId ? () => navigate(`/analysis/${analysisId}`) : handleAnalyze}
+              disabled={isAnalyzing || isProcessingOCR}
+              className={analysisReady && analysisId ? "w-full bg-emerald-600 hover:bg-emerald-700 text-white" : "w-full"}
+              variant={analysisReady && analysisId ? "default" : "cta"}
+              size="lg"
+            >
+              {isAnalyzing ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Analyzing...
+                </>
+              ) : analysisReady && analysisId ? (
+                "Results Ready - View Report"
+              ) : (
+                "Analyze Product"
+              )}
+            </Button>
+
+            {analysisStatus && isAnalyzing && <p className="text-xs text-muted-foreground mt-2">{analysisStatus}</p>}
+          </Card>
         </div>
       </AppShell>
     </TooltipProvider>

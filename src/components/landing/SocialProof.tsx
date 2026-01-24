@@ -32,7 +32,7 @@ const SocialProof = () => {
 
   return (
     <section className="py-20 bg-background">
-      <div className="container mx-auto px-6">
+      <div className="container mx-auto px-[5px] lg:px-6">
         <div className="text-center mb-16">
           <p className="text-sm font-semibold text-accent mb-3">Live Metrics</p>
           <h2 className="font-heading text-3xl md:text-4xl">

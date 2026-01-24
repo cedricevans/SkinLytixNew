@@ -26,7 +26,7 @@ export const ProfessionalReferralBanner = ({
 
   return (
     <div className="sticky top-0 z-40 bg-gradient-to-r from-warning/10 to-destructive/10 border-b-2 border-warning animate-pulse-glow">
-      <div className="container mx-auto px-4 py-3">
+      <div className="container mx-auto px-[5px] lg:px-4 py-3">
         <div className="flex items-center justify-between gap-4">
           <div className="flex items-center gap-3 flex-1">
             <Stethoscope className="w-6 h-6 text-warning flex-shrink-0" />

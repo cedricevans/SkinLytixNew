@@ -3,12 +3,28 @@ import { createClient } from '@supabase/supabase-js';
 import type { Database } from './types';
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
-const SUPABASE_PUBLISHABLE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+// Support both env var names used across the repo: prefer ANON key, fall back to PUBLISHABLE
+const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY ?? import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+
+// Basic runtime validation to make startup errors clearer when env vars are misconfigured.
+if (!SUPABASE_URL || typeof SUPABASE_URL !== 'string' || !/^https?:\/\//i.test(SUPABASE_URL)) {
+  // eslint-disable-next-line no-console
+  console.error(
+    `Invalid or missing VITE_SUPABASE_URL: "${String(SUPABASE_URL)}". Please set VITE_SUPABASE_URL to the full https://... Supabase URL in your .env`,
+  );
+}
+
+if (!SUPABASE_ANON_KEY || typeof SUPABASE_ANON_KEY !== 'string') {
+  // eslint-disable-next-line no-console
+  console.error(
+    `Missing VITE_SUPABASE_ANON_KEY (or VITE_SUPABASE_PUBLISHABLE_KEY). Supabase client may fail to authenticate requests from the browser.`,
+  );
+}
 
 // Import the supabase client like this:
 // import { supabase } from "@/integrations/supabase/client";
 
-export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
+export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_ANON_KEY, {
   auth: {
     storage: localStorage,
     persistSession: true,

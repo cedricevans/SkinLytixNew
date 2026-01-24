@@ -23,7 +23,7 @@ const Navigation = () => {
 
   return (
     <header className="sticky top-0 z-50 w-full bg-azure">
-      <div className="container mx-auto px-6">
+      <div className="container mx-auto px-[5px] lg:px-6">
         <div className="flex h-16 items-center justify-between">
           {/* Logo */}
           <button

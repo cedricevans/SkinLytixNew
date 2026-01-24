@@ -84,24 +84,17 @@ export function PaywallModal({
         return;
       }
 
-      const { data, error } = await supabase.functions.invoke('create-checkout', {
-        body: { 
-          plan: selectedPlan, 
-          billingCycle: billingCycle 
-        },
-      });
-
-      if (error) {
-        console.error('Checkout error:', error);
+      try {
+        const data: any = await (await import('@/lib/functions-client')).invokeFunction('create-checkout', { plan: selectedPlan, billingCycle });
+        if (data?.url) {
+          window.open(data.url, '_blank');
+          onOpenChange(false);
+          toast.success('Checkout opened in new tab');
+        }
+      } catch (err) {
+        console.error('Checkout error:', err);
         toast.error('Failed to start checkout. Please try again.');
         return;
-      }
-
-      if (data?.url) {
-        // Open Stripe checkout in new tab
-        window.open(data.url, '_blank');
-        onOpenChange(false);
-        toast.success('Checkout opened in new tab');
       }
     } catch (err) {
       console.error('Checkout error:', err);

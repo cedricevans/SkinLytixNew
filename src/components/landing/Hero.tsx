@@ -25,7 +25,7 @@ const Hero = ({ id }: HeroProps) => {
       </div>
       
       {/* Content */}
-      <div className="container mx-auto px-6 relative z-10">
+      <div className="container mx-auto px-[20px] lg:px-6 relative z-10">
         <div className="max-w-2xl">
           <div className="inline-flex items-center gap-2 bg-primary-foreground/10 text-primary-foreground px-4 py-2 rounded-full text-sm font-semibold mb-6">
             Expert Validated - Human + AI

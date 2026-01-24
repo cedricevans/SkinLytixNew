@@ -92,7 +92,7 @@ export default function RoutineOptimization() {
 
   if (loading) {
     return (
-      <AppShell showNavigation showBottomNav contentClassName="px-4 py-8">
+      <AppShell showNavigation showBottomNav contentClassName="px-[5px] lg:px-4 py-8">
         <div className="flex items-center justify-center min-h-[50vh]">
           <p className="text-muted-foreground">Loading optimization...</p>
         </div>
@@ -102,7 +102,7 @@ export default function RoutineOptimization() {
 
   if (!data) {
     return (
-      <AppShell showNavigation showBottomNav contentClassName="px-4 py-8">
+      <AppShell showNavigation showBottomNav contentClassName="px-[5px] lg:px-4 py-8">
         <div className="flex items-center justify-center min-h-[50vh]">
           <p className="text-muted-foreground">Optimization not found</p>
         </div>
@@ -126,7 +126,7 @@ export default function RoutineOptimization() {
 
   return (
     <TooltipProvider>
-      <AppShell showNavigation showBottomNav contentClassName="px-4 py-8">
+      <AppShell showNavigation showBottomNav contentClassName="px-[5px] lg:px-4 py-8">
       <div className="container mx-auto max-w-4xl">
         <Button
           variant="ghost"

@@ -59,16 +59,22 @@ export function useUsageLimits() {
       const currentMonth = new Date().toISOString().slice(0, 7) + '-01';
 
       // Get or create usage record for current month
-      let { data: usageData } = await supabase
+      const { data: usageData, error: usageError } = await supabase
         .from('usage_limits')
         .select('*')
         .eq('user_id', user.id)
         .gte('period_start', currentMonth)
         .maybeSingle();
 
-      if (!usageData) {
+      if (usageError) {
+        console.error('Error fetching usage limits:', usageError);
+        // fall through and attempt to create a fresh record
+      }
+
+      let finalUsage = usageData as any;
+      if (!finalUsage) {
         // Create new usage record for this month
-        const { data: newUsage } = await supabase
+        const { data: newUsage, error: newUsageError } = await supabase
           .from('usage_limits')
           .insert({
             user_id: user.id,
@@ -76,17 +82,23 @@ export function useUsageLimits() {
           })
           .select()
           .single();
-        usageData = newUsage;
+
+        if (newUsageError) {
+          console.error('Error creating usage_limits record:', newUsageError);
+        } else {
+          finalUsage = newUsage as any;
+        }
       }
 
-      if (usageData) {
+      if (finalUsage) {
         setUsage({
-          chatMessagesUsed: usageData.chat_messages_used || 0,
-          routineOptimizationsUsed: usageData.routine_optimizations_used || 0,
-          productComparisonsUsed: usageData.product_comparisons_used || 0,
-          pdfExportsUsed: usageData.pdf_exports_used || 0,
+          chatMessagesUsed: finalUsage.chat_messages_used || 0,
+          routineOptimizationsUsed: finalUsage.routine_optimizations_used || 0,
+          productComparisonsUsed: finalUsage.product_comparisons_used || 0,
+          pdfExportsUsed: finalUsage.pdf_exports_used || 0,
         });
       }
+
     } catch (error) {
       console.error('Error loading usage limits:', error);
     } finally {
@@ -115,11 +127,19 @@ export function useUsageLimits() {
       pdfExportsUsed: 'pdf_exports_used',
     };
 
-    await supabase
-      .from('usage_limits')
-      .update({ [columnMap[type]]: newValue })
-      .eq('user_id', user.id)
-      .gte('period_start', currentMonth);
+      try {
+        const { error } = await supabase
+          .from('usage_limits')
+          .update({ [columnMap[type]]: newValue })
+          .eq('user_id', user.id)
+          .gte('period_start', currentMonth);
+
+        if (error) {
+          console.error('Failed to increment usage limit in DB:', error);
+        }
+      } catch (err) {
+        console.error('Unexpected error updating usage limits:', err);
+      }
   };
 
   const getRemainingUsage = (type: keyof UsageLimits, tier: 'free' | 'premium' | 'pro'): number => {

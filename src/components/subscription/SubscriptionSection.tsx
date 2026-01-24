@@ -65,9 +65,7 @@ export function SubscriptionSection({ className }: SubscriptionSectionProps) {
   const syncSubscription = async () => {
     setIsSyncing(true);
     try {
-      const { data, error } = await supabase.functions.invoke('check-subscription');
-      if (error) throw error;
-      
+      await (await import('@/lib/functions-client')).invokeFunction('check-subscription');
       await refresh();
       toast.success('Subscription status updated');
     } catch (error) {
@@ -81,9 +79,7 @@ export function SubscriptionSection({ className }: SubscriptionSectionProps) {
   const handleManageBilling = async () => {
     setIsManagingBilling(true);
     try {
-      const { data, error } = await supabase.functions.invoke('customer-portal');
-      if (error) throw error;
-      
+      const data: any = await (await import('@/lib/functions-client')).invokeFunction('customer-portal');
       if (!data?.url) {
         throw new Error("Billing portal is not available for this account yet.");
       }

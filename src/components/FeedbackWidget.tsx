@@ -115,11 +115,11 @@ const FeedbackWidget = () => {
       
       // Auto-close after success
       setTimeout(() => setIsOpen(false), 1500);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error submitting feedback:", error);
       toast({
         title: "Submission Failed",
-        description: "Something went wrong. Please try again.",
+        description: error?.message || "Something went wrong. Please try again.",
         variant: "destructive",
       });
     } finally {

@@ -30,7 +30,7 @@ const Index = () => {
   return (
     <main className="min-h-screen font-landing">
       <header className="sticky top-0 z-50 w-full bg-azure text-primary-foreground">
-        <div className="container mx-auto px-6">
+        <div className="container mx-auto px-[10px] lg:px-6">
           <div className="flex h-16 items-center justify-between">
             <button
               type="button"

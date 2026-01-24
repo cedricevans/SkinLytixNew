@@ -197,8 +197,11 @@ const Settings = () => {
   const handleDeleteAccount = async () => {
     setIsDeletingAccount(true);
     try {
-      const { error } = await supabase.functions.invoke("delete-account");
-      if (error) throw error;
+      try {
+        await (await import('@/lib/functions-client')).invokeFunction('delete-account');
+      } catch (err) {
+        throw err;
+      }
       await supabase.auth.signOut();
       toast({
         title: "Account deleted",
@@ -218,7 +221,7 @@ const Settings = () => {
   };
 
   return (
-    <AppShell showNavigation showBottomNav contentClassName="px-4 py-6 md:py-10">
+    <AppShell showNavigation showBottomNav contentClassName="px-[5px] lg:px-4 py-6 md:py-10">
       <PageHeader>
         <div>
           <p className="text-sm uppercase tracking-[0.25em] text-muted-foreground">Settings</p>

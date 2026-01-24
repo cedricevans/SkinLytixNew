@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { Loader2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { invokeFunction } from "@/lib/functions-client";
 import AppShell from "@/components/AppShell";
 import PageHeader from "@/components/PageHeader";
 import { Card } from "@/components/ui/card";
@@ -54,42 +55,13 @@ export default function AnalysisFast() {
       setAnalysisStatus("Running full analysis...");
 
       try {
-        const { data: sessionData } = await supabase.auth.getSession();
-        const accessToken = sessionData.session?.access_token;
-        const useProxy = import.meta.env.DEV && import.meta.env.VITE_USE_FUNCTIONS_PROXY === "true";
-
         const body = {
           ...payload,
           scan_mode: "detailed",
           skip_ingredient_ai_explanations: true,
         };
 
-        let data: any;
-
-        if (useProxy) {
-          const response = await fetch("/functions/analyze-product", {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              apikey: import.meta.env.VITE_SUPABASE_ANON_KEY,
-              ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
-            },
-            body: JSON.stringify(body),
-          });
-
-          if (!response.ok) {
-            const errorText = await response.text();
-            throw new Error(errorText || "Failed to analyze product");
-          }
-          data = await response.json();
-        } else {
-          const { data: invokeData, error } = await supabase.functions.invoke("analyze-product", {
-            body,
-          });
-
-          if (error) throw error;
-          data = invokeData;
-        }
+        const data: any = await invokeFunction('analyze-product', body);
 
         if (!isCancelled) {
           navigate(`/analysis/${data.analysis_id}`);
@@ -156,7 +128,7 @@ export default function AnalysisFast() {
   return (
     <AppShell
       className="bg-gradient-to-b from-background to-muted"
-      contentClassName="px-4 py-8"
+      contentClassName="px-[5px] lg:px-4 py-8"
       showNavigation
       showBottomNav
     >

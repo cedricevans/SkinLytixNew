@@ -31,64 +31,28 @@ const Footer = () => {
   }, []);
 
   return (
-    <footer className="py-12 px-6 bg-primary text-primary-foreground">
+    <footer className="py-12 px-[10px] lg:px-6 bg-primary text-primary-foreground">
       <div className="max-w-6xl mx-auto">
-        <div className="grid md:grid-cols-4 gap-8 mb-8">
-          {/* Brand */}
-          <div className="md:col-span-2">
-            <h3 className="text-2xl font-heading font-bold mb-3">SkinLytix</h3>
-            <p className="font-body text-primary-foreground/80 text-sm leading-relaxed max-w-md">
-              Evidence-based skincare intelligence for people tired of wasting money on products that don't work. 
-              Built on real consumer research. Powered by free, open APIs.
-            </p>
-          </div>
-
-          {/* Quick Links */}
-          <div>
-            <h4 className="text-sm font-heading font-semibold mb-3 text-primary-foreground">Quick Links</h4>
-            <ul className="space-y-2 text-sm font-body">
-              <li><a href="/about" className="text-primary-foreground/80 hover:text-primary-foreground transition-colors">About Us</a></li>
-              <li><a href="/how-it-works" className="text-primary-foreground/80 hover:text-primary-foreground transition-colors">How It Works</a></li>
-              <li><a href="/faq" className="text-primary-foreground/80 hover:text-primary-foreground transition-colors">FAQ</a></li>
-              <li><a href="/contact" className="text-primary-foreground/80 hover:text-primary-foreground transition-colors">Contact</a></li>
-            </ul>
-          </div>
-
-          {/* Social Media */}
-          <div>
-            <h4 className="text-sm font-heading font-semibold mb-3 text-primary-foreground">Connect With Us</h4>
-            <div className="flex gap-3 mb-3">
-              <a 
-                href="https://www.instagram.com/skinlytix?utm_source=ig_web_button_share_sheet&igsh=ZDNlZDc0MzIxNw==" 
-                target="_blank" 
-                rel="noopener noreferrer"
-                className="w-10 h-10 rounded-full bg-primary-foreground/10 hover:bg-primary-foreground/20 flex items-center justify-center transition-all hover:scale-110"
-                aria-label="Follow us on Instagram"
-              >
-                <Instagram className="w-5 h-5 text-primary-foreground" />
-              </a>
-              <a 
-                href="https://www.threads.com/@skinlytix" 
-                target="_blank" 
-                rel="noopener noreferrer"
-                className="w-10 h-10 rounded-full bg-primary-foreground/10 hover:bg-primary-foreground/20 flex items-center justify-center transition-all hover:scale-110"
-                aria-label="Follow us on Threads"
-              >
-                <AtSign className="w-5 h-5 text-primary-foreground" />
-              </a>
-              <a 
-                href="https://www.facebook.com/profile.php?id=61574847090738" 
-                target="_blank" 
-                rel="noopener noreferrer"
-                className="w-10 h-10 rounded-full bg-primary-foreground/10 hover:bg-primary-foreground/20 flex items-center justify-center transition-all hover:scale-110"
-                aria-label="Follow us on Facebook"
-              >
-                <Facebook className="w-5 h-5 text-primary-foreground" />
-              </a>
+        <div className="space-y-8 mb-8">
+          <div className="lg:grid lg:grid-cols-4 lg:gap-8">
+            <div className="lg:col-span-2">
+              <h3 className="text-2xl font-heading font-bold mb-3">SkinLytix</h3>
+              <p className="font-body text-primary-foreground/80 text-sm leading-relaxed max-w-md">
+                Evidence-based skincare intelligence for people tired of wasting money on products that don't work.
+                Built on real consumer research. Powered by free, open APIs.
+              </p>
             </div>
-            <p className="text-xs text-primary-foreground/60">
-              Join our community on Instagram, Threads, and Facebook for skincare tips and insights.
-            </p>
+            <div className="hidden lg:block">
+              <FooterLinks />
+            </div>
+            <div className="hidden lg:block">
+              <FooterConnect />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-8 lg:hidden">
+            <FooterLinks />
+            <FooterConnect />
           </div>
         </div>
 
@@ -107,5 +71,67 @@ const Footer = () => {
     </footer>
   );
 };
+
+const FooterLinks = () => (
+  <div>
+    <h4 className="text-sm font-heading font-semibold mb-3 text-primary-foreground uppercase tracking-[0.2em]">
+      Quick Links
+    </h4>
+    <ul className="space-y-2 text-sm font-body">
+      {[
+        { label: "About Us", href: "/about" },
+        { label: "How It Works", href: "/how-it-works" },
+        { label: "FAQ", href: "/faq" },
+        { label: "Contact", href: "/contact" },
+      ].map((link) => (
+        <li key={link.label}>
+          <a href={link.href} className="text-primary-foreground/80 hover:text-primary-foreground transition-colors">
+            {link.label}
+          </a>
+        </li>
+      ))}
+    </ul>
+  </div>
+);
+
+const FooterConnect = () => (
+  <div>
+    <h4 className="text-sm font-heading font-semibold mb-3 text-primary-foreground uppercase tracking-[0.2em]">
+      Connect With Us
+    </h4>
+    <div className="flex gap-3 mb-3">
+      <a
+        href="https://www.instagram.com/skinlytix?utm_source=ig_web_button_share_sheet&igsh=ZDNlZDc0MzIxNw=="
+        target="_blank"
+        rel="noopener noreferrer"
+        className="w-10 h-10 rounded-full bg-primary-foreground/10 hover:bg-primary-foreground/20 flex items-center justify-center transition-all hover:scale-110"
+        aria-label="Follow us on Instagram"
+      >
+        <Instagram className="w-5 h-5 text-primary-foreground" />
+      </a>
+      <a
+        href="https://www.threads.com/@skinlytix"
+        target="_blank"
+        rel="noopener noreferrer"
+        className="w-10 h-10 rounded-full bg-primary-foreground/10 hover:bg-primary-foreground/20 flex items-center justify-center transition-all hover:scale-110"
+        aria-label="Follow us on Threads"
+      >
+        <AtSign className="w-5 h-5 text-primary-foreground" />
+      </a>
+      <a
+        href="https://www.facebook.com/profile.php?id=61574847090738"
+        target="_blank"
+        rel="noopener noreferrer"
+        className="w-10 h-10 rounded-full bg-primary-foreground/10 hover:bg-primary-foreground/20 flex items-center justify-center transition-all hover:scale-110"
+        aria-label="Follow us on Facebook"
+      >
+        <Facebook className="w-5 h-5 text-primary-foreground" />
+      </a>
+    </div>
+    <p className="text-xs text-primary-foreground/60">
+      Join our community on Instagram, Threads, and Facebook for skincare tips and insights.
+    </p>
+  </div>
+);
 
 export default Footer;

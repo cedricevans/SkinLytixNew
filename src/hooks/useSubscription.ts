@@ -99,7 +99,11 @@ export function useSubscription() {
       try {
         const { data: { session } } = await supabase.auth.getSession();
         if (session) {
-          await supabase.functions.invoke('check-subscription');
+          try {
+            await (await import('@/lib/functions-client')).invokeFunction('check-subscription');
+          } catch (err) {
+            console.error('Error invoking check-subscription:', err);
+          }
           loadSubscriptionStatus();
         }
       } catch (error) {

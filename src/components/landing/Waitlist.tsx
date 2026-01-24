@@ -6,7 +6,7 @@ const Waitlist = () => {
 
   return (
     <section id="waitlist" className="py-12 md:py-16 bg-[rgb(60,160,185)]">
-      <div className="container mx-auto px-6">
+      <div className="container mx-auto px-[5px] lg:px-6">
         <div className="max-w-3xl mx-auto">
           {/* Header */}
           <div className="text-center mb-8">

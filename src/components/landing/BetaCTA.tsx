@@ -34,7 +34,7 @@ const BetaCTA = ({ id }: BetaCTAProps) => {
 
   return (
     <section id={id} className="py-20 bg-background">
-      <div className="container mx-auto px-6">
+      <div className="container mx-auto px-[5px] lg:px-6">
         <div className="max-w-5xl mx-auto">
           <h2 className="font-heading text-3xl md:text-4xl text-center mb-3">
             <BrandName /> Creator Circle

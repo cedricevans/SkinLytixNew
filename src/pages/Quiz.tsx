@@ -42,7 +42,7 @@ const Quiz = () => {
   return (
     <main className="min-h-screen bg-gradient-to-b from-background to-muted">
       <header className="sticky top-0 z-50 w-full bg-primary text-primary-foreground">
-        <div className="max-w-6xl mx-auto px-4 flex items-center justify-between h-16">
+        <div className="max-w-6xl mx-auto px-[5px] lg:px-4 flex items-center justify-between h-16">
           <button
             type="button"
             onClick={() => navigate('/')}
@@ -55,7 +55,7 @@ const Quiz = () => {
         </div>
       </header>
 
-      <div className="container max-w-2xl mx-auto px-4 py-16">
+      <div className="container max-w-2xl mx-auto px-[5px] lg:px-4 py-16">
         <Card className="p-6 md:p-8 text-center">
           <h1 className="text-3xl md:text-4xl font-heading font-bold mb-3">
             Skin Type Quiz
