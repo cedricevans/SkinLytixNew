@@ -2,22 +2,22 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 
 /**
- * Goals in this version
+ * Goals
  * 1. Keep AI + OBF together. OBF enriches, AI proposes.
  * 2. Always return usable UI fields, even when OBF is blocked.
- * 3. Price estimate should show up when AI provides it.
- * 4. Everything “linked”: include productUrl (if available) plus an internalLink you control.
- * 5. Never force the UI to send users back to OBF. Your UI can use productUrl, but it does not have to.
+ * 3. priceEstimate should show up when AI provides it.
+ * 4. Include productUrl (if available) plus an internalLink you control.
+ * 5. Never force UI to send users back to OBF.
  */
 
-// CORS configuration
+// CORS
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+// Cache
 const aiCache = new Map<string, { value: any[]; expiresAt: number }>();
-
 type ObfEnriched = {
   imageUrl: string | null;
   productUrl: string | null;
@@ -33,7 +33,6 @@ type ObfEnriched = {
   packaging?: string | null;
   storeLocation?: string | null;
 };
-
 const obfCache = new Map<string, { value: ObfEnriched | null; expiresAt: number }>();
 
 const getCache = <T>(cache: Map<string, { value: T; expiresAt: number }>, key: string): T | undefined => {
@@ -50,13 +49,23 @@ const setCache = <T>(cache: Map<string, { value: T; expiresAt: number }>, key: s
   cache.set(key, { value, expiresAt: Date.now() + ttlMs });
 };
 
+// Models
+const OPENROUTER_MODEL = "qwen/qwen3-coder:free"; // updated per user request
+// If you want fastest free, swap to: "google/gemma-3-4b:free" or "qwen/qwen3-4b:free"
+
 serve(async (req: Request): Promise<Response> => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
-    const { productName, brand, ingredients, category, skinType, concerns } = await req.json();
+    const body = await req.json();
+    const productName = typeof body?.productName === "string" ? body.productName.trim() : "";
+    const brand = typeof body?.brand === "string" ? body.brand.trim() : "";
+    const category = typeof body?.category === "string" ? body.category.trim() : "";
+    const skinType = typeof body?.skinType === "string" ? body.skinType.trim() : "";
+    const concerns = typeof body?.concerns === "string" ? body.concerns.trim() : "";
+    const ingredients = Array.isArray(body?.ingredients) ? body.ingredients : [];
 
-    if (!productName || typeof productName !== "string") {
+    if (!productName) {
       return new Response(JSON.stringify({ dupes: [], error: "productName is required" }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
@@ -72,9 +81,11 @@ serve(async (req: Request): Promise<Response> => {
       });
     }
 
-    const promptIngredients: string[] = Array.isArray(ingredients) ? ingredients.slice(0, 40) : [];
+    const promptIngredients: string[] = Array.isArray(ingredients)
+      ? ingredients.filter((x: any) => typeof x === "string").slice(0, 40)
+      : [];
 
-    const scentContext = `${category || ""} ${productName}`.toLowerCase();
+    const scentContext = `${category} ${productName}`.toLowerCase();
     const isScentFocused =
       scentContext.includes("body") ||
       scentContext.includes("lotion") ||
@@ -82,8 +93,6 @@ serve(async (req: Request): Promise<Response> => {
       scentContext.includes("cream") ||
       scentContext.includes("mist");
 
-    // AI prompt
-    // IMPORTANT: we ask for priceEstimate explicitly and allow estimates (not “guaranteed store prices”).
     const systemPrompt = `
 You are a skincare expert that finds REAL, existing product dupes.
 Return VALID JSON ONLY. No markdown. No commentary.
@@ -91,21 +100,21 @@ Return VALID JSON ONLY. No markdown. No commentary.
 Return ONLY a JSON array of 12 products.
 
 Each product object MUST include:
-- "name": string (exact product name)
+- "name": string
 - "brand": string | null
-- "category": string | null (example: "Moisturizer", "Cleanser", "Body lotion")
-- "priceEstimate": string | null (example: "$8-12", "$15", "Under $20". You are allowed to estimate.)
-- "highlights": string[] (2-4 short bullets, plain language)
-- "keyIngredients": string[] (5-10 ingredient names, lower effort list is fine)
-- "flags": string[] (0-6 short watchouts, example: "Fragrance", "Potential allergens", "Essential oils", "Drying alcohol")
-- "whereToBuy": string | null (example: "Target", "Ulta", "Amazon", "Sephora", "Drugstore", "Online")
-- "productUrl": string | null (official brand page or major retailer when you know it, else null)
-- "sharedIngredients": string[] | null (ingredient strings if you can infer them, else null)
+- "category": string | null
+- "priceEstimate": string | null
+- "highlights": string[] (2-4 short bullets)
+- "keyIngredients": string[] (5-10)
+- "flags": string[] (0-6)
+- "whereToBuy": string | null
+- "productUrl": string | null
+- "sharedIngredients": string[] | null
 
 Rules:
-- Do NOT invent brand if you are unsure. Use null.
+- Do NOT invent brand. Use null if unsure.
 - Do NOT return fake products. Only real products.
-- Keep strings short. No long paragraphs.
+- Keep strings short.
 `.trim();
 
     const userPrompt = [
@@ -128,9 +137,29 @@ Rules:
       dupes = cachedDupes;
     } else {
       let aiContent: string | null = null;
-      let fallbackLevel = 0;
+      const errorLog: string[] = [];
 
-      // Lovable gateway
+      const parseAiArray = (content: string | null) => {
+        if (!content) return [];
+        const clean = content.replace(/```json\n?/gi, "").replace(/```\n?/g, "").trim();
+        const match = clean.match(/\[[\s\S]*\]/);
+        try {
+          const parsed = JSON.parse(match ? match[0] : clean);
+          if (Array.isArray(parsed)) return parsed;
+          if (Array.isArray(parsed?.dupes)) return parsed.dupes;
+          return [];
+        } catch {
+          return [];
+        }
+      };
+
+
+      // Helper to always log error body
+      const safeReadText = async (r: Response) => {
+        try { return await r.text(); } catch { return ""; }
+      };
+
+      // 1) Lovable gateway
       if (LOVABLE_API_KEY) {
         try {
           const aiResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
@@ -153,19 +182,16 @@ Rules:
             const aiData = await aiResponse.json();
             aiContent = aiData.choices?.[0]?.message?.content ?? null;
           } else {
-            console.warn("AI Gateway error:", aiResponse.status);
-            fallbackLevel = 1;
+            const err = await safeReadText(aiResponse);
+            errorLog.push(`Lovable status ${aiResponse.status}: ${err}`);
           }
         } catch (e) {
-          console.warn("AI Gateway fetch error:", e);
-          fallbackLevel = 1;
+          errorLog.push(`Lovable error ${(e as Error)?.message || String(e)}`);
         }
-      } else {
-        fallbackLevel = 1;
       }
 
-      // Gemini direct
-      if (!aiContent && GEMINI_API_KEY && fallbackLevel >= 1) {
+      // 2) Gemini direct
+      if (!aiContent && GEMINI_API_KEY) {
         try {
           const prompt = `${systemPrompt}\n\n${userPrompt}`;
           const response = await fetch(
@@ -184,17 +210,16 @@ Rules:
             const dataJson = await response.json();
             aiContent = dataJson?.candidates?.[0]?.content?.parts?.[0]?.text ?? null;
           } else {
-            console.warn("Gemini direct error:", response.status);
-            fallbackLevel = 2;
+            const err = await safeReadText(response);
+            errorLog.push(`Gemini status ${response.status}: ${err}`);
           }
         } catch (e) {
-          console.warn("Gemini fetch error:", e);
-          fallbackLevel = 2;
+          errorLog.push(`Gemini error ${(e as Error)?.message || String(e)}`);
         }
       }
 
-      // OpenRouter fallback
-      if (!aiContent && OPENROUTER_API_KEY && fallbackLevel >= 2) {
+      // 3) OpenRouter fallback
+      if (!aiContent && OPENROUTER_API_KEY) {
         try {
           const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
             method: "POST",
@@ -203,7 +228,9 @@ Rules:
               "Content-Type": "application/json",
             },
             body: JSON.stringify({
-              model: "tngtech/deepseek-r1t-chimera:free",
+              model: OPENROUTER_MODEL,
+              // Helps models output clean JSON when supported
+              response_format: { type: "json_object" },
               messages: [
                 { role: "system", content: systemPrompt },
                 { role: "user", content: userPrompt },
@@ -216,42 +243,29 @@ Rules:
             const aiData = await response.json();
             aiContent = aiData.choices?.[0]?.message?.content ?? null;
           } else {
-            console.error("OpenRouter fallback failed:", response.status);
-            return new Response(
-              JSON.stringify({
-                dupes: [],
-                error: "All AI models are currently unavailable. Please try again later.",
-              }),
-              {
-                status: 503,
-                headers: { ...corsHeaders, "Content-Type": "application/json" },
-              },
-            );
+            const err = await safeReadText(response);
+            errorLog.push(`OpenRouter status ${response.status}: ${err}`);
           }
         } catch (e) {
-          console.error("OpenRouter fetch error:", e);
+          errorLog.push(`OpenRouter error ${(e as Error)?.message || String(e)}`);
         }
       }
 
-      if (!aiContent) aiContent = "[]";
+      dupes = parseAiArray(aiContent);
 
-      // Parse AI response
-      try {
-        const cleanContent = aiContent.replace(/```json\n?/gi, "").replace(/```\n?/g, "").trim();
-        const match = cleanContent.match(/\[[\s\S]*\]/);
-        const parsed = JSON.parse(match ? match[0] : cleanContent);
-        dupes = Array.isArray(parsed) ? parsed : Array.isArray(parsed?.dupes) ? parsed.dupes : [];
-      } catch (parseError) {
-        console.error("Failed to parse AI response:", parseError);
-        dupes = [];
-      }
-
+      // Hard floor so UI does not break
+      if (!Array.isArray(dupes)) dupes = [];
       setCache(aiCache, aiCacheKey, dupes, 10 * 60 * 1000);
+
+      // If everything failed, still return a clean payload
+      if (!dupes.length && errorLog.length) {
+        console.warn("AI failed:", errorLog.join(" | "));
+      }
     }
 
     // ---------------- Helpers ----------------
     const normaliseIngredient = (value: string): string =>
-      value
+      (value || "")
         .toLowerCase()
         .replace(/\(.*?\)/g, " ")
         .replace(/[^a-z0-9\s]/g, " ")
@@ -289,7 +303,7 @@ Rules:
     };
 
     const normaliseText = (value: string): string =>
-      value
+      (value || "")
         .toLowerCase()
         .replace(/[^a-z0-9\s]/g, " ")
         .replace(/\s+/g, " ")
@@ -437,10 +451,7 @@ Rules:
     };
 
     // OBF lookup
-    const lookupOpenBeautyFacts = async (
-      name: string,
-      dupeBrand: string | undefined,
-    ): Promise<ObfEnriched | null> => {
+    const lookupOpenBeautyFacts = async (name: string, dupeBrand: string | undefined): Promise<ObfEnriched | null> => {
       const cacheKey = `${name}:${dupeBrand || ""}`;
       const cached = getCache(obfCache, cacheKey);
       if (cached !== undefined) return cached;
@@ -475,7 +486,6 @@ Rules:
             if (typeof product.image_front_url === "string") images.push(product.image_front_url);
             if (typeof product.image_url === "string" && !images.includes(product.image_url)) images.push(product.image_url);
 
-            // NOTE: OBF often does NOT have price. Keep it as-is if present.
             const price = product.price ?? null;
             const description = product.description ?? null;
             const generic_name = product.generic_name ?? null;
@@ -559,7 +569,6 @@ Rules:
 
         if (!name || typeof name !== "string") return null;
 
-        // OBF enrichment
         const obf = enrichIndexes.has(index) ? await lookupOpenBeautyFacts(name, dupeBrand) : null;
 
         // Ingredients priority: OBF -> AI sharedIngredients -> AI ingredients string/array
@@ -584,7 +593,7 @@ Rules:
         let images: string[] = [];
 
         if (Array.isArray(obf?.images)) {
-          for (const img of obf!.images!) {
+          for (const img of obf.images) {
             if (typeof img === "string" && img && !images.includes(img) && !isPlaceholderImage(img)) images.push(img);
           }
         }
@@ -593,16 +602,15 @@ Rules:
         if (dupe?.imageUrl && !isPlaceholderImage(dupe.imageUrl) && !images.includes(dupe.imageUrl)) images.push(dupe.imageUrl);
         if (!images.length) images = [];
 
-        // URL and whereToBuy (AI first, else OBF)
-        const productUrl: string | null = (dupe?.productUrl && typeof dupe.productUrl === "string" ? dupe.productUrl : null) ??
-          (obf?.productUrl ?? null);
+        // URL and whereToBuy
+        const productUrl: string | null =
+          (dupe?.productUrl && typeof dupe.productUrl === "string" ? dupe.productUrl : null) ?? (obf?.productUrl ?? null);
 
         const whereToBuy: string | null =
           (dupe?.whereToBuy && typeof dupe.whereToBuy === "string" ? dupe.whereToBuy : null) ??
           (obf?.productUrl ? "Open Beauty Facts" : null);
 
-        // Price and description and category
-        // IMPORTANT: priceEstimate is expected from AI.
+        // Price
         const priceEstimate: string | null =
           (dupe?.priceEstimate && typeof dupe.priceEstimate === "string" ? dupe.priceEstimate : null) ??
           (dupe?.price_range && typeof dupe.price_range === "string" ? dupe.price_range : null) ??
@@ -616,16 +624,10 @@ Rules:
           (obf?.description ?? obf?.generic_name ?? null);
 
         const resolvedCategory: string | null =
-          (dupe?.category && typeof dupe.category === "string" ? dupe.category : null) ??
-          (obf?.categories ?? null);
+          (dupe?.category && typeof dupe.category === "string" ? dupe.category : null) ?? (obf?.categories ?? null);
 
-        // Highlights, keyIngredients, flags from AI when present
-        const highlights: string[] =
-          Array.isArray(dupe?.highlights) ? dupe.highlights.filter(Boolean).slice(0, 8) : [];
-
-        const keyIngredients: string[] =
-          Array.isArray(dupe?.keyIngredients) ? dupe.keyIngredients.filter(Boolean).slice(0, 15) : [];
-
+        const highlights: string[] = Array.isArray(dupe?.highlights) ? dupe.highlights.filter(Boolean).slice(0, 8) : [];
+        const keyIngredients: string[] = Array.isArray(dupe?.keyIngredients) ? dupe.keyIngredients.filter(Boolean).slice(0, 15) : [];
         const flags: string[] = Array.isArray(dupe?.flags) ? dupe.flags.filter(Boolean).slice(0, 12) : [];
 
         const ingredientList = targetIngredients ?? [];
@@ -645,10 +647,10 @@ Rules:
           imageUrl: images[0] ?? null,
           productUrl,
           whereToBuy,
-          priceEstimate, // keep as a top-level field for UI
+          priceEstimate,
           description,
           category: resolvedCategory,
-          storeLocation: (obf?.storeLocation ?? dupe?.storeLocation ?? null),
+          storeLocation: obf?.storeLocation ?? dupe?.storeLocation ?? null,
           matchPercent: overlapStats?.percent ?? null,
           matchedCount: overlapStats?.matchedCount ?? null,
           sourceCount: overlapStats?.sourceCount ?? null,
@@ -736,19 +738,14 @@ Rules:
     }
 
     function extractHighlights(dupe: any): string[] {
-      // Prefer AI highlights. Fallback to short, useful derived highlights.
       const fromAi = Array.isArray(dupe?.highlights) ? dupe.highlights.map((x: any) => (x || "").trim()).filter(Boolean) : [];
 
       const derived: string[] = [];
-      if (typeof dupe?.matchedCount === "number" && typeof dupe?.sourceCount === "number") {
-        derived.push(`Solid ingredient overlap`);
-      }
+      if (typeof dupe?.matchedCount === "number" && typeof dupe?.sourceCount === "number") derived.push("Solid ingredient overlap");
+
       if (Array.isArray(dupe?.ingredientList)) {
         const ing = dupe.ingredientList.map((x: string) => x.toLowerCase());
         if (ing.some((x) => x.includes("ceramide") || x.includes("cholesterol"))) derived.push("Barrier support");
-      }
-      if (Array.isArray(dupe?.ingredientList)) {
-        const ing = dupe.ingredientList.map((x: string) => x.toLowerCase());
         if (ing.some((x) => x.includes("fragrance") || x.includes("parfum"))) derived.push("Contains fragrance");
       }
 
@@ -762,9 +759,6 @@ Rules:
     }
 
     function extractPriceEstimate(dupe: any): string | null {
-      // This is the missing piece in your current output.
-      // Your UI expects dupe.priceEstimate, but your earlier pipeline often only set dupe.price.
-      // We prioritize AI priceEstimate first.
       const v =
         (typeof dupe?.priceEstimate === "string" && dupe.priceEstimate.trim() ? dupe.priceEstimate.trim() : null) ??
         (typeof dupe?.price_range === "string" && dupe.price_range.trim() ? dupe.price_range.trim() : null) ??
@@ -774,8 +768,6 @@ Rules:
         (typeof dupe?.obf?.price === "number" ? `$${dupe.obf.price}` : null);
 
       if (!v) return null;
-
-      // normalize common cases: "15" -> "$15"
       if (/^\d+(\.\d+)?$/.test(v)) return `$${v}`;
       return v;
     }
@@ -791,10 +783,7 @@ Rules:
       const highlights = extractHighlights(dupe);
       const priceEstimate = extractPriceEstimate(dupe);
 
-      const productUrl =
-        typeof dupe?.productUrl === "string" && dupe.productUrl.trim() ? dupe.productUrl.trim() : null;
-
-      // This is the internal link you control. Your UI should route to a details page/modal using this.
+      const productUrl = typeof dupe?.productUrl === "string" && dupe.productUrl.trim() ? dupe.productUrl.trim() : null;
       const internalLink = `/dupes/${id}`;
 
       return {
@@ -806,7 +795,6 @@ Rules:
         images: Array.isArray(dupe?.images) ? dupe.images : [],
         matchPercent: typeof dupe?.matchPercent === "number" ? dupe.matchPercent : null,
 
-        // UI fields you want visible above "More"
         priceEstimate,
         category: dupe?.category || null,
         highlights,
@@ -814,16 +802,13 @@ Rules:
         flags,
         ingredientsCount: ingredientsList.length,
 
-        // UI fields you want available under "More"
         description: dupe?.description || null,
         whereToBuy: dupe?.whereToBuy || null,
         storeLocation: dupe?.storeLocation || null,
         productUrl,
 
-        // Full ingredient list for your own details view (still not forcing OBF)
         ingredientList: ingredientsList,
 
-        // Optional meta for deeper views
         meta: {
           barcode: dupe?.obf?.barcode ?? null,
           packaging: dupe?.obf?.packaging ?? null,
@@ -864,9 +849,6 @@ Rules:
         bestValueId,
       },
       dupes: uiDupes,
-
-      // Keep raw only if you actively use it in the app.
-      // If you do not need it, delete this to reduce payload.
       dupesRaw: filteredDupes,
     };
 
