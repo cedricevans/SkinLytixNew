@@ -18,13 +18,7 @@ import { invokeFunction } from "@/lib/functions-client";
 
 const CATEGORY_FILTERS = ["all", "face", "body", "hair", "scalp"];
 
-const RETAILER_SEARCH_URLS = {
-  target: "https://www.target.com/s?searchTerm=",
-  ulta: "https://www.ulta.com/search?Ntt=",
-  sephora: "https://www.sephora.com/search?keyword=",
-  amazon: "https://www.amazon.com/s?k=",
-  walmart: "https://www.walmart.com/search?q=",
-};
+const norm = (v) => String(v || "").trim();
 
 const getMarketDupeCacheKey = (userId, productId) => {
   if (!userId || !productId) return null;
@@ -62,31 +56,74 @@ const writeMarketDupeCache = (userId, productId, dupes) => {
   } catch {}
 };
 
-const normalizeDupe = (dupe, fallbackCategory) => {
-  if (!dupe || (!dupe.name && !dupe.productName && !dupe.product_name)) return null;
+const pickImageWithSource = (dupe) => {
+  const top =
+    dupe?.imageUrl ||
+    (Array.isArray(dupe?.images) && dupe.images[0]) ||
+    null;
 
-  const name = dupe.name || dupe.productName || dupe.product_name;
+  if (top) return { url: top, from: "top" };
+
+  const obf =
+    dupe?.obf?.imageUrl ||
+    (Array.isArray(dupe?.obf?.images) && dupe.obf.images[0]) ||
+    null;
+
+  if (obf) return { url: obf, from: "obf" };
+
+  return { url: null, from: "none" };
+};
+
+const normalizeDupe = (dupe, fallbackCategory) => {
+  if (!dupe) return null;
+
+  const picked = pickImageWithSource(dupe);
+
+  const topName = dupe.name || dupe.productName || dupe.product_name || "";
+  const topBrand = dupe.brand ?? dupe.brandName ?? dupe.brand_name ?? "";
+
+  const obfName = dupe?.obf?.productName || dupe?.obf?.name || dupe?.obf?.product_name || "";
+  const obfBrand = dupe?.obf?.brand ?? dupe?.obf?.brandName ?? dupe?.obf?.brand_name ?? "";
+
+  const name = picked.from === "obf" ? (obfName || topName) : (topName || obfName);
+  const brand = picked.from === "obf" ? (obfBrand || topBrand) : (topBrand || obfBrand);
+
+  if (!name) return null;
+
+  const price = dupe.priceEstimate ?? dupe.price ?? null;
+
+  const ingredientsFromLists = Array.isArray(dupe.ingredientList)
+    ? dupe.ingredientList
+    : Array.isArray(dupe.ingredients)
+      ? dupe.ingredients
+      : [];
+
+  const ingredientsFromString =
+    typeof dupe.ingredients === "string"
+      ? dupe.ingredients.split(/[,;\n]+/).map((x) => x.trim()).filter(Boolean)
+      : [];
+
+  const ingredientList = ingredientsFromLists.length ? ingredientsFromLists : ingredientsFromString;
+
+  const images = Array.isArray(dupe.images)
+    ? dupe.images
+    : dupe.imageUrl
+      ? [dupe.imageUrl]
+      : picked.url
+        ? [picked.url]
+        : [];
 
   return {
-    name,
-    brand: dupe.brand ?? dupe.brandName ?? dupe.brand_name ?? "",
-    imageUrl:
-      dupe.imageUrl ??
-      (Array.isArray(dupe.images) && dupe.images.length > 0 ? dupe.images[0] : null) ??
-      null,
-    price: dupe.priceEstimate ?? dupe.price ?? dupe.priceEstimate ?? null,
+    name: norm(name),
+    brand: norm(brand),
+    imageUrl: picked.url,
+    price,
     matchPercent: typeof dupe.matchPercent === "number" ? dupe.matchPercent : null,
     description: dupe.description ?? null,
     category: dupe.category ?? fallbackCategory ?? null,
     whereToBuy: dupe.whereToBuy ?? null,
-    images: Array.isArray(dupe.images) ? dupe.images : dupe.imageUrl ? [dupe.imageUrl] : [],
-    ingredientList: Array.isArray(dupe.ingredientList)
-      ? dupe.ingredientList
-      : Array.isArray(dupe.ingredients)
-        ? dupe.ingredients
-        : typeof dupe.ingredients === "string"
-          ? dupe.ingredients.split(/[,;\n]+/).map((x) => x.trim()).filter(Boolean)
-          : [],
+    images,
+    ingredientList,
     storeLocation: dupe.storeLocation ?? null,
     matchedCount: dupe.matchedCount ?? null,
     sourceCount: dupe.sourceCount ?? null,
@@ -103,6 +140,14 @@ const normalizeDupe = (dupe, fallbackCategory) => {
     ingredientsCount: typeof dupe.ingredientsCount === "number" ? dupe.ingredientsCount : undefined,
     internalLink: dupe.internalLink ?? undefined,
   };
+};
+
+const savedKeyFor = ({ product_name, brand, source_product_id }) => {
+  return `${norm(source_product_id)}::${norm(product_name)}::${norm(brand)}`;
+};
+
+const savedKeyForMarketDupe = ({ name, brand }, sourceProductId) => {
+  return `${norm(sourceProductId)}::${norm(name)}::${norm(brand)}`;
 };
 
 export default function Compare() {
@@ -147,8 +192,6 @@ export default function Compare() {
       .filter((i) => i.length > 2);
   }
 
-  // Fix: you had TWO fetchData useEffects doing the same thing.
-  // That double-fetch + state race is a common source of errors.
   useEffect(() => {
     let cancelled = false;
 
@@ -178,7 +221,10 @@ export default function Compare() {
             .select("id, product_name, brand, epiq_score, product_price, category, image_url")
             .eq("user_id", user.id)
             .order("analyzed_at", { ascending: false }),
-          supabase.from("saved_dupes").select("id, product_name, brand").eq("user_id", user.id),
+          supabase
+            .from("saved_dupes")
+            .select("id, product_name, brand, source_product_id")
+            .eq("user_id", user.id),
           supabase.from("profiles").select("skin_type, skin_concerns").eq("id", user.id).single(),
         ]);
 
@@ -192,14 +238,15 @@ export default function Compare() {
 
           const params = new URLSearchParams(location.search);
           const requestedId = params.get("productId");
-          const initialId = requestedId && unique.some((a) => a.id === requestedId) ? requestedId : unique[0]?.id ?? null;
+          const initialId =
+            requestedId && unique.some((a) => a.id === requestedId) ? requestedId : unique[0]?.id ?? null;
           setSelectedProductId((prev) => prev ?? initialId);
         } else if (analysesRes.error) {
           console.error("analyses fetch error:", analysesRes.error);
         }
 
         if (!savedRes.error && Array.isArray(savedRes.data)) {
-          setSavedDupes(new Set(savedRes.data.map((d) => `${d.product_name}-${d.brand}`)));
+          setSavedDupes(new Set(savedRes.data.map(savedKeyFor)));
         } else if (savedRes.error) {
           console.error("saved_dupes fetch error:", savedRes.error);
         }
@@ -243,7 +290,10 @@ export default function Compare() {
     return analysisIngredients[selectedProductId];
   }, [analysisIngredients, selectedProductId]);
 
-  const sourceIngredients = useMemo(() => (selectedIngredients ? parseIngredients(selectedIngredients) : []), [selectedIngredients]);
+  const sourceIngredients = useMemo(
+    () => (selectedIngredients ? parseIngredients(selectedIngredients) : []),
+    [selectedIngredients],
+  );
 
   const loadIngredientsForIds = async (ids) => {
     if (!userId || !ids || ids.length === 0) return;
@@ -360,7 +410,9 @@ export default function Compare() {
       }
 
       const rawDupes = Array.isArray(data?.dupes) ? data.dupes : [];
-      const normalizedDupes = rawDupes.map((d) => normalizeDupe(d, selectedProduct.category || "face")).filter(Boolean);
+      const normalizedDupes = rawDupes
+        .map((d) => normalizeDupe(d, selectedProduct.category || "face"))
+        .filter(Boolean);
 
       setDupeStage("Results ready");
       setDupeProgress(100);
@@ -451,11 +503,20 @@ export default function Compare() {
   const toggleSaveMarketDupe = async (dupe) => {
     if (!userId || !selectedProductId) return;
 
-    const key = `${dupe.name}-${dupe.brand}`;
+    const safeName = norm(dupe?.name);
+    const safeBrand = norm(dupe?.brand);
+
+    const key = savedKeyForMarketDupe({ name: safeName, brand: safeBrand }, selectedProductId);
     const isSaved = savedDupes.has(key);
 
     if (isSaved) {
-      const { error } = await supabase.from("saved_dupes").delete().eq("user_id", userId).eq("product_name", dupe.name);
+      const { error } = await supabase
+        .from("saved_dupes")
+        .delete()
+        .eq("user_id", userId)
+        .eq("source_product_id", selectedProductId)
+        .eq("product_name", safeName)
+        .eq("brand", safeBrand);
 
       if (!error) {
         setSavedDupes((prev) => {
@@ -475,11 +536,12 @@ export default function Compare() {
     } else {
       const { error } = await supabase.from("saved_dupes").insert({
         user_id: userId,
-        product_name: dupe.name,
-        brand: dupe.brand,
-        image_url: dupe.imageUrl,
         source_product_id: selectedProductId,
-        where_to_buy: dupe.whereToBuy || null,
+        product_name: safeName,
+        brand: safeBrand,
+        image_url: dupe?.imageUrl || null,
+        price_estimate: dupe?.price ?? null,
+        saved_at: new Date().toISOString(),
       });
 
       if (!error) {
@@ -499,7 +561,10 @@ export default function Compare() {
   const toggleSaveMyProduct = async (match) => {
     if (!userId || !selectedProductId) return;
 
-    const key = `${match.product.product_name}-${match.product.brand}`;
+    const productName = norm(match?.product?.product_name);
+    const brand = norm(match?.product?.brand || "");
+
+    const key = `${norm(selectedProductId)}::${productName}::${brand}`;
     const isSaved = savedDupes.has(key);
 
     if (isSaved) {
@@ -507,7 +572,9 @@ export default function Compare() {
         .from("saved_dupes")
         .delete()
         .eq("user_id", userId)
-        .eq("product_name", match.product.product_name);
+        .eq("source_product_id", selectedProductId)
+        .eq("product_name", productName)
+        .eq("brand", brand);
 
       if (!error) {
         setSavedDupes((prev) => {
@@ -527,12 +594,14 @@ export default function Compare() {
     } else {
       const { error } = await supabase.from("saved_dupes").insert({
         user_id: userId,
-        product_name: match.product.product_name,
-        brand: match.product.brand,
-        reasons: match.whyDupe,
-        shared_ingredients: match.sharedIngredients,
-        price_estimate: match.product.product_price ? `$${match.product.product_price}` : null,
         source_product_id: selectedProductId,
+        product_name: productName,
+        brand,
+        reasons: match?.whyDupe ?? null,
+        shared_ingredients: match?.sharedIngredients ?? null,
+        price_estimate: match?.product?.product_price ? `$${match.product.product_price}` : null,
+        image_url: match?.product?.image_url ?? null,
+        saved_at: new Date().toISOString(),
       });
 
       if (!error) {
@@ -612,7 +681,6 @@ export default function Compare() {
             </Card>
           ) : (
             <div className="flex flex-col gap-6 w-full">
-              {/* Top row: Product picker (left) + Quick overview (right, desktop only) */}
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 w-full">
                 <div className="min-w-0 space-y-6">
                   <Card>
@@ -641,7 +709,11 @@ export default function Compare() {
                           </SelectContent>
                         </Select>
 
-                        <Button onClick={() => findMarketDupes({ force: true })} disabled={findingDupes || !selectedProduct} className="gap-2">
+                        <Button
+                          onClick={() => findMarketDupes({ force: true })}
+                          disabled={findingDupes || !selectedProduct}
+                          className="gap-2"
+                        >
                           {findingDupes ? (
                             <>
                               <Loader2 className="w-4 h-4 animate-spin" />
@@ -663,8 +735,12 @@ export default function Compare() {
                             <p className="text-sm text-muted-foreground truncate">{selectedProduct.brand}</p>
                           </div>
                           <div className="text-right">
-                            <p className={`font-bold text-lg ${getScoreColor(selectedProduct.epiq_score)}`}>{selectedProduct.epiq_score || "—"}</p>
-                            {selectedProduct.product_price && <p className="text-sm text-muted-foreground">${selectedProduct.product_price}</p>}
+                            <p className={`font-bold text-lg ${getScoreColor(selectedProduct.epiq_score)}`}>
+                              {selectedProduct.epiq_score || "—"}
+                            </p>
+                            {selectedProduct.product_price && (
+                              <p className="text-sm text-muted-foreground">${selectedProduct.product_price}</p>
+                            )}
                           </div>
                         </div>
                       )}
@@ -672,7 +748,6 @@ export default function Compare() {
                   </Card>
                 </div>
 
-                {/* Desktop only */}
                 <div className="hidden lg:block min-w-0 space-y-6">
                   <Card>
                     <CardHeader className="pb-2">
@@ -710,7 +785,8 @@ export default function Compare() {
                   </TabsList>
 
                   <p className="text-sm text-muted-foreground">
-                    Market Dupes compares your selected product to popular retail formulas. My Products compares it to your own scans.
+                    Market Dupes compares your selected product to popular retail formulas. My Products compares it to
+                    your own scans.
                   </p>
 
                   <div className="flex gap-2 flex-wrap">
@@ -755,14 +831,18 @@ export default function Compare() {
                     ) : filteredMarketDupes.length > 0 ? (
                       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
                         {filteredMarketDupes.map((dupe, idx) => {
-                          const key = `${dupe.name}-${dupe.brand}`;
+                          const key = savedKeyForMarketDupe(dupe, selectedProductId);
                           return (
                             <div
                               key={`${dupe.brand}-${dupe.name}-${idx}`}
                               className={`animate-fade-in${idx === filteredMarketDupes.length - 1 ? " mb-5 sm:mb-0" : ""}`}
                               style={{ animationDelay: `${idx * 50}ms` }}
                             >
-                              <DupeCard dupe={dupe} isSaved={savedDupes.has(key)} onToggleSave={() => toggleSaveMarketDupe(dupe)} />
+                              <DupeCard
+                                dupe={dupe}
+                                isSaved={savedDupes.has(key)}
+                                onToggleSave={() => toggleSaveMarketDupe(dupe)}
+                              />
                             </div>
                           );
                         })}
@@ -790,9 +870,16 @@ export default function Compare() {
                     {Array.isArray(myProductMatches) && myProductMatches.length > 0 ? (
                       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
                         {myProductMatches.map((match, idx) => {
-                          const key = `${match.product.product_name}-${match.product.brand}`;
+                          const productName = norm(match?.product?.product_name);
+                          const brand = norm(match?.product?.brand || "");
+                          const key = `${norm(selectedProductId)}::${productName}::${brand}`;
+
                           return (
-                            <div key={match.product.id} className="animate-fade-in" style={{ animationDelay: `${idx * 50}ms` }}>
+                            <div
+                              key={match.product.id}
+                              className="animate-fade-in"
+                              style={{ animationDelay: `${idx * 50}ms` }}
+                            >
                               <DupeCard
                                 dupe={{
                                   name: match.product.product_name,

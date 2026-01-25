@@ -5,28 +5,15 @@ import { Heart, ChevronDown, ChevronUp, ShieldAlert, Info } from "lucide-react";
 import { cn } from "@/lib/utils";
 import noImageFound from "@/assets/no_image_found.png";
 
-type DupeBadges = {
-  bestMatch?: boolean;
-  bestValue?: boolean;
-};
+const uniq = (arr) => Array.from(new Set((arr || []).filter(Boolean)));
 
-type DupeCardProps = {
-  dupe: any;
-  isSaved?: boolean;
-  onToggleSave?: () => void;
-  defaultExpanded?: boolean;
-  badges?: DupeBadges;
-};
-
-const uniq = (arr: string[]) => Array.from(new Set(arr.filter(Boolean)));
-
-const toTitle = (v: string) =>
-  v
+const toTitle = (v) =>
+  String(v || "")
     .replace(/_/g, " ")
     .replace(/\s+/g, " ")
     .trim();
 
-const pickFirstImage = (dupe: any) => {
+const pickFirstImage = (dupe) => {
   if (dupe?.imageUrl) return dupe.imageUrl;
   if (Array.isArray(dupe?.images) && dupe.images[0]) return dupe.images[0];
   if (dupe?.obf?.imageUrl) return dupe.obf.imageUrl;
@@ -34,10 +21,9 @@ const pickFirstImage = (dupe: any) => {
   return null;
 };
 
-const detectFlagsFromIngredients = (ingredients: string[]) => {
-  const joined = ingredients.join(" ").toLowerCase();
-
-  const flags: string[] = [];
+const detectFlagsFromIngredients = (ingredients) => {
+  const joined = (ingredients || []).join(" ").toLowerCase();
+  const flags = [];
 
   if (joined.includes("fragrance") || joined.includes("parfum")) flags.push("Fragrance");
   if (joined.includes("limonene")) flags.push("Potential allergens");
@@ -49,11 +35,11 @@ const detectFlagsFromIngredients = (ingredients: string[]) => {
   return uniq(flags);
 };
 
-const deriveHighlights = (dupe: any) => {
+const deriveHighlights = (dupe) => {
   const list = Array.isArray(dupe?.highlights) ? dupe.highlights : [];
   if (list.length) return list;
 
-  const fallback: string[] = [];
+  const fallback = [];
   const mp = dupe?.matchPercent;
 
   if (typeof mp === "number") {
@@ -69,8 +55,9 @@ const deriveHighlights = (dupe: any) => {
       : [];
 
   const joined = ingredients.join(" ").toLowerCase();
-  if (joined.includes("glycerin") || joined.includes("ceramide") || joined.includes("hyaluron"))
+  if (joined.includes("glycerin") || joined.includes("ceramide") || joined.includes("hyaluron")) {
     fallback.push("Barrier support");
+  }
 
   const flags = detectFlagsFromIngredients(ingredients);
   if (flags.includes("Fragrance")) fallback.push("Contains fragrance");
@@ -78,7 +65,7 @@ const deriveHighlights = (dupe: any) => {
   return fallback.length ? fallback : ["Good routine fit"];
 };
 
-const deriveKeyIngredients = (dupe: any) => {
+const deriveKeyIngredients = (dupe) => {
   const list = Array.isArray(dupe?.keyIngredients) ? dupe.keyIngredients : [];
   if (list.length) return uniq(list);
 
@@ -88,29 +75,48 @@ const deriveKeyIngredients = (dupe: any) => {
       ? dupe.obf.ingredients
       : [];
 
-  const cleaned = ingredientList
-    .map((v: any) => String(v || "").trim())
-    .filter(Boolean);
-
-  // Pick a useful slice. You can tune this later.
+  const cleaned = (ingredientList || []).map((v) => String(v || "").trim()).filter(Boolean);
   return uniq(cleaned).slice(0, 8);
 };
 
-const deriveIngredientList = (dupe: any) => {
+const deriveIngredientList = (dupe) => {
   const list = Array.isArray(dupe?.ingredientList)
     ? dupe.ingredientList
     : Array.isArray(dupe?.obf?.ingredients)
       ? dupe.obf.ingredients
       : [];
 
-  return list.map((v: any) => String(v || "").trim()).filter(Boolean);
+  return (list || []).map((v) => String(v || "").trim()).filter(Boolean);
 };
 
-const formatScore = (v: any) => {
+const formatScore = (v) => {
   if (v === null || v === undefined) return "N/A";
   const num = Number(v);
   if (Number.isNaN(num)) return "N/A";
   return num.toFixed(2);
+};
+
+const deriveBrand = (dupe) => {
+  return (
+    dupe?.obf?.brand ||
+    dupe?.brand ||
+    dupe?.brandName ||
+    dupe?.brand_name ||
+    dupe?.obf?.brandName ||
+    dupe?.obf?.brand_name ||
+    "Unknown brand"
+  );
+};
+
+const deriveName = (dupe) => {
+  return (
+    dupe?.name ||
+    dupe?.productName ||
+    dupe?.product_name ||
+    dupe?.obf?.productName ||
+    dupe?.obf?.product_name ||
+    "Unknown product"
+  );
 };
 
 export const DupeCard = ({
@@ -119,7 +125,7 @@ export const DupeCard = ({
   onToggleSave,
   defaultExpanded = false,
   badges = {},
-}: DupeCardProps) => {
+}) => {
   const [expanded, setExpanded] = useState(defaultExpanded);
   const [imageError, setImageError] = useState(false);
   const [imageLoaded, setImageLoaded] = useState(false);
@@ -127,8 +133,8 @@ export const DupeCard = ({
   const displayImageRaw = pickFirstImage(dupe);
   const displayImage = !imageError && displayImageRaw ? displayImageRaw : noImageFound;
 
-  const brand = dupe?.brand || dupe?.obf?.brand || "Unknown brand";
-  const name = dupe?.name || dupe?.productName || dupe?.obf?.productName || "Unknown product";
+  const brand = deriveBrand(dupe);
+  const name = deriveName(dupe);
 
   const priceText = dupe?.priceEstimate || dupe?.price || "Price unavailable";
   const categoryText = dupe?.category || dupe?.obf?.categories || "Moisturizer";
@@ -141,6 +147,7 @@ export const DupeCard = ({
   const ingredientList = useMemo(() => deriveIngredientList(dupe), [dupe]);
   const highlights = useMemo(() => deriveHighlights(dupe), [dupe]);
   const keyIngredients = useMemo(() => deriveKeyIngredients(dupe), [dupe]);
+
   const flags = useMemo(() => {
     const explicit = Array.isArray(dupe?.flags) ? dupe.flags.filter(Boolean) : [];
     if (explicit.length) return uniq(explicit);
@@ -159,7 +166,6 @@ export const DupeCard = ({
   const showBestMatch = Boolean(badges?.bestMatch);
   const showBestValue = Boolean(badges?.bestValue);
 
-  // Everything under "More"
   const expandedDetails = useMemo(() => {
     const matchedCount = dupe?.matchedCount ?? dupe?.matchMeta?.matchedCount ?? null;
     const sourceCount = dupe?.sourceCount ?? dupe?.matchMeta?.sourceCount ?? null;
@@ -167,7 +173,7 @@ export const DupeCard = ({
     return [
       { label: "Description", value: dupe?.description || dupe?.obf?.generic_name || "Not provided" },
       { label: "Store", value: dupe?.storeLocation || dupe?.obf?.storeLocation || "Not provided" },
-      { label: "Where to buy", value: dupe?.whereToBuy || "Not provided" },
+      { label: "Where to buy", value: dupe?.whereToBuy || dupe?.obf?.whereToBuy || "Not provided" },
       { label: "Ingredient match", value: matchedCount && sourceCount ? `${matchedCount} of ${sourceCount}` : "Not provided" },
       { label: "Match score", value: formatScore(dupe?.matchScore) },
       { label: "Name score", value: formatScore(dupe?.nameScore) },
@@ -182,10 +188,9 @@ export const DupeCard = ({
       className={cn(
         "group relative overflow-hidden bg-card border-border transition-all hover:shadow-lg hover:-translate-y-0.5",
         showBestMatch && "ring-1 ring-primary/40",
-        showBestValue && "ring-1 ring-emerald-500/30",
+        showBestValue && "ring-1 ring-emerald-500/30"
       )}
     >
-      {/* Save */}
       <button
         type="button"
         onClick={(e) => {
@@ -198,23 +203,17 @@ export const DupeCard = ({
         <Heart
           className={cn(
             "w-4 h-4",
-            isSaved ? "fill-rose-500 text-rose-500" : "text-muted-foreground hover:text-rose-500",
+            isSaved ? "fill-rose-500 text-rose-500" : "text-muted-foreground hover:text-rose-500"
           )}
         />
       </button>
 
-      {/* Badges */}
       <div className="absolute top-2 left-2 z-10 flex gap-1">
         <Badge className="bg-primary/90 text-primary-foreground text-[10px]">{matchLabel}</Badge>
-        {showBestMatch && (
-          <Badge className="bg-primary text-primary-foreground text-[10px]">Best match</Badge>
-        )}
-        {showBestValue && (
-          <Badge className="bg-emerald-600 text-white text-[10px]">Best value</Badge>
-        )}
+        {showBestMatch && <Badge className="bg-primary text-primary-foreground text-[10px]">Best match</Badge>}
+        {showBestValue && <Badge className="bg-emerald-600 text-white text-[10px]">Best value</Badge>}
       </div>
 
-      {/* Image */}
       <div className="aspect-square bg-muted/30 relative">
         {!imageLoaded && !imageError && <div className="absolute inset-0 animate-pulse bg-muted" />}
         <img
@@ -223,22 +222,18 @@ export const DupeCard = ({
           className={cn(
             "w-full h-full transition-all",
             displayImage === noImageFound ? "object-contain p-6" : "object-cover",
-            imageLoaded ? "opacity-100" : "opacity-0",
+            imageLoaded ? "opacity-100" : "opacity-0"
           )}
           onLoad={() => setImageLoaded(true)}
           onError={() => setImageError(true)}
         />
       </div>
 
-      {/* Content */}
       <div className="p-3 space-y-2">
-        {/* Brand */}
         <p className="text-[10px] uppercase tracking-wide text-muted-foreground truncate">{brand}</p>
 
-        {/* Name */}
         <h3 className="text-sm font-semibold line-clamp-2 min-h-[2.5rem]">{name}</h3>
 
-        {/* Price + Toggle */}
         <div className="flex justify-between items-end gap-2">
           <p className="text-base font-bold text-primary truncate">{String(priceText)}</p>
 
@@ -253,23 +248,19 @@ export const DupeCard = ({
           </button>
         </div>
 
-        {/* Category */}
         <p className="text-[10px] text-muted-foreground">{String(categoryText)}</p>
 
-        {/* Why it fits (always visible) */}
         <div>
           <p className="text-[10px] uppercase font-medium text-muted-foreground">Why it fits</p>
           <ul className="text-xs text-muted-foreground space-y-0.5">
-            {highlights.slice(0, 3).map((h: string, i: number) => (
+            {highlights.slice(0, 3).map((h, i) => (
               <li key={i}>{h}</li>
             ))}
           </ul>
         </div>
 
-        {/* Expanded: show everything */}
         {expanded && (
           <div className="space-y-3 pt-1">
-            {/* Extra detail rows */}
             <div className="rounded-md border border-border bg-muted/10 p-2 space-y-1">
               <div className="flex items-center gap-1.5 mb-1">
                 <Info className="w-3.5 h-3.5 text-muted-foreground" />
@@ -286,13 +277,16 @@ export const DupeCard = ({
               </div>
             </div>
 
-            {/* Key ingredients */}
             <div>
               <p className="text-[10px] uppercase font-medium text-muted-foreground">Key ingredients</p>
               {keyIngredients.length > 0 ? (
                 <div className="flex flex-wrap gap-1">
-                  {keyIngredients.map((k: string, i: number) => (
-                    <span key={i} className="bg-muted px-1.5 py-0.5 rounded text-[10px] max-w-full truncate" title={k}>
+                  {keyIngredients.map((k, i) => (
+                    <span
+                      key={i}
+                      className="bg-muted px-1.5 py-0.5 rounded text-[10px] max-w-full truncate"
+                      title={k}
+                    >
                       {k}
                     </span>
                   ))}
@@ -302,7 +296,6 @@ export const DupeCard = ({
               )}
             </div>
 
-            {/* Watch outs */}
             <div>
               <div className="flex items-center gap-1.5">
                 <ShieldAlert className="w-3.5 h-3.5 text-yellow-600" />
@@ -311,9 +304,12 @@ export const DupeCard = ({
 
               {flags.length > 0 ? (
                 <div className="flex flex-wrap gap-1">
-                  {flags.map((f: string, i: number) => (
-                    <span key={i} className="bg-yellow-100 text-yellow-800 px-1.5 py-0.5 rounded text-[10px] font-semibold">
-                      {toTitle(String(f))}
+                  {flags.map((f, i) => (
+                    <span
+                      key={i}
+                      className="bg-yellow-100 text-yellow-800 px-1.5 py-0.5 rounded text-[10px] font-semibold"
+                    >
+                      {toTitle(f)}
                     </span>
                   ))}
                 </div>
@@ -322,19 +318,15 @@ export const DupeCard = ({
               )}
             </div>
 
-            {/* Ingredient count */}
-            {ingredientCountText && (
-              <p className="text-[10px] text-muted-foreground">{ingredientCountText}</p>
-            )}
+            {ingredientCountText && <p className="text-[10px] text-muted-foreground">{ingredientCountText}</p>}
 
-            {/* Full ingredient list */}
             <div>
               <p className="text-[10px] uppercase font-medium text-muted-foreground">Full ingredient list</p>
 
               {ingredientList.length > 0 ? (
                 <div className="max-h-40 overflow-auto rounded-md border border-border bg-background p-2">
                   <ul className="text-xs text-muted-foreground space-y-0.5">
-                    {ingredientList.map((ing: string, i: number) => (
+                    {ingredientList.map((ing, i) => (
                       <li key={i} className="leading-4">
                         {ing}
                       </li>

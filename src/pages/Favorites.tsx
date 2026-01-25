@@ -228,41 +228,36 @@ export default function Favorites() {
 
               {/* Grid of saved dupes */}
               <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-                {filteredAndSortedDupes.map((dupe, idx) => (
-                  <div 
-                    key={dupe.id}
-                    className="animate-fade-in"
-                    style={{ animationDelay: `${idx * 30}ms` }}
-                  >
-                    <DupeCard
-                      name={dupe.product_name}
-                      brand={dupe.brand || "Unknown"}
-                      imageUrl={dupe.image_url || undefined}
-                      reasons={dupe.reasons || []}
-                      sharedIngredients={dupe.shared_ingredients || []}
-                      priceEstimate={dupe.price_estimate || undefined}
-                      whereToBuy={dupe.where_to_buy || undefined}
-                      purchaseUrl={dupe.purchase_url || undefined}
-                      isSaved={true}
-                      onToggleSave={() => handleUnsave(dupe.id)}
-                      category="skincare"
-                      showPlaceholder={true}
-                    />
-                    <Button
-                      variant="link"
-                      className="mt-2 px-0 text-xs"
-                      onClick={() => {
-                        if (dupe.source_product_id) {
-                          navigate(`/compare?productId=${dupe.source_product_id}`);
-                        } else {
-                          navigate("/compare");
-                        }
-                      }}
+                {filteredAndSortedDupes.map((dupe, idx) => {
+                  // Map image_url to imageUrl for DupeCard compatibility
+                  const dupeWithImage = { ...dupe, imageUrl: dupe.image_url };
+                  return (
+                    <div 
+                      key={dupe.id}
+                      className="animate-fade-in"
+                      style={{ animationDelay: `${idx * 30}ms` }}
                     >
-                      Find more dupes like this
-                    </Button>
-                  </div>
-                ))}
+                      <DupeCard
+                        dupe={dupeWithImage}
+                        isSaved={true}
+                        onToggleSave={() => handleUnsave(dupe.id)}
+                      />
+                      <Button
+                        variant="link"
+                        className="mt-2 px-0 text-xs"
+                        onClick={() => {
+                          if (dupe.source_product_id) {
+                            navigate(`/compare?productId=${dupe.source_product_id}`);
+                          } else {
+                            navigate("/compare");
+                          }
+                        }}
+                      >
+                        Find more dupes like this
+                      </Button>
+                    </div>
+                  );
+                })}
               </div>
 
               {filteredAndSortedDupes.length === 0 && savedDupes.length > 0 && (
