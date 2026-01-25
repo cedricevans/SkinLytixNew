@@ -189,7 +189,8 @@ const Navigation = ({
         .from("user_analyses")
         .select("id")
         .eq("user_id", user.id)
-        .order("created_at", { ascending: false })
+        // user_analyses uses `analyzed_at` for the analysis timestamp
+        .order("analyzed_at", { ascending: false })
         .limit(1)
         .maybeSingle();
 

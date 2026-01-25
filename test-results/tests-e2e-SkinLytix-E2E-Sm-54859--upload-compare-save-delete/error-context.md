@@ -1,0 +1,47 @@
+# Page snapshot
+
+```yaml
+- generic [ref=e2]:
+  - region "Notifications (F8)":
+    - list
+  - region "Notifications alt+T"
+  - generic [ref=e3]:
+    - banner [ref=e4]:
+      - generic [ref=e5]:
+        - button "SkinLytix home" [ref=e6] [cursor=pointer]:
+          - text: SkinLytix
+          - superscript [ref=e7]: (TM)
+        - navigation [ref=e9]:
+          - button "Home" [ref=e10] [cursor=pointer]
+          - button "Features" [ref=e11] [cursor=pointer]
+          - button "How It Works" [ref=e12] [cursor=pointer]
+          - button "Pricing" [ref=e13] [cursor=pointer]
+          - button "Sign In" [active] [ref=e14] [cursor=pointer]
+          - button "Get Started Free" [ref=e15] [cursor=pointer]
+    - main [ref=e16]:
+      - generic [ref=e17]:
+        - generic [ref=e18]:
+          - heading "Welcome to SkinLytix" [level=1] [ref=e19]
+          - paragraph [ref=e20]: Your personal skincare intelligence engine
+        - alert [ref=e21]:
+          - img [ref=e22]
+          - generic [ref=e24]:
+            - strong [ref=e25]: "Beta Notice:"
+            - text: If you forget your password, use the password reset flow to regain access.
+        - generic [ref=e26]:
+          - tablist [ref=e27]:
+            - tab "Sign In" [selected] [ref=e28] [cursor=pointer]
+            - tab "Sign Up" [ref=e29] [cursor=pointer]
+          - tabpanel "Sign In" [ref=e30]:
+            - generic [ref=e31]:
+              - generic [ref=e32]:
+                - text: Email
+                - textbox "Email" [ref=e33]: cedric.evans@gmail.com
+              - generic [ref=e34]:
+                - text: Password
+                - textbox "Password" [ref=e35]: pa55word
+              - button "Forgot password?" [ref=e36] [cursor=pointer]
+              - button "Sign In" [ref=e37] [cursor=pointer]
+  - button "Report bug or suggest feature" [ref=e38] [cursor=pointer]:
+    - img [ref=e39]
+```

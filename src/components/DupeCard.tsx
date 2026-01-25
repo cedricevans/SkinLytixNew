@@ -77,7 +77,8 @@ export const DupeCard = ({
           src={displayImage}
           alt={`${brand} ${name}`}
           className={cn(
-            "w-full h-full object-cover group-hover:scale-105 transition-all duration-300",
+            "w-full h-full group-hover:scale-105 transition-all duration-300",
+            displayImage === noImageFound ? "object-contain" : "object-cover",
             imageLoaded ? "opacity-100" : "opacity-0"
           )}
           onError={() => {

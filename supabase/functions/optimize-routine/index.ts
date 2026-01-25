@@ -12,6 +12,11 @@ serve(async (req) => {
   }
 
   try {
+  // Declare variables for AI response and fallback tracking at the top of the try block
+  let aiData;
+  let optimizationData;
+  let fallbackLevel = 0;
+  let aiResponse;
     const { routineId } = await req.json();
     console.log('Optimizing routine:', routineId);
 
@@ -290,6 +295,8 @@ Format your response as a structured JSON:
 }`;
 
     const aiResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+
+  aiResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${lovableApiKey}`,
@@ -306,13 +313,95 @@ Format your response as a structured JSON:
     });
 
     if (!aiResponse.ok) {
-      const errorText = await aiResponse.text();
-      console.error('AI API error:', aiResponse.status, errorText);
-      throw new Error(`AI API error: ${aiResponse.status}`);
+      // Fallback to Gemini 2.5 Flash Lite direct call
+  fallbackLevel = 1;
+      const geminiApiKey = Deno.env.get('GEMINI_API_KEY');
+      if (!geminiApiKey) throw new Error('GEMINI_API_KEY not set');
+      console.warn('Lovable API failed, falling back to Gemini direct:', aiResponse.status);
+  aiResponse = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key=' + geminiApiKey, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          contents: [
+            { role: 'user', parts: [{ text: aiPrompt }] }
+          ],
+          generationConfig: {
+            response_mime_type: 'application/json',
+            temperature: 0.7,
+            maxOutputTokens: 2048
+          }
+        }),
+      });
+      if (!aiResponse.ok) {
+        // Third-level fallback: Gemma model with user comfort message
+  fallbackLevel = 2;
+        console.warn('Gemini Flash Lite failed, falling back to Gemma. Status:', aiResponse.status);
+  aiResponse = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemma-3-4b:generateContent?key=' + geminiApiKey, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            contents: [
+              { role: 'user', parts: [{ text: aiPrompt }] }
+            ],
+            generationConfig: {
+              response_mime_type: 'application/json',
+              temperature: 0.7,
+              maxOutputTokens: 2048
+            }
+          }),
+        });
+        if (!aiResponse.ok) {
+          // All models failed: likely out of credits/quota everywhere
+          const errorText = await aiResponse.text();
+          console.error('Gemma fallback failed: ', aiResponse.status, errorText);
+          return new Response(
+            JSON.stringify({
+              error: 'All AI models are currently unavailable due to quota or credit exhaustion. Please try again later or contact support if this persists.'
+            }),
+            { status: 503, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
+        aiData = await aiResponse.json();
+        let content = aiData.candidates?.[0]?.content?.parts?.[0]?.text || aiData.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
+        try {
+          optimizationData = JSON.parse(content);
+        } catch (e) {
+          // If Gemma output is not valid JSON, return a helpful message
+          optimizationData = {
+            summary: "This routine includes active ingredients that need extra review. We’re running a deeper analysis to make sure everything works well together. Some results may need additional verification.",
+            fallback: true
+          };
+        }
+      } else {
+        aiData = await aiResponse.json();
+        let content = aiData.candidates?.[0]?.content?.parts?.[0]?.text || aiData.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
+        try {
+          optimizationData = JSON.parse(content);
+        } catch (e) {
+          optimizationData = {
+            summary: "This routine includes active ingredients that need extra review. We’re running a deeper analysis to make sure everything works well together. Some results may need additional verification.",
+            fallback: true
+          };
+        }
+      }
+    } else {
+      aiData = await aiResponse.json();
+      optimizationData = JSON.parse(aiData.choices[0].message.content);
     }
 
-    const aiData = await aiResponse.json();
-    const optimizationData = JSON.parse(aiData.choices[0].message.content);
+    // Track which fallback was used
+    // fallbackLevel: 0 = Lovable, 1 = Gemini, 2 = Gemma
+    optimizationData.fallbackLevel = fallbackLevel;
+    if (fallbackLevel > 0) {
+      // Proactively log/flag fallback usage for quota monitoring
+      let fallbackName = fallbackLevel === 1 ? 'Gemini' : 'Gemma';
+      console.warn(`AI fallback triggered: ${fallbackName} used for routineId ${routineId}`);
+      // Optionally: send alert/notification here (e.g., webhook, email, etc.)
+    }
 
     // Calculate total cost and add metadata
     const totalCost = productsData.reduce((sum, p) => sum + (p.price || 0), 0);

@@ -117,12 +117,6 @@ export function PaywallModal({
                 <Sparkles className="h-3 w-3" />
                 Premium Feature
               </Badge>
-              <button 
-                onClick={() => onOpenChange(false)}
-                className="text-muted-foreground hover:text-foreground"
-              >
-                <X className="h-5 w-5" />
-              </button>
             </div>
             <DialogTitle className="text-2xl mt-3">
               Unlock {feature}

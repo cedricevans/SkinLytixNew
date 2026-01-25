@@ -81,83 +81,126 @@ You are a skincare expert that finds real, existing product dupes. You MUST retu
 
 Return ONLY a JSON array of 12 real skincare products that are dupes/alternatives. Each object must have:
 - "name": string (exact product name as sold in stores)
-- "brand": string (brand name)
-- "imageUrl": string (MUST be a real product image URL from one of these sources, or null if unavailable:
-  * Target: https://target.scene7.com/is/image/Target/[product-id]
-  * Ulta: https://media.ulta.com/i/ulta/[product-id]
-  * Sephora: https://www.sephora.com/productimages/[product-id]
-  * Amazon: https://m.media-amazon.com/images/I/[product-id])
-- "reasons": array of 2-3 strings explaining why it's a dupe
-- "sharedIngredients": array of 2-4 key shared ingredients
-- "priceEstimate": string (e.g., "$15-25")
-- "profileMatch": boolean (true if suits the user's skin type/concerns)
-- "category": string (face, body, hair, or scalp)
-- "whereToBuy": string (retailer name like "Target", "Ulta", "Amazon", "Sephora")
-Optional fields if relevant:
-- "scentNotes": array of 2-4 scent notes (for fragranced body products)
-
-Focus on REAL products from brands like CeraVe, La Roche-Posay, The Ordinary, Neutrogena, Cetaphil, Paula's Choice, Olay, Aveeno, Eucerin, Vanicream, First Aid Beauty, Kiehl's, Drunk Elephant, Sunday Riley, Tatcha, etc.`;
-
-    const userPrompt = `
-Find 5 real skincare product dupes for:
-
-Product: ${productName}${brand ? ` by ${brand}` : ''}
-Category: ${category || 'face'}
-Key Ingredients: ${promptIngredients.join(', ') || 'Not specified'}
-User Profile: ${skinType || 'normal'} skin${Array.isArray(concerns) && concerns.length ? `, concerns: ${concerns.join(', ')}` : ''}
-
-Return products that:
-1. Have similar key active ingredients
-2. Serve the same skincare function
-3. Are widely available for purchase
-4. Match the user's skin profile when possible
-${isScentFocused ? '5. Match the scent profile when relevant (vanilla, coconut, shea, etc.)' : ''}
-
-Return ONLY the JSON array, no other text.`;
-
-    console.log('Finding dupes for:', productName, 'Category:', category);
 
     const aiCacheKey = JSON.stringify({
-      productName,
-      brand,
-      category,
-      skinType,
-      concerns,
-      ingredients: promptIngredients,
-    });
-    const cachedDupes = getCache(aiCache, aiCacheKey);
+      let dupes: any[] = [];
+      if (cachedDupes) {
+        dupes = cachedDupes;
+      } else {
+        // Robust fallback logic: Lovable -> Gemini -> Gemma
+        let aiContent = null;
+        let fallbackLevel = 0;
+        // 0 = Lovable, 1 = Gemini, 2 = Gemma
 
-    let dupes: any[] = [];
-    if (cachedDupes) {
-      dupes = cachedDupes;
-    } else {
-      const callLovable = async () => {
-        if (!LOVABLE_API_KEY) return null;
-        const aiResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${LOVABLE_API_KEY}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            model: 'google/gemini-2.5-flash-lite',
-            messages: [
-              { role: 'system', content: systemPrompt.trim() },
-              { role: 'user', content: userPrompt.trim() },
-            ],
-            temperature: 0.7,
-          }),
-        });
-
-        if (!aiResponse.ok) {
-          const errorText = await aiResponse.text();
-          console.error('AI Gateway error:', aiResponse.status, errorText);
-          return null;
+        // Try Lovable
+        if (LOVABLE_API_KEY) {
+          const aiResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${LOVABLE_API_KEY}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              model: 'google/gemini-2.5-flash-lite',
+              messages: [
+                { role: 'system', content: systemPrompt.trim() },
+                { role: 'user', content: userPrompt.trim() },
+              ],
+              temperature: 0.7,
+            }),
+          });
+          if (aiResponse.ok) {
+            const aiData = await aiResponse.json();
+            aiContent = aiData.choices?.[0]?.message?.content ?? null;
+          } else {
+            const errorText = await aiResponse.text();
+            console.warn('AI Gateway error:', aiResponse.status, errorText);
+            fallbackLevel = 1;
+          }
+        } else {
+          fallbackLevel = 1;
         }
 
-        const aiData = await aiResponse.json();
-        return aiData.choices?.[0]?.message?.content ?? null;
-      };
+        // Try Gemini direct if Lovable failed
+        if (!aiContent && GEMINI_API_KEY) {
+          const prompt = `${systemPrompt.trim()}\n\n${userPrompt.trim()}`;
+          const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key=${GEMINI_API_KEY}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              contents: [{
+                role: 'user',
+                parts: [{ text: prompt }],
+              }],
+              generationConfig: { temperature: 0.7 },
+            }),
+          });
+          if (response.ok) {
+            const dataJson = await response.json();
+            aiContent = dataJson?.candidates?.[0]?.content?.parts?.[0]?.text ?? null;
+          } else {
+            const errorText = await response.text();
+            console.warn('Gemini direct error:', response.status, errorText);
+            fallbackLevel = 2;
+          }
+        }
+
+        // Try Gemma if both above failed
+        if (!aiContent && GEMINI_API_KEY) {
+          const prompt = `${systemPrompt.trim()}\n\n${userPrompt.trim()}`;
+          const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemma-3-4b:generateContent?key=${GEMINI_API_KEY}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              contents: [{
+                role: 'user',
+                parts: [{ text: prompt }],
+              }],
+              generationConfig: { temperature: 0.7 },
+            }),
+          });
+          if (response.ok) {
+            const dataJson = await response.json();
+            aiContent = dataJson?.candidates?.[0]?.content?.parts?.[0]?.text ?? null;
+          } else {
+            const errorText = await response.text();
+            console.error('Gemma fallback failed:', response.status, errorText);
+            // All models failed: likely out of credits/quota everywhere
+            return new Response(JSON.stringify({
+              dupes: [],
+              error: 'All AI models are currently unavailable due to quota or credit exhaustion. Please try again later or contact support if this persists.'
+            }), {
+              status: 503,
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            });
+          }
+        }
+
+        // Track which fallback was used
+        if (fallbackLevel > 0) {
+          let fallbackName = fallbackLevel === 1 ? 'Gemini' : 'Gemma';
+          console.warn(`AI fallback triggered: ${fallbackName} used for find-dupes`);
+          // Optionally: send alert/notification here (e.g., webhook, email, etc.)
+        }
+
+        if (!aiContent) aiContent = '[]';
+
+        // Parse the AI response, stripping away any accidental Markdown formatting.
+        try {
+          const cleanContent = (aiContent as string)
+            .replace(/```json\n?/gi, '')
+            .replace(/```\n?/g, '')
+            .trim();
+          const match = cleanContent.match(/\[[\s\S]*\]/);
+          const parsed = JSON.parse(match ? match[0] : cleanContent);
+          dupes = Array.isArray(parsed) ? parsed : (Array.isArray(parsed?.dupes) ? parsed.dupes : []);
+        } catch (parseError) {
+          console.error('Failed to parse AI response:', parseError);
+          dupes = [];
+        }
+
+        setCache(aiCache, aiCacheKey, dupes, 10 * 60 * 1000);
+      }
 
       const callGeminiDirect = async () => {
         if (!GEMINI_API_KEY) return null;
@@ -382,66 +425,110 @@ Return ONLY the JSON array, no other text.`;
       let chosenScore = -1;
 
       for (const candidate of products) {
-        const candidateName =
-          candidate.product_name ||
-          candidate.product_name_en ||
-          candidate.product_name_fr ||
-          candidate.product_name_es ||
-          candidate.product_name_it ||
-          '';
-        const candidateBrands = candidate.brands || candidate.brands_tags?.join(' ') || '';
-        const candidateIngredients = extractObfIngredients(candidate);
-        const overlapStats = candidateIngredients && sourceList.length
-          ? computeOverlapStats(sourceList, candidateIngredients)
-          : null;
-        const nameScore = computeTokenSimilarity(name, candidateName);
-        const brandScore = brandName
-          ? computeTokenSimilarity(brandName, candidateBrands)
-          : 0;
-        const overlapScore = overlapStats ? overlapStats.percent / 100 : 0;
-        const candidateScore = overlapScore * 2 + nameScore * 1.2 + brandScore * 0.8;
-
-        if (candidateScore > chosenScore) {
-          chosenScore = candidateScore;
-          chosen = candidate;
-          chosenIngredients = candidateIngredients;
-        }
-      }
-
-      return { chosen, chosenIngredients };
-    };
-
-    // Look up a product on OBF by name/brand to enrich ingredients and images.
-    const lookupOpenBeautyFacts = async (
       name: string,
       brandName: string | undefined,
-      sourceList: string[],
-    ): Promise<{
-      imageUrl: string | null;
-      productUrl: string | null;
-      ingredients: string[] | null;
-      brand: string | null;
-      productName: string | null;
-    } | null> => {
-      const termsList = buildSearchTerms(name, brandName);
-      if (!termsList.length) return null;
 
-      let bestResult: { imageUrl: string | null; productUrl: string | null; ingredients: string[] | null; brand: string | null; productName: string | null } | null = null;
-      let bestScore = -1;
+        // Robust fallback logic: Lovable -> Gemini -> Gemma
+        let aiContent = null;
+        let fallbackLevel = 0;
+        // 0 = Lovable, 1 = Gemini, 2 = Gemma
 
-      for (const terms of termsList) {
-        const cacheKey = `obf:${terms.toLowerCase()}`;
-        const cached = getCache(obfCache, cacheKey);
-        if (cached !== undefined) {
-          if (cached && cached.ingredients) {
-            const overlapStats = computeOverlapStats(sourceList, cached.ingredients);
-            const score = overlapStats ? overlapStats.percent : 0;
-            if (score > bestScore) {
-              bestScore = score;
+        // Try Lovable
+        if (LOVABLE_API_KEY) {
+          const aiResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${LOVABLE_API_KEY}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              model: 'google/gemini-2.5-flash-lite',
+              messages: [
+                { role: 'system', content: systemPrompt.trim() },
+                { role: 'user', content: userPrompt.trim() },
+              ],
+              temperature: 0.7,
+            }),
+          });
+          if (aiResponse.ok) {
+            const aiData = await aiResponse.json();
+            aiContent = aiData.choices?.[0]?.message?.content ?? null;
+          } else {
+            const errorText = await aiResponse.text();
+            console.warn('AI Gateway error:', aiResponse.status, errorText);
+            fallbackLevel = 1;
+          }
+        } else {
+          fallbackLevel = 1;
+        }
+
+        // Try Gemini direct if Lovable failed
+        if (!aiContent && GEMINI_API_KEY) {
+          const prompt = `${systemPrompt.trim()}
               bestResult = cached;
             }
+          const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key=${GEMINI_API_KEY}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              contents: [{
+                role: 'user',
+                parts: [{ text: prompt }],
+              }],
+              generationConfig: { temperature: 0.7 },
+            }),
+          });
+          if (response.ok) {
+            const dataJson = await response.json();
+            aiContent = dataJson?.candidates?.[0]?.content?.parts?.[0]?.text ?? null;
+          } else {
+            const errorText = await response.text();
+            console.warn('Gemini direct error:', response.status, errorText);
+            fallbackLevel = 2;
+          }
+        }
+
+        // Try Gemma if both above failed
+        if (!aiContent && GEMINI_API_KEY) {
+          const prompt = `${systemPrompt.trim()}
           }
           continue;
+          const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemma-3-4b:generateContent?key=${GEMINI_API_KEY}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              contents: [{
+                role: 'user',
+                parts: [{ text: prompt }],
+              }],
+              generationConfig: { temperature: 0.7 },
+            }),
+          });
+          if (response.ok) {
+            const dataJson = await response.json();
+            aiContent = dataJson?.candidates?.[0]?.content?.parts?.[0]?.text ?? null;
+          } else {
+            const errorText = await response.text();
+            console.error('Gemma fallback failed:', response.status, errorText);
+            // All models failed: likely out of credits/quota everywhere
+            return new Response(JSON.stringify({
+              dupes: [],
+              error: 'All AI models are currently unavailable due to quota or credit exhaustion. Please try again later or contact support if this persists.'
+            }), {
+              status: 503,
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            });
+          }
+        }
+
+        // Track which fallback was used
+        if (fallbackLevel > 0) {
+          let fallbackName = fallbackLevel === 1 ? 'Gemini' : 'Gemma';
+          console.warn(`AI fallback triggered: ${fallbackName} used for find-dupes`);
+          // Optionally: send alert/notification here (e.g., webhook, email, etc.)
+        }
+
+        if (!aiContent) aiContent = '[]';
         }
 
         const params = new URLSearchParams({

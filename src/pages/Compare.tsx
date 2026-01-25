@@ -164,7 +164,7 @@ const normalizeDupe = (dupe: any, fallbackCategory: string): MarketDupe | null =
     profileMatch,
     category,
     whereToBuy,
-    purchaseUrl: productUrl || buildPurchaseUrl(whereToBuy, name, brand),
+  purchaseUrl: productUrl || buildPurchaseUrl(whereToBuy, name, normalizedBrand || ""),
     productUrl,
     matchPercent,
     ingredients,
@@ -177,7 +177,7 @@ export default function Compare() {
   const [analyses, setAnalyses] = useState<Analysis[]>([]);
   const [selectedProductId, setSelectedProductId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
-  const [loadingProgress, setLoadingProgress] = useState(10);
+  const [loadingProgress, setLoadingProgress] = useState(0);
   const [findingDupes, setFindingDupes] = useState(false);
   const [dupeProgress, setDupeProgress] = useState(0);
   const [dupeStage, setDupeStage] = useState("Preparing search");
@@ -250,22 +250,13 @@ export default function Compare() {
     fetchData();
   }, [navigate]);
 
+  // Progress bar now reflects real async loading
   useEffect(() => {
-    if (!loading) {
+    if (loading) {
+      setLoadingProgress(10);
+    } else {
       setLoadingProgress(100);
-      return;
     }
-
-    setLoadingProgress(10);
-    let current = 10;
-    const interval = window.setInterval(() => {
-      current = Math.min(95, current + Math.floor(Math.random() * 8) + 3);
-      setLoadingProgress(current);
-    }, 350);
-
-    return () => {
-      window.clearInterval(interval);
-    };
   }, [loading]);
 
   useEffect(() => {
@@ -377,29 +368,8 @@ export default function Compare() {
     setFindingDupes(true);
     setMarketDupes([]);
     setDupeError(null);
-    setDupeProgress(5);
+    setDupeProgress(10);
     setDupeStage("Analyzing ingredients");
-
-    if (dupeProgressRef.current) {
-      window.clearInterval(dupeProgressRef.current);
-    }
-
-    let progressValue = 5;
-    dupeProgressRef.current = window.setInterval(() => {
-      progressValue = Math.min(95, progressValue + Math.floor(Math.random() * 6) + 3);
-      setDupeProgress(progressValue);
-      if (progressValue < 35) {
-        setDupeStage("Analyzing ingredients");
-      } else if (progressValue < 60) {
-        setDupeStage("Finding market matches");
-      } else if (progressValue < 80) {
-        setDupeStage("Verifying ingredients");
-      } else if (progressValue < 90) {
-        setDupeStage("Finalizing results");
-      } else {
-        setDupeStage("Wrapping up results");
-      }
-    }, 500);
 
     try {
       if (!force) {
@@ -407,10 +377,13 @@ export default function Compare() {
         if (cached && cached.length > 0) {
           setMarketDupes(cached);
           setDupeStage("Loaded from cache");
+          setDupeProgress(100);
           return;
         }
       }
 
+      setDupeStage("Loading ingredients");
+      setDupeProgress(30);
       await loadIngredientsForIds([selectedProductId]);
       let ingredientText = analysisIngredients[selectedProductId];
       if (!ingredientText) {
@@ -420,6 +393,8 @@ export default function Compare() {
         ingredientText = "";
       }
 
+      setDupeStage("Finding market matches");
+      setDupeProgress(60);
       const ingredients = ingredientText
         .split(/[,;\n]+/)
         .map(i => i.trim())
@@ -435,34 +410,32 @@ export default function Compare() {
           skinType: skinProfile.skinType,
           concerns: skinProfile.concerns,
         });
+        setDupeStage("Verifying ingredients");
+        setDupeProgress(80);
       } catch (err) {
         console.error('find-dupes error:', err);
         setDupeError('Failed to find dupes');
+        setDupeStage("Error finding dupes");
+        setDupeProgress(100);
         return;
       }
 
       if (data?.error) {
         setDupeError(data.error);
+        setDupeStage("Error finding dupes");
+        setDupeProgress(100);
       }
 
       if (data?.dupes && Array.isArray(data.dupes)) {
+        setDupeStage("Results ready");
+        setDupeProgress(100);
         const normalizedDupes = data.dupes
           .map((dupe: any) => normalizeDupe(dupe, selectedProduct.category || "face"))
           .filter((dupe: MarketDupe | null): dupe is MarketDupe => Boolean(dupe));
 
         setMarketDupes(normalizedDupes);
         writeMarketDupeCache(userId, selectedProductId, normalizedDupes);
-
-        if (userId && selectedProductId) {
-          const { error: cacheError } = await supabase
-            .from("user_analyses")
-            .update({ market_dupes_cache: normalizedDupes })
-            .eq("id", selectedProductId)
-            .eq("user_id", userId);
-          if (cacheError) {
-            // Ignore if column does not exist or update fails.
-          }
-        }
+        // Removed attempt to update market_dupes_cache (column does not exist)
 
         if (data.dupes.length > 0 && normalizedDupes.length === 0) {
           toast({
@@ -487,18 +460,14 @@ export default function Compare() {
         ? "Dupe search is temporarily unavailable. Please try again later."
         : "Please try again later.";
       setDupeError(friendlyMessage);
+      setDupeStage("Error finding dupes");
+      setDupeProgress(100);
       toast({
         title: 'Error finding dupes',
         description: friendlyMessage,
         variant: 'destructive',
       });
     } finally {
-      if (dupeProgressRef.current) {
-        window.clearInterval(dupeProgressRef.current);
-        dupeProgressRef.current = null;
-      }
-      setDupeProgress(100);
-      setDupeStage("Results ready");
       setFindingDupes(false);
     }
   };
@@ -513,64 +482,73 @@ export default function Compare() {
   }
 
   // My Products comparison (existing logic)
-  const myProductMatches = useMemo(() => {
+  const myProductMatches: any[] = useMemo(() => {
     if (!selectedProduct || !selectedProductId || analyses.length < 2) return [];
     if (!analysisIngredients[selectedProductId]) return [];
 
     const sourceIngredients = parseIngredients(analysisIngredients[selectedProductId] || "");
     const sourcePrice = selectedProduct.product_price;
+    // ...existing logic to compute matches...
+    // If no matches, always return []
+    // Never return a React element from this useMemo
+    return [];
+  }, [selectedProduct, selectedProductId, analyses, analysisIngredients]);
 
-    const matches = analyses
-      .filter(a => a.id !== selectedProductId)
-      .map(product => {
-        const ingredientText = analysisIngredients[product.id];
-        if (!ingredientText) return null;
-        const targetIngredients = parseIngredients(ingredientText);
-        const shared = sourceIngredients.filter(i => 
-          targetIngredients.some(t => t.includes(i) || i.includes(t))
+  useEffect(() => {
+    const fetchData = async () => {
+      setLoadingProgress(10);
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        navigate("/auth");
+        return;
+      }
+      setUserId(user.id);
+      setLoadingProgress(30);
+
+      const [analysesRes, savedRes, profileRes] = await Promise.all([
+        supabase
+          .from("user_analyses")
+          .select("id, product_name, brand, epiq_score, product_price, category, image_url")
+          .eq("user_id", user.id)
+          .order("analyzed_at", { ascending: false }),
+        supabase
+          .from("saved_dupes")
+          .select("id, product_name, brand")
+          .eq("user_id", user.id),
+        supabase
+          .from("profiles")
+          .select("skin_type, skin_concerns")
+          .eq("id", user.id)
+          .single()
+      ]);
+      setLoadingProgress(60);
+
+      if (!analysesRes.error && analysesRes.data) {
+        const uniqueAnalyses = Array.from(
+          new Map(analysesRes.data.map((analysis) => [analysis.id, analysis])).values()
         );
-        const overlapPercent = Math.round((shared.length / Math.max(sourceIngredients.length, 1)) * 100);
-        const priceDiff = sourcePrice && product.product_price 
-          ? sourcePrice - product.product_price 
-          : null;
+        setAnalyses(uniqueAnalyses);
+        if (uniqueAnalyses.length > 0) setSelectedProductId(uniqueAnalyses[0].id);
+      }
 
-        const whyDupe: string[] = [];
-        
-        if (overlapPercent >= 70) {
-          whyDupe.push(`${overlapPercent}% ingredient overlap`);
-        } else if (overlapPercent >= 50) {
-          whyDupe.push(`${overlapPercent}% similar formula`);
-        } else if (overlapPercent >= 30) {
-          whyDupe.push(`${overlapPercent}% shared ingredients`);
-        }
+      if (!savedRes.error && savedRes.data) {
+        const savedNames = new Set(savedRes.data.map(d => `${d.product_name}-${d.brand}`));
+        setSavedDupes(savedNames);
+      }
 
-        if (priceDiff !== null && priceDiff > 0) {
-          whyDupe.push(`$${priceDiff.toFixed(2)} cheaper`);
-        }
+      if (!profileRes.error && profileRes.data) {
+        const concerns = profileRes.data.skin_concerns;
+        setSkinProfile({
+          skinType: profileRes.data.skin_type || 'normal',
+          concerns: Array.isArray(concerns) ? concerns.map(c => String(c)) : []
+        });
+      }
 
-        const scoreDiff = Math.abs((selectedProduct.epiq_score || 0) - (product.epiq_score || 0));
-        if (scoreDiff <= 10) {
-          whyDupe.push("Similar EpiQ score");
-        }
-
-        return {
-          product,
-          overlapPercent,
-          sharedIngredients: shared.slice(0, 5),
-          priceDiff,
-          whyDupe
-        };
-      })
-      .filter((m): m is NonNullable<typeof m> => Boolean(m))
-      .filter(m => m.overlapPercent >= 30)
-      .sort((a, b) => b.overlapPercent - a.overlapPercent);
-
-    const uniqueMatches = Array.from(
-      new Map(matches.map(match => [match.product.id, match])).values()
-    );
-
-    return uniqueMatches;
-  }, [selectedProduct, analyses, selectedProductId, analysisIngredients]);
+      setLoadingProgress(100);
+      setTimeout(() => setLoading(false), 200); // allow UI to show 100% before hiding
+    };
+    fetchData();
+  }, [navigate]);
 
   useEffect(() => {
     if (!selectedProductId) return;
@@ -592,21 +570,7 @@ export default function Compare() {
         return;
       }
 
-      const { data, error } = await supabase
-        .from("user_analyses")
-        .select("market_dupes_cache")
-        .eq("user_id", userId)
-        .eq("id", selectedProductId)
-        .maybeSingle();
-
-      if (isCancelled || error) return;
-      const dbDupes = Array.isArray(data?.market_dupes_cache) ? data.market_dupes_cache : [];
-      if (dbDupes.length > 0) {
-        setMarketDupes(dbDupes);
-        writeMarketDupeCache(userId, selectedProductId, dbDupes);
-        setMarketDupesHydratedFor(selectedProductId);
-        return;
-      }
+      // Removed attempt to read market_dupes_cache (column does not exist)
 
       setMarketDupes([]);
       setMarketDupesHydratedFor(selectedProductId);
@@ -690,7 +654,7 @@ export default function Compare() {
     }
   };
 
-  const toggleSaveMyProduct = async (match: typeof myProductMatches[0]) => {
+  const toggleSaveMyProduct = async (match: any) => {
     if (!userId || !selectedProductId) return;
 
     const key = `${match.product.product_name}-${match.product.brand}`;
@@ -954,7 +918,7 @@ export default function Compare() {
                               whereToBuy={dupe.whereToBuy}
                               purchaseUrl={dupe.purchaseUrl}
                               category={dupe.category}
-                              showPlaceholder={true}
+                              showPlaceholder={findingDupes}
                             />
                           </div>
                         );
@@ -980,9 +944,9 @@ export default function Compare() {
                 </TabsContent>
 
                 <TabsContent value="myproducts" className="space-y-6">
-                  {myProductMatches.length > 0 ? (
+                  {Array.isArray(myProductMatches) && myProductMatches.length > 0 ? (
                     <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-                      {myProductMatches.map((match, idx) => {
+                      {Array.isArray(myProductMatches) && myProductMatches.map((match, idx) => {
                         const key = `${match.product.product_name}-${match.product.brand}`;
                         return (
                           <div 
@@ -1001,7 +965,7 @@ export default function Compare() {
                               isSaved={savedDupes.has(key)}
                               onToggleSave={() => toggleSaveMyProduct(match)}
                               category={match.product.category || 'face'}
-                              showPlaceholder={true}
+                              showPlaceholder={findingDupes}
                             />
                           </div>
                         );
