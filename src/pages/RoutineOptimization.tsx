@@ -4,6 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { PaywallModal } from "@/components/paywall/PaywallModal";
 import { ArrowLeft, AlertTriangle, TrendingDown, DollarSign, CheckCircle, Info, AlertCircle } from "lucide-react";
 import { toast } from "sonner";
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from "@/components/ui/tooltip";
@@ -66,6 +67,7 @@ export default function RoutineOptimization() {
   const navigate = useNavigate();
   const [data, setData] = useState<OptimizationData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [showUnlock, setShowUnlock] = useState(false);
 
   useEffect(() => {
     loadOptimization();
@@ -127,6 +129,13 @@ export default function RoutineOptimization() {
   return (
     <TooltipProvider>
       <AppShell showNavigation showBottomNav contentClassName="px-[5px] lg:px-4 py-8">
+        {/* Unlock Modal */}
+        <PaywallModal
+          open={showUnlock}
+          onOpenChange={setShowUnlock}
+          feature="Routine Optimization"
+          featureDescription="Unlock advanced routine optimization and personalized recommendations."
+        />
       <div className="container mx-auto max-w-4xl">
         <Button
           variant="ghost"

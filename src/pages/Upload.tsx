@@ -18,7 +18,7 @@ import PageHeader from "@/components/PageHeader";
 
 // Helper: Downscale image for faster AI extraction and OCR
 const downscaleImage = (imageDataUrl, maxSize = 1600, quality = 0.82) => {
-  return new Promise((resolve) => {
+  return new Promise<string>((resolve) => {
     const img = new Image();
     img.onload = () => {
       const maxDim = Math.max(img.width, img.height);
@@ -66,8 +66,8 @@ const rotateDataUrl = (imageDataUrl, degrees) => {
 
 // Helper: preprocess variants for better OCR accuracy
 const preprocessImageHard = async (imageDataUrl) => {
-  const resized = await downscaleImage(imageDataUrl, 2000, 0.92);
-  return new Promise((resolve) => {
+  const resized = await downscaleImage(imageDataUrl, 2000, 0.92) as string;
+  return new Promise<string>((resolve) => {
     const img = new Image();
     img.onload = () => {
       const canvas = document.createElement("canvas");
@@ -99,8 +99,8 @@ const preprocessImageHard = async (imageDataUrl) => {
 };
 
 const preprocessImageSoft = async (imageDataUrl) => {
-  const resized = await downscaleImage(imageDataUrl, 2200, 0.92);
-  return new Promise((resolve) => {
+  const resized = await downscaleImage(imageDataUrl, 2200, 0.92) as string;
+  return new Promise<string>((resolve) => {
     const img = new Image();
     img.onload = () => {
       const canvas = document.createElement("canvas");
@@ -307,11 +307,12 @@ const Upload = () => {
   const initOcrWorker = async () => {
     if (ocrWorkerReadyRef.current && ocrWorkerRef.current) return ocrWorkerRef.current;
 
-    const worker = await Tesseract.createWorker({
+    // Suppress type error for workerPath by casting to any
+    const worker = await (Tesseract.createWorker as any)({
       workerPath: "https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/worker.min.js",
       corePath: "https://cdn.jsdelivr.net/npm/tesseract.js-core@5/tesseract-core.wasm.js",
       langPath: "https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/lang-data",
-      logger: (m) => {
+      logger: (m: any) => {
         if (!m) return;
         if (typeof m.progress === "number") setOcrProgress(Math.max(1, Math.round(m.progress * 100)));
       },
@@ -319,7 +320,6 @@ const Upload = () => {
 
     await worker.loadLanguage("eng");
     await worker.initialize("eng");
-
     await worker.setParameters({
       preserve_interword_spaces: "1",
       user_defined_dpi: "300",
@@ -1132,7 +1132,15 @@ const Upload = () => {
             </div>
 
             <Button
-              onClick={analysisReady && analysisId ? () => navigate(`/analysis/${analysisId}`) : handleAnalyze}
+              onClick={(e) => {
+                if (analysisReady && analysisId) {
+                  navigate(`/analysis/${analysisId}`);
+                } else {
+                  // Prevent default to avoid form submission if inside a form
+                  e.preventDefault();
+                  handleAnalyze();
+                }
+              }}
               disabled={isAnalyzing || isProcessingOCR}
               className={analysisReady && analysisId ? "w-full bg-emerald-600 hover:bg-emerald-700 text-white" : "w-full"}
               variant={analysisReady && analysisId ? "default" : "cta"}
