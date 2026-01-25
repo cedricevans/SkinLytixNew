@@ -13,6 +13,7 @@ import { ArrowLeft, Search, Sparkles, FlaskConical, Package, Loader2, AlertTrian
 import { useSubscription } from "@/hooks/useSubscription";
 import { PaywallModal } from "@/components/paywall/PaywallModal";
 import { DupeCard } from "@/components/DupeCard";
+import type { DupeProductSummary, DupeProductExpanded } from "@/types/dupe-product";
 import { toast } from "@/hooks/use-toast";
 import { invokeFunction } from '@/lib/functions-client';
 
@@ -27,21 +28,8 @@ interface Analysis {
   image_url: string | null;
 }
 
-interface MarketDupe {
-  name: string;
-  brand: string;
-  imageUrl: string;
-  reasons: string[];
-  sharedIngredients: string[];
-  ingredients?: string[];
-  priceEstimate: string;
-  profileMatch: boolean;
-  category: string;
-  whereToBuy?: string;
-  purchaseUrl?: string;
-  productUrl?: string;
-  matchPercent?: number;
-}
+// Deprecated: MarketDupe. Use DupeProductSummary/DupeProductExpanded instead.
+type MarketDupe = DupeProductExpanded;
 
 interface SavedDupe {
   id: string;
@@ -120,54 +108,29 @@ const normalizePrice = (price: unknown) => {
 };
 
 const normalizeDupe = (dupe: any, fallbackCategory: string): MarketDupe | null => {
-  const name = dupe?.name || dupe?.productName || dupe?.product_name;
-  const brandRaw = dupe?.brand || dupe?.brandName || dupe?.brand_name;
-  if (!name) return null;
-
-  const imageUrl = dupe?.imageUrl || dupe?.image_url || dupe?.image || "";
-  const normalizedImageUrl = typeof imageUrl === "string" && imageUrl.includes("images.unsplash.com")
-    ? ""
-    : imageUrl;
-  const priceEstimate = normalizePrice(
-    dupe?.priceEstimate || dupe?.price_estimate || dupe?.price || dupe?.priceRange || dupe?.price_range
-  );
-  const whereToBuy = dupe?.whereToBuy || dupe?.where_to_buy || dupe?.retailer || dupe?.retailers;
-  const productUrl = dupe?.productUrl || dupe?.product_url || dupe?.url;
-  const category = String(dupe?.category || fallbackCategory || "face").toLowerCase();
-  const reasons = Array.isArray(dupe?.reasons) ? dupe.reasons : [];
-  const sharedIngredients = Array.isArray(dupe?.sharedIngredients)
-    ? dupe.sharedIngredients
-    : Array.isArray(dupe?.shared_ingredients)
-      ? dupe.shared_ingredients
-      : [];
-  const profileMatch = Boolean(dupe?.profileMatch ?? dupe?.profile_match);
-  const matchPercentRaw = dupe?.matchPercent ?? dupe?.match_percent ?? dupe?.overlapPercent ?? dupe?.overlap_percent;
-  const matchPercent = typeof matchPercentRaw === "number" ? matchPercentRaw : undefined;
-  const ingredientsRaw = dupe?.ingredients ?? dupe?.ingredients_list ?? dupe?.ingredientsList ?? dupe?.ingredients_text;
-  const ingredients = Array.isArray(ingredientsRaw)
-    ? ingredientsRaw.filter(Boolean).map((item: string) => item.trim())
-    : typeof ingredientsRaw === "string"
-      ? ingredientsRaw.split(/[,;]+/).map((item) => item.trim()).filter((item) => item.length > 2)
-      : undefined;
-
-  const normalizedBrand = typeof brandRaw === "string" && /skinlytix/i.test(brandRaw)
-    ? ""
-    : brandRaw;
-
+  // Map backend dupe object to DupeProductExpanded shape
+  if (!dupe?.name) return null;
   return {
-    name,
-    brand: normalizedBrand || "",
-    imageUrl: normalizedImageUrl,
-    reasons,
-    sharedIngredients,
-    priceEstimate: priceEstimate || "",
-    profileMatch,
-    category,
-    whereToBuy,
-  purchaseUrl: productUrl || buildPurchaseUrl(whereToBuy, name, normalizedBrand || ""),
-    productUrl,
-    matchPercent,
-    ingredients,
+    name: dupe.name,
+    brand: dupe.brand ?? "",
+    imageUrl: dupe.imageUrl ?? (Array.isArray(dupe.images) && dupe.images.length > 0 ? dupe.images[0] : null),
+    price: dupe.price ?? null,
+    matchPercent: dupe.matchPercent ?? null,
+    description: dupe.description ?? null,
+    category: dupe.category ?? fallbackCategory ?? null,
+    whereToBuy: dupe.whereToBuy ?? null,
+    images: dupe.images ?? (dupe.imageUrl ? [dupe.imageUrl] : []),
+    ingredientList: dupe.ingredientList ?? dupe.ingredients ?? [],
+    storeLocation: dupe.storeLocation ?? null,
+    matchedCount: dupe.matchedCount ?? null,
+    sourceCount: dupe.sourceCount ?? null,
+    matchScore: dupe.matchScore ?? null,
+    nameScore: dupe.nameScore ?? null,
+    brandScore: dupe.brandScore ?? null,
+    scentScore: dupe.scentScore ?? null,
+    compositeScore: dupe.compositeScore ?? null,
+    obf: dupe.obf ?? {},
+    productUrl: dupe.productUrl ?? null,
   };
 };
 
@@ -340,12 +303,12 @@ export default function Compare() {
       return Math.min(98, Math.max(1, Math.round(dupe.matchPercent)));
     }
 
-    if (!dupe.ingredients || dupe.ingredients.length === 0 || sourceList.length === 0) {
+  if (!dupe.ingredientList || dupe.ingredientList.length === 0 || sourceList.length === 0) {
       return undefined;
     }
 
     const sourceIngredients = Array.from(new Set(normalizeList(sourceList)));
-    const targetIngredients = Array.from(new Set(normalizeList(dupe.ingredients)));
+  const targetIngredients = Array.from(new Set(normalizeList(dupe.ingredientList)));
     if (!sourceIngredients.length || !targetIngredients.length) return undefined;
 
     let matched = 0;
@@ -636,12 +599,9 @@ export default function Compare() {
           product_name: dupe.name,
           brand: dupe.brand,
           image_url: dupe.imageUrl,
-          reasons: dupe.reasons,
-          shared_ingredients: dupe.sharedIngredients,
-          price_estimate: dupe.priceEstimate,
+          // No longer saving reasons/sharedIngredients/priceEstimate/purchaseUrl
           source_product_id: selectedProductId,
           where_to_buy: dupe.whereToBuy || null,
-          purchase_url: dupe.purchaseUrl || null
         });
 
       if (!error) {
@@ -906,18 +866,9 @@ export default function Compare() {
                             style={{ animationDelay: `${idx * 50}ms` }}
                           >
                             <DupeCard
-                              name={dupe.name}
-                              brand={dupe.brand}
-                              imageUrl={dupe.imageUrl}
-                              priceEstimate={dupe.priceEstimate}
-                              matchPercentage={getMarketMatchPercent(dupe, sourceIngredients)}
-                              reasons={dupe.reasons}
-                              sharedIngredients={dupe.sharedIngredients}
+                              dupe={dupe}
                               isSaved={savedDupes.has(key)}
                               onToggleSave={() => toggleSaveMarketDupe(dupe)}
-                              whereToBuy={dupe.whereToBuy}
-                              purchaseUrl={dupe.purchaseUrl}
-                              category={dupe.category}
                               showPlaceholder={findingDupes}
                             />
                           </div>
@@ -955,16 +906,18 @@ export default function Compare() {
                             style={{ animationDelay: `${idx * 50}ms` }}
                           >
                             <DupeCard
-                              name={match.product.product_name}
-                              brand={match.product.brand || "Unknown Brand"}
-                              imageUrl={match.product.image_url || undefined}
-                              priceEstimate={match.product.product_price ? `$${match.product.product_price}` : undefined}
-                              reasons={match.whyDupe}
-                              sharedIngredients={match.sharedIngredients}
-                              matchPercentage={match.overlapPercent}
+                              dupe={{
+                                name: match.product.product_name,
+                                brand: match.product.brand || "Unknown Brand",
+                                imageUrl: match.product.image_url || null,
+                                price: match.product.product_price ? `$${match.product.product_price}` : null,
+                                matchPercent: match.overlapPercent ?? null,
+                                description: null,
+                                category: match.product.category || 'face',
+                                whereToBuy: null,
+                              }}
                               isSaved={savedDupes.has(key)}
                               onToggleSave={() => toggleSaveMyProduct(match)}
-                              category={match.product.category || 'face'}
                               showPlaceholder={findingDupes}
                             />
                           </div>
