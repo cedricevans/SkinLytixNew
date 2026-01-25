@@ -9,12 +9,7 @@ import { Card } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import Tesseract from "tesseract.js";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-  TooltipProvider,
-} from "@/components/ui/tooltip";
+import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from "@/components/ui/tooltip";
 import { useTracking, trackEvent } from "@/hooks/useTracking";
 import OCRLoadingTips from "@/components/OCRLoadingTips";
 import { FrictionFeedbackBanner } from "@/components/FrictionFeedbackBanner";
@@ -40,16 +35,45 @@ const downscaleImage = (imageDataUrl, maxSize = 1600, quality = 0.82) => {
   });
 };
 
-// Helper: Preprocess image for better OCR accuracy
-const preprocessImage = async (imageDataUrl) => {
-  const resized = await downscaleImage(imageDataUrl, 1800, 0.9);
+// Helper: rotate image for alternate OCR passes (helps when users shoot sideways)
+const rotateDataUrl = (imageDataUrl, degrees) => {
+  if (!degrees) return Promise.resolve(imageDataUrl);
   return new Promise((resolve) => {
     const img = new Image();
     img.onload = () => {
       const canvas = document.createElement("canvas");
       const ctx = canvas.getContext("2d");
 
-      const upscale = Math.max(1, 1400 / Math.max(img.width, img.height));
+      const rad = (degrees * Math.PI) / 180;
+      const w = img.width;
+      const h = img.height;
+
+      const swap = degrees % 180 !== 0;
+      canvas.width = swap ? h : w;
+      canvas.height = swap ? w : h;
+
+      ctx.translate(canvas.width / 2, canvas.height / 2);
+      ctx.rotate(rad);
+      ctx.drawImage(img, -w / 2, -h / 2);
+
+      resolve(canvas.toDataURL("image/png"));
+    };
+    img.onerror = () => resolve(imageDataUrl);
+    img.src = imageDataUrl;
+  });
+};
+
+// Helper: preprocess variants for better OCR accuracy
+const preprocessImageHard = async (imageDataUrl) => {
+  // Strong thresholding, best when label is crisp and high contrast
+  const resized = await downscaleImage(imageDataUrl, 2000, 0.92);
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => {
+      const canvas = document.createElement("canvas");
+      const ctx = canvas.getContext("2d");
+
+      const upscale = Math.max(1, 1800 / Math.max(img.width, img.height));
       canvas.width = Math.round(img.width * upscale);
       canvas.height = Math.round(img.height * upscale);
       ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
@@ -57,10 +81,10 @@ const preprocessImage = async (imageDataUrl) => {
       const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
       const data = imageData.data;
 
-      // Convert to grayscale and increase contrast
+      // Hard threshold
       for (let i = 0; i < data.length; i += 4) {
         const gray = data[i] * 0.299 + data[i + 1] * 0.587 + data[i + 2] * 0.114;
-        const enhanced = gray < 128 ? 0 : 255;
+        const enhanced = gray < 150 ? 0 : 255;
         data[i] = enhanced;
         data[i + 1] = enhanced;
         data[i + 2] = enhanced;
@@ -69,6 +93,44 @@ const preprocessImage = async (imageDataUrl) => {
       ctx.putImageData(imageData, 0, 0);
       resolve(canvas.toDataURL("image/png"));
     };
+    img.onerror = () => resolve(resized);
+    img.src = resized;
+  });
+};
+
+const preprocessImageSoft = async (imageDataUrl) => {
+  // Softer enhancement, better when hard threshold blows out characters
+  const resized = await downscaleImage(imageDataUrl, 2200, 0.92);
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => {
+      const canvas = document.createElement("canvas");
+      const ctx = canvas.getContext("2d");
+
+      const upscale = Math.max(1, 1800 / Math.max(img.width, img.height));
+      canvas.width = Math.round(img.width * upscale);
+      canvas.height = Math.round(img.height * upscale);
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+
+      const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      const data = imageData.data;
+
+      // Grayscale + mild contrast
+      const contrast = 1.25;
+      const intercept = 128 * (1 - contrast);
+
+      for (let i = 0; i < data.length; i += 4) {
+        const gray = data[i] * 0.299 + data[i + 1] * 0.587 + data[i + 2] * 0.114;
+        const c = Math.max(0, Math.min(255, gray * contrast + intercept));
+        data[i] = c;
+        data[i + 1] = c;
+        data[i + 2] = c;
+      }
+
+      ctx.putImageData(imageData, 0, 0);
+      resolve(canvas.toDataURL("image/png"));
+    };
+    img.onerror = () => resolve(resized);
     img.src = resized;
   });
 };
@@ -79,16 +141,66 @@ const extractIngredientSection = (text) => {
   const ingredientIndex = lower.search(/ingredients?\b/);
   let section = ingredientIndex >= 0 ? text.slice(ingredientIndex) : text;
   section = section.replace(/ingredients?\s*[:\-]?\s*/i, "");
-  section = section.split(/\bmay contain\b|\bcontains\b|\bwarning\b|\bdirections\b|\buse\b/i)[0] || section;
+  section = section.split(/\bmay contain\b|\bcontains\b|\bwarning\b|\bdirections\b|\buse\b|\bkeep out\b|\bcaution\b/i)[0] || section;
   return section;
 };
 
 const cleanIngredientText = (text) => {
-  let cleaned = text.replace(/[^a-zA-Z0-9\s,\-\(\)\/\.]/g, "");
+  let cleaned = (text || "").replace(/[^a-zA-Z0-9\s,\-\(\)\/\.]/g, "");
   cleaned = cleaned.replace(/\s+/g, " ");
   cleaned = cleaned.replace(/\b\d+\b/g, "");
   cleaned = cleaned.trim();
   return cleaned;
+};
+
+// Heuristic: detect if OCR text is likely ingredients vs random noise
+const scoreIngredientLikeText = (rawText) => {
+  const t = (rawText || "").trim();
+  if (!t) return 0;
+
+  const lower = t.toLowerCase();
+  const hasIngredientsWord = /ingredients?\b/.test(lower) ? 15 : 0;
+
+  const cleaned = cleanIngredientText(extractIngredientSection(t));
+  const tokens = cleaned
+    .split(/[,;\n]/)
+    .map((s) => s.trim())
+    .filter(Boolean);
+
+  const tokenCount = tokens.length;
+  const tokenScore = Math.min(35, tokenCount * 2);
+
+  const weirdRatio = (() => {
+    const letters = (t.match(/[a-z]/gi) || []).length;
+    const weird = (t.match(/[^\w\s,().\-\/%:]/g) || []).length;
+    if (letters === 0) return 50;
+    return Math.min(50, Math.round((weird / letters) * 100));
+  })();
+
+  const knownMarkers = [
+    "water",
+    "glycerin",
+    "fragrance",
+    "parfum",
+    "niacinamide",
+    "alcohol",
+    "phenoxyethanol",
+    "citric acid",
+    "sodium",
+    "chloride",
+    "tocopherol",
+    "caprylic",
+    "cetearyl",
+    "dimethicone",
+  ];
+  const markerHits = knownMarkers.reduce((sum, k) => (lower.includes(k) ? sum + 1 : sum), 0);
+  const markerScore = Math.min(20, markerHits * 4);
+
+  // Penalize super short output
+  const lengthPenalty = cleaned.length < 40 ? 25 : 0;
+
+  // Higher is better
+  return hasIngredientsWord + tokenScore + markerScore - weirdRatio - lengthPenalty;
 };
 
 const buildAnalysisSignature = (name, ingredients) => {
@@ -167,6 +279,9 @@ const Upload = () => {
   const fileInputRef = useRef(null);
   const cameraInputRef = useRef(null);
 
+  const ocrWorkerRef = useRef(null);
+  const ocrWorkerReadyRef = useRef(false);
+
   const [productImage, setProductImage] = useState(null);
   const [productName, setProductName] = useState("");
   const [barcode, setBarcode] = useState("");
@@ -186,6 +301,49 @@ const Upload = () => {
   const analysisStartRef = useRef(null);
   const [lastCacheSignature, setLastCacheSignature] = useState(null);
 
+  const initOcrWorker = async () => {
+    if (ocrWorkerReadyRef.current && ocrWorkerRef.current) return ocrWorkerRef.current;
+
+    const worker = await Tesseract.createWorker({
+      logger: (m) => {
+        if (m?.status === "recognizing text" && typeof m.progress === "number") {
+          setOcrProgress(Math.round(m.progress * 100));
+        }
+      },
+    });
+
+    await worker.loadLanguage("eng");
+    await worker.initialize("eng");
+
+    // Global baseline params. We still override per-pass below.
+    await worker.setParameters({
+      preserve_interword_spaces: "1",
+      user_defined_dpi: "300",
+      // Keep this tight. We want chemicals, punctuation, slashes.
+      tessedit_char_whitelist: "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789(),.-/%:/+[] ",
+      // Reduce weird artifacts
+      tessedit_char_blacklist: "©®™•°~`|{}<>_",
+    });
+
+    ocrWorkerRef.current = worker;
+    ocrWorkerReadyRef.current = true;
+    return worker;
+  };
+
+  useEffect(() => {
+    // Cleanup worker on unmount
+    return () => {
+      const w = ocrWorkerRef.current;
+      if (w) {
+        try {
+          w.terminate();
+        } catch {}
+      }
+      ocrWorkerRef.current = null;
+      ocrWorkerReadyRef.current = false;
+    };
+  }, []);
+
   const handleImageUpload = async (file) => {
     trackEvent({
       eventName: "image_uploaded",
@@ -198,10 +356,86 @@ const Upload = () => {
       const imageDataUrl = e.target?.result;
       setProductImage(imageDataUrl);
 
-      // Always attempt AI extraction first (fallback to OCR on failure)
+      // Attempt AI first. If credits are out or AI fails, OCR will run.
       await handleAIExtraction(imageDataUrl);
     };
     reader.readAsDataURL(file);
+  };
+
+  const runOcrPass = async (worker, imageDataUrl, passParams, passLabel) => {
+    try {
+      await worker.setParameters(passParams);
+      const res = await worker.recognize(imageDataUrl);
+
+      const text = res?.data?.text || "";
+      const words = res?.data?.words || [];
+      const avgConfidence =
+        words.length > 0
+          ? Math.round(words.reduce((sum, w) => sum + (w.confidence || 0), 0) / words.length)
+          : 0;
+
+      const ingredientScore = scoreIngredientLikeText(text);
+
+      return {
+        label: passLabel,
+        text,
+        avgConfidence,
+        ingredientScore,
+        combinedScore: avgConfidence * 0.7 + ingredientScore * 1.3,
+      };
+    } catch (e) {
+      return {
+        label: passLabel,
+        text: "",
+        avgConfidence: 0,
+        ingredientScore: 0,
+        combinedScore: 0,
+        error: e,
+      };
+    }
+  };
+
+  const finalizeFromOcrText = (fullText) => {
+    const lines = (fullText || "")
+      .split("\n")
+      .map((l) => l.trim())
+      .filter(Boolean);
+
+    if (lines.length > 0 && !brand) {
+      const potentialBrand = lines[0];
+      if (potentialBrand.length < 30) setBrand(cleanIngredientText(potentialBrand));
+    }
+
+    const textLower = (fullText || "").toLowerCase();
+    const categoryKeywords = {
+      cleanser: ["cleanser", "cleansing", "wash"],
+      serum: ["serum"],
+      moisturizer: ["moisturizer", "cream", "lotion"],
+      toner: ["toner"],
+      sunscreen: ["sunscreen", "spf", "sun protection"],
+      mask: ["mask"],
+      treatment: ["treatment", "spot"],
+      shampoo: ["shampoo"],
+      conditioner: ["conditioner"],
+      deodorant: ["deodorant"],
+      bodywash: ["body wash", "bodywash"],
+    };
+
+    for (const [cat, keywords] of Object.entries(categoryKeywords)) {
+      if (keywords.some((kw) => textLower.includes(kw))) {
+        setCategory(cat);
+        break;
+      }
+    }
+
+    const ingredientsMatch = (fullText || "").match(/ingredients?[:\s]+(.+?)(?:\n\n|$)/is);
+    const rawIngredients = ingredientsMatch ? ingredientsMatch[1].trim() : extractIngredientSection(fullText || "");
+    const cleaned = cleanIngredientText(rawIngredients);
+
+    return {
+      cleanedIngredients: cleaned,
+      rawIngredients,
+    };
   };
 
   const handleTesseractOCR = async (imageDataUrl) => {
@@ -209,72 +443,115 @@ const Upload = () => {
     setOcrProgress(0);
 
     try {
-      const preprocessedImage = await preprocessImage(imageDataUrl);
+      const worker = await initOcrWorker();
 
-      const result = await Tesseract.recognize(preprocessedImage, "eng", {
-        logger: (m) => {
-          if (m.status === "recognizing text") {
-            setOcrProgress(Math.round(m.progress * 100));
-          }
+      // Build a set of candidate images to OCR:
+      // - soft preprocess
+      // - hard preprocess
+      // - plus rotated versions (helps a lot on mobile photos)
+      setOcrProgress(5);
+
+      const soft = await preprocessImageSoft(imageDataUrl);
+      setOcrProgress(10);
+      const hard = await preprocessImageHard(imageDataUrl);
+      setOcrProgress(15);
+
+      const soft90 = await rotateDataUrl(soft, 90);
+      const soft270 = await rotateDataUrl(soft, 270);
+      const hard90 = await rotateDataUrl(hard, 90);
+      const hard270 = await rotateDataUrl(hard, 270);
+
+      const candidates = [
+        { img: soft, name: "soft" },
+        { img: hard, name: "hard" },
+        { img: soft90, name: "soft-90" },
+        { img: soft270, name: "soft-270" },
+        { img: hard90, name: "hard-90" },
+        { img: hard270, name: "hard-270" },
+      ];
+
+      // Multiple OCR passes:
+      // PSM 6 works well for uniform blocks.
+      // PSM 4 helps when text is in columns/variable layout.
+      // PSM 11 helps when it is sparse / line-ish.
+      const passes = [
+        {
+          label: "psm6",
+          params: {
+            tessedit_pageseg_mode: "6",
+            // Reduce random symbols and enforce DPI
+            user_defined_dpi: "300",
+          },
         },
-        tessedit_char_whitelist: "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789(),.-/% ",
-        preserve_interword_spaces: "1",
-      });
+        {
+          label: "psm4",
+          params: {
+            tessedit_pageseg_mode: "4",
+            user_defined_dpi: "300",
+          },
+        },
+        {
+          label: "psm11",
+          params: {
+            tessedit_pageseg_mode: "11",
+            user_defined_dpi: "300",
+          },
+        },
+      ];
 
-      const fullText = result.data.text || "";
-      const avgConfidence =
-        result.data.words && result.data.words.length > 0
-          ? Math.round(
-              result.data.words.reduce((sum, w) => sum + (w.confidence || 0), 0) /
-                result.data.words.length
-            )
-          : 0;
+      const results = [];
+      // Keep runtime reasonable: try top 2 images first, then expand if needed.
+      const initialCandidates = candidates.slice(0, 2);
+      const extraCandidates = candidates.slice(2);
 
-      const lines = fullText
-        .split("\n")
-        .map((l) => l.trim())
-        .filter(Boolean);
+      setOcrProgress(20);
 
-      if (lines.length > 0 && !brand) {
-        const potentialBrand = lines[0];
-        if (potentialBrand.length < 30) setBrand(cleanIngredientText(potentialBrand));
-      }
-
-      const textLower = fullText.toLowerCase();
-      const categoryKeywords = {
-        cleanser: ["cleanser", "cleansing", "wash"],
-        serum: ["serum"],
-        moisturizer: ["moisturizer", "cream", "lotion"],
-        toner: ["toner"],
-        sunscreen: ["sunscreen", "spf", "sun protection"],
-        mask: ["mask"],
-        treatment: ["treatment", "spot"],
-      };
-
-      for (const [cat, keywords] of Object.entries(categoryKeywords)) {
-        if (keywords.some((kw) => textLower.includes(kw))) {
-          setCategory(cat);
-          break;
+      for (const c of initialCandidates) {
+        for (const p of passes) {
+          const r = await runOcrPass(worker, c.img, p.params, `${c.name}-${p.label}`);
+          results.push(r);
         }
       }
 
-      const ingredientsMatch = fullText.match(/ingredients?[:\s]+(.+?)(?:\n\n|$)/is);
-      const rawIngredients = ingredientsMatch ? ingredientsMatch[1].trim() : extractIngredientSection(fullText);
+      // Pick best so far
+      results.sort((a, b) => (b.combinedScore || 0) - (a.combinedScore || 0));
+      let best = results[0];
 
-      if (avgConfidence < 45) {
+      // If best looks weak, expand search
+      const weak = !best || best.avgConfidence < 55 || best.ingredientScore < 20;
+      if (weak) {
+        setOcrProgress(35);
+        for (const c of extraCandidates) {
+          for (const p of passes.slice(0, 2)) {
+            const r = await runOcrPass(worker, c.img, p.params, `${c.name}-${p.label}`);
+            results.push(r);
+          }
+          results.sort((a, b) => (b.combinedScore || 0) - (a.combinedScore || 0));
+          best = results[0];
+          if (best && best.avgConfidence >= 60 && best.ingredientScore >= 25) break;
+        }
+      }
+
+      const bestText = best?.text || "";
+      const { cleanedIngredients } = finalizeFromOcrText(bestText);
+
+      // Final gate: if still garbage, tell user to type
+      const finalIngredientScore = scoreIngredientLikeText(bestText);
+      const finalOk = cleanedIngredients.length >= 60 && finalIngredientScore >= 15;
+
+      if (!finalOk) {
         toast({
-          title: "Low OCR Confidence",
-          description: "We could not read the label clearly. Type ingredients manually for best results.",
+          title: "OCR Needs Help",
+          description: "We could not read the label clearly. Retake the photo with better light, then try again, or type ingredients manually.",
           variant: "destructive",
         });
       } else {
-        setIngredientsList(cleanIngredientText(rawIngredients));
+        setIngredientsList(cleanedIngredients);
+        toast({
+          title: "OCR Complete",
+          description: "Ingredients extracted. Review and edit.",
+        });
       }
-
-      toast({
-        title: "OCR Complete",
-        description: "Product info extracted. Review and edit.",
-      });
     } catch (error) {
       console.error("OCR error:", error);
       toast({
@@ -290,7 +567,7 @@ const Upload = () => {
 
   const handleAIExtraction = async (imageDataUrl) => {
     setIsProcessingOCR(true);
-    setOcrProgress(50);
+    setOcrProgress(40);
 
     try {
       const compressedImage = await downscaleImage(imageDataUrl, 1600, 0.82);
@@ -301,9 +578,22 @@ const Upload = () => {
         },
       });
 
+      // If AI credits are out, this often returns an error or empty-ish output.
       if (error) throw error;
 
-      setIngredientsList(data?.ingredients || "");
+      const aiIngredients = (data?.ingredients || "").trim();
+      const aiLooksBad =
+        !aiIngredients ||
+        aiIngredients.length < 40 ||
+        scoreIngredientLikeText(aiIngredients) < 10 ||
+        /[^\w\s,().\-\/%:+$begin:math:display$$end:math:display$]/.test(aiIngredients);
+
+      // If AI returns junk, force OCR fallback
+      if (aiLooksBad) {
+        throw new Error("AI returned low-quality extraction");
+      }
+
+      setIngredientsList(aiIngredients);
       if (data?.brand) setBrand(data.brand);
       if (data?.category) setCategory(data.category);
       if (data?.productName) setProductName(data.productName);
@@ -316,8 +606,8 @@ const Upload = () => {
     } catch (error) {
       console.error("AI extraction error:", error);
       toast({
-        title: "AI Extraction Failed",
-        description: "Falling back to standard OCR.",
+        title: "AI Unavailable",
+        description: "Switching to advanced OCR mode.",
         variant: "destructive",
       });
       await handleTesseractOCR(imageDataUrl);
@@ -379,7 +669,6 @@ const Upload = () => {
       invalidateAnalysisCache(user.id, signature);
     }
 
-    // FIX 1: use analyzed_at (this column exists in your Profile page)
     const { data: existingAnalysis } = await supabase
       .from("user_analyses")
       .select("id, recommendations_json")
@@ -570,7 +859,6 @@ const Upload = () => {
         invalidateAnalysisCache(user.id, signature);
       }
 
-      // FIX 2: use analyzed_at here too
       const { data: existingAnalysis } = await supabase
         .from("user_analyses")
         .select("id, recommendations_json")
@@ -589,7 +877,6 @@ const Upload = () => {
       }
     };
 
-    // FIX 3: debounce to avoid hammering Supabase while typing
     const t = window.setTimeout(() => {
       checkCache();
     }, 500);
@@ -720,26 +1007,18 @@ const Upload = () => {
                   </TooltipTrigger>
                   <TooltipContent className="max-w-xs">
                     <p className="text-xs leading-relaxed">
-                      Take a photo of where the ingredients are listed. We extract the text using AI, with OCR fallback.
+                      Take a photo of where the ingredients are listed. We extract the text using AI, with advanced OCR fallback.
                     </p>
                   </TooltipContent>
                 </Tooltip>
               </Label>
 
               <div className="flex flex-col sm:flex-row gap-4">
-                <Button
-                  variant="outline"
-                  onClick={() => fileInputRef.current?.click()}
-                  className="flex-1 w-full touch-target"
-                >
+                <Button variant="outline" onClick={() => fileInputRef.current?.click()} className="flex-1 w-full touch-target">
                   <UploadIcon className="w-4 h-4 mr-2" />
                   Upload Photo
                 </Button>
-                <Button
-                  variant="outline"
-                  onClick={() => cameraInputRef.current?.click()}
-                  className="flex-1 w-full touch-target"
-                >
+                <Button variant="outline" onClick={() => cameraInputRef.current?.click()} className="flex-1 w-full touch-target">
                   <Camera className="w-4 h-4 mr-2" />
                   Take Photo
                 </Button>
@@ -775,7 +1054,7 @@ const Upload = () => {
               </div>
             )}
 
-            {isProcessingOCR && <OCRLoadingTips progress={ocrProgress} message="Extracting ingredients with AI..." />}
+            {isProcessingOCR && <OCRLoadingTips progress={ocrProgress} message="Extracting ingredients, AI first then advanced OCR..." />}
 
             <div className="space-y-4">
               <div>

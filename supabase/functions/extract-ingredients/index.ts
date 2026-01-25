@@ -11,10 +11,12 @@ serve(async (req) => {
   }
 
   try {
+
     const { image, productType } = await req.json();
-    const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
-    const GEMINI_API_KEY = Deno.env.get('GEMINI_API_KEY');
-    
+  const OPENROUTER_API_KEY = Deno.env.get('OPENROUTER_API_KEY');
+  const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
+  const GEMINI_API_KEY = Deno.env.get('GEMINI_API_KEY');
+
     const buildPrompt = () => `${getProductTypeContext(productType)}
 
 Extract the following information from this personal care product image:
@@ -71,13 +73,13 @@ Important:
         return null;
       }
 
-      const data = await response.json();
-      return data?.choices?.[0]?.message?.content ?? null;
+  const lovableData = await response.json();
+  return lovableData?.choices?.[0]?.message?.content ?? null;
     };
 
     const callGeminiDirect = async () => {
       if (!GEMINI_API_KEY) return null;
-      const { mimeType, data } = await getImageData(image);
+  const { mimeType, data: geminiImageData } = await getImageData(image);
       const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key=${GEMINI_API_KEY}`, {
         method: 'POST',
         headers: {
@@ -92,7 +94,7 @@ Important:
               {
                 inline_data: {
                   mime_type: mimeType,
-                  data,
+                  data: geminiImageData,
                 },
               },
             ],
@@ -114,10 +116,79 @@ Important:
       return dataJson?.candidates?.[0]?.content?.parts?.[0]?.text ?? null;
     };
 
-    const content = (await callLovable()) ?? (await callGeminiDirect());
-    
+    // OpenRouter fallback (DeepSeek Chimera)
+
+    const callOpenRouter = async () => {
+      if (!OPENROUTER_API_KEY) return null;
+      const { mimeType, data: openrouterImageData } = await getImageData(image);
+      const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${OPENROUTER_API_KEY}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: 'tngtech/deepseek-r1t-chimera:free',
+          messages: [
+            {
+              role: 'system',
+              content: 'You are a precise extraction engine. Return ONLY valid JSON that matches the schema.'
+            },
+            {
+              role: 'user',
+              content: [
+                { type: 'text', text: buildPrompt() },
+                // Use inline_data for OpenRouter if supported, else fallback to image_url
+                { type: 'image_url', image_url: { url: image } },
+                // Uncomment below if OpenRouter supports inline_data (base64):
+                // { type: 'inline_data', inline_data: { mime_type: mimeType, data: openrouterImageData } },
+              ],
+            },
+          ],
+        })
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('OpenRouter error:', response.status, errorText);
+        return null;
+      }
+
+      const openrouterData = await response.json();
+      return openrouterData?.choices?.[0]?.message?.content ?? null;
+    };
+
+
+  // 3-level fallback: OpenRouter → Lovable → Gemini, with error logging
+  let content = null;
+  let aiErrorLog = [];
+
+  try {
+    content = await callOpenRouter();
+    if (!content) aiErrorLog.push('OpenRouter returned no content');
+  } catch (err) {
+    aiErrorLog.push('OpenRouter error: ' + (err instanceof Error ? err.message : String(err)));
+  }
+  if (!content) {
+    try {
+      content = await callLovable();
+      if (!content) aiErrorLog.push('Lovable returned no content');
+    } catch (err) {
+      aiErrorLog.push('Lovable error: ' + (err instanceof Error ? err.message : String(err)));
+    }
+  }
+  if (!content) {
+    try {
+      content = await callGeminiDirect();
+      if (!content) aiErrorLog.push('Gemini returned no content');
+    } catch (err) {
+      aiErrorLog.push('Gemini error: ' + (err instanceof Error ? err.message : String(err)));
+    }
+  }
+
     if (!content) {
-      throw new Error('No content returned from AI');
+      console.error('AI extraction failed. Fallback log:', aiErrorLog);
+      throw new Error('No content returned from AI. Fallback log: ' + aiErrorLog.join(' | '));
     }
 
     const tryParseJson = (raw: string) => {
