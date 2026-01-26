@@ -1,5 +1,5 @@
-import { useState, useEffect, useMemo, useRef } from "react";
-import { useNavigate, useLocation } from "react-router-dom";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import AppShell from "@/components/AppShell";
 import { Button } from "@/components/ui/button";
@@ -57,18 +57,10 @@ const writeMarketDupeCache = (userId, productId, dupes) => {
 };
 
 const pickImageWithSource = (dupe) => {
-  const top =
-    dupe?.imageUrl ||
-    (Array.isArray(dupe?.images) && dupe.images[0]) ||
-    null;
-
+  const top = dupe?.imageUrl || (Array.isArray(dupe?.images) && dupe.images[0]) || null;
   if (top) return { url: top, from: "top" };
 
-  const obf =
-    dupe?.obf?.imageUrl ||
-    (Array.isArray(dupe?.obf?.images) && dupe.obf.images[0]) ||
-    null;
-
+  const obf = dupe?.obf?.imageUrl || (Array.isArray(dupe?.obf?.images) && dupe.obf.images[0]) || null;
   if (obf) return { url: obf, from: "obf" };
 
   return { url: null, from: "none" };
@@ -154,57 +146,236 @@ export default function Compare() {
   const navigate = useNavigate();
   const location = useLocation();
 
-  const [analyses, setAnalyses] = useState([]);
-  const [selectedProductId, setSelectedProductId] = useState(null);
-
   const [loading, setLoading] = useState(true);
   const [loadingProgress, setLoadingProgress] = useState(0);
 
-  const [findingDupes, setFindingDupes] = useState(false);
-  const [dupeProgress, setDupeProgress] = useState(0);
-  const [dupeStage, setDupeStage] = useState("Preparing search");
-
-  const [marketDupes, setMarketDupes] = useState([]);
-  const [dupeError, setDupeError] = useState(null);
-
-  const [showPaywall, setShowPaywall] = useState(false);
-  const [savedDupes, setSavedDupes] = useState(new Set());
   const [userId, setUserId] = useState(null);
+
+  const [analyses, setAnalyses] = useState([]);
+  const [selectedProductId, setSelectedProductId] = useState(null);
+
+  const [savedDupes, setSavedDupes] = useState(new Set());
+  const [showPaywall, setShowPaywall] = useState(false);
 
   const [categoryFilter, setCategoryFilter] = useState("all");
   const [activeTab, setActiveTab] = useState("market");
 
-  const [analysisIngredients, setAnalysisIngredients] = useState({});
   const [skinProfile, setSkinProfile] = useState({ skinType: "normal", concerns: [] });
 
-  const [marketDupesHydratedFor, setMarketDupesHydratedFor] = useState(null);
-  const autoDupeStartedRef = useRef(new Set());
+  const [findingDupes, setFindingDupes] = useState(false);
+  const [dupeProgress, setDupeProgress] = useState(0);
+  const [dupeStage, setDupeStage] = useState("Ready");
+  const [dupeError, setDupeError] = useState(null);
+
+  const [marketDupes, setMarketDupes] = useState([]);
+
+  const ingredientsCacheRef = useRef({});
+  const inflightRef = useRef(new Map());
+  const latestRequestKeyRef = useRef(null);
 
   const { effectiveTier } = useSubscription();
   const dupeLimit = effectiveTier === "pro" ? Infinity : effectiveTier === "premium" ? 5 : 2;
 
-  function parseIngredients(list) {
-    if (!list || typeof list !== "string") return [];
-    return list
-      .toLowerCase()
-      .split(/[,;\n]+/)
-      .map((i) => i.trim())
-      .filter((i) => i.length > 2);
-  }
+  const selectedProduct = useMemo(
+    () => analyses.find((a) => a.id === selectedProductId) || null,
+    [analyses, selectedProductId],
+  );
+
+  const filteredMarketDupes = useMemo(() => {
+    if (categoryFilter === "all") return marketDupes;
+    return marketDupes.filter((d) => d.category === categoryFilter);
+  }, [marketDupes, categoryFilter]);
+
+  const myProductMatches = useMemo(() => {
+    return [];
+  }, []);
+
+  const getScoreColor = (score) => {
+    if (!score) return "text-muted-foreground";
+    if (score >= 70) return "text-emerald-500";
+    if (score >= 50) return "text-amber-500";
+    return "text-red-500";
+  };
+
+  const readUrlSelectedId = (list) => {
+    const params = new URLSearchParams(location.search);
+    const requestedId = params.get("productId");
+    if (requestedId && list.some((a) => a.id === requestedId)) return requestedId;
+    return list[0]?.id ?? null;
+  };
+
+  const loadIngredientsForId = async (uid, id) => {
+    if (!uid || !id) return "";
+
+    const cached = ingredientsCacheRef.current[id];
+    if (typeof cached === "string") return cached;
+
+    const { data, error } = await supabase
+      .from("user_analyses")
+      .select("ingredients_list")
+      .eq("user_id", uid)
+      .eq("id", id)
+      .maybeSingle();
+
+    if (error) {
+      console.error("loadIngredientsForId error:", error);
+      return "";
+    }
+
+    const text = data?.ingredients_list || "";
+    ingredientsCacheRef.current[id] = text;
+    return text;
+  };
+
+  const hydrateCachedDupesForSelection = (uid, pid) => {
+    if (!uid || !pid) return;
+    setDupeError(null);
+
+    const cached = readMarketDupeCache(uid, pid);
+    if (cached && cached.length > 0) {
+      setMarketDupes(cached);
+      setDupeStage("Showing your last results");
+      setDupeProgress(100);
+      return;
+    }
+
+    setMarketDupes([]);
+    setDupeStage("No saved results yet. Tap Find Market Dupes.");
+    setDupeProgress(0);
+  };
+
+  const findMarketDupes = async ({ force = false } = {}) => {
+    if (!userId || !selectedProductId || !selectedProduct) return;
+
+    setDupeError(null);
+    setFindingDupes(true);
+    setDupeProgress(10);
+    setDupeStage("Preparing");
+
+    const requestKey = `${userId}:${selectedProductId}:${force ? "refresh" : "cache-ok"}`;
+    latestRequestKeyRef.current = requestKey;
+
+    if (!force) {
+      const cached = readMarketDupeCache(userId, selectedProductId);
+      if (cached && cached.length > 0) {
+        setMarketDupes(cached);
+        setDupeStage("Loaded saved results");
+        setDupeProgress(100);
+        setFindingDupes(false);
+        return;
+      }
+    }
+
+    const inflightExisting = inflightRef.current.get(requestKey);
+    if (inflightExisting) {
+      try {
+        const dupes = await inflightExisting;
+        if (latestRequestKeyRef.current !== requestKey) return;
+        setMarketDupes(dupes);
+        setDupeStage("Results ready");
+        setDupeProgress(100);
+      } catch (e) {
+        if (latestRequestKeyRef.current !== requestKey) return;
+        setDupeError("Failed to find dupes");
+        setDupeStage("Error");
+        setDupeProgress(100);
+      } finally {
+        if (latestRequestKeyRef.current === requestKey) setFindingDupes(false);
+      }
+      return;
+    }
+
+    const promise = (async () => {
+      setDupeStage("Loading ingredients");
+      setDupeProgress(30);
+
+      const ingredientText = await loadIngredientsForId(userId, selectedProductId);
+
+      const ingredients = String(ingredientText || "")
+        .split(/[,;\n]+/)
+        .map((i) => i.trim())
+        .filter(Boolean);
+
+      setDupeStage("Finding market matches");
+      setDupeProgress(60);
+
+      const data = await invokeFunction("find-dupes", {
+        productName: selectedProduct.product_name,
+        brand: selectedProduct.brand,
+        ingredients,
+        category: selectedProduct.category || "face",
+        skinType: skinProfile.skinType,
+        concerns: skinProfile.concerns,
+      });
+
+      if (data?.error) {
+        throw new Error(String(data.error));
+      }
+
+      const rawDupes = Array.isArray(data?.dupes) ? data.dupes : [];
+      const normalizedDupes = rawDupes
+        .map((d) => normalizeDupe(d, selectedProduct.category || "face"))
+        .filter(Boolean);
+
+      writeMarketDupeCache(userId, selectedProductId, normalizedDupes);
+
+      return normalizedDupes;
+    })();
+
+    inflightRef.current.set(requestKey, promise);
+
+    try {
+      const dupes = await promise;
+      if (latestRequestKeyRef.current !== requestKey) return;
+
+      if (!dupes || dupes.length === 0) {
+        setMarketDupes([]);
+        setDupeStage("No results found. Try again.");
+        setDupeProgress(100);
+        return;
+      }
+
+      setMarketDupes(dupes);
+      setDupeStage("Results ready");
+      setDupeProgress(100);
+    } catch (error) {
+      console.error("findMarketDupes error:", error);
+
+      const message = error instanceof Error ? error.message : "";
+      const friendlyMessage =
+        message.includes("402") || message.includes("Payment Required")
+          ? "Dupe search is temporarily unavailable. Try again later."
+          : "Failed to find dupes. Try again.";
+
+      if (latestRequestKeyRef.current !== requestKey) return;
+
+      setDupeError(friendlyMessage);
+      setDupeStage("Error");
+      setDupeProgress(100);
+
+      toast({
+        title: "Error finding dupes",
+        description: friendlyMessage,
+        variant: "destructive",
+      });
+    } finally {
+      inflightRef.current.delete(requestKey);
+      if (latestRequestKeyRef.current === requestKey) setFindingDupes(false);
+    }
+  };
 
   useEffect(() => {
     let cancelled = false;
 
-    const fetchData = async () => {
+    const run = async () => {
       try {
         setLoading(true);
         setLoadingProgress(10);
 
         const { data: auth, error: authErr } = await supabase.auth.getUser();
-        const user = auth?.user;
-
         if (authErr) console.error("auth.getUser error:", authErr);
 
+        const user = auth?.user;
         if (!user) {
           navigate("/auth");
           return;
@@ -232,18 +403,12 @@ export default function Compare() {
 
         setLoadingProgress(70);
 
-        if (!analysesRes.error && Array.isArray(analysesRes.data)) {
-          const unique = Array.from(new Map(analysesRes.data.map((a) => [a.id, a])).values());
-          setAnalyses(unique);
+        const list = Array.isArray(analysesRes.data) ? analysesRes.data : [];
+        const unique = Array.from(new Map(list.map((a) => [a.id, a])).values());
+        setAnalyses(unique);
 
-          const params = new URLSearchParams(location.search);
-          const requestedId = params.get("productId");
-          const initialId =
-            requestedId && unique.some((a) => a.id === requestedId) ? requestedId : unique[0]?.id ?? null;
-          setSelectedProductId((prev) => prev ?? initialId);
-        } else if (analysesRes.error) {
-          console.error("analyses fetch error:", analysesRes.error);
-        }
+        const initialId = readUrlSelectedId(unique);
+        setSelectedProductId(initialId);
 
         if (!savedRes.error && Array.isArray(savedRes.data)) {
           setSavedDupes(new Set(savedRes.data.map(savedKeyFor)));
@@ -264,12 +429,12 @@ export default function Compare() {
           if (!cancelled) setLoading(false);
         }, 150);
       } catch (e) {
-        console.error("Compare fetchData fatal:", e);
-        setLoading(false);
+        console.error("Compare init fatal:", e);
+        if (!cancelled) setLoading(false);
       }
     };
 
-    fetchData();
+    run();
 
     return () => {
       cancelled = true;
@@ -277,358 +442,15 @@ export default function Compare() {
   }, [navigate, location.search]);
 
   useEffect(() => {
-    setLoadingProgress((p) => (loading ? Math.min(p || 0, 10) : 100));
-  }, [loading]);
+    if (!userId || !selectedProductId) return;
 
-  const selectedProduct = useMemo(
-    () => analyses.find((a) => a.id === selectedProductId),
-    [analyses, selectedProductId],
-  );
-
-  const selectedIngredients = useMemo(() => {
-    if (!selectedProductId) return undefined;
-    return analysisIngredients[selectedProductId];
-  }, [analysisIngredients, selectedProductId]);
-
-  const sourceIngredients = useMemo(
-    () => (selectedIngredients ? parseIngredients(selectedIngredients) : []),
-    [selectedIngredients],
-  );
-
-  const loadIngredientsForIds = async (ids) => {
-    if (!userId || !ids || ids.length === 0) return;
-
-    const missing = ids.filter((id) => !analysisIngredients[id]);
-    if (missing.length === 0) return;
-
-    const { data, error } = await supabase
-      .from("user_analyses")
-      .select("id, ingredients_list")
-      .eq("user_id", userId)
-      .in("id", missing);
-
-    if (error) {
-      console.error("loadIngredientsForIds error:", error);
-      return;
-    }
-
-    if (!Array.isArray(data)) return;
-
-    setAnalysisIngredients((prev) => {
-      const next = { ...prev };
-      data.forEach((row) => {
-        if (row.ingredients_list) next[row.id] = row.ingredients_list;
-      });
-      return next;
-    });
-  };
-
-  const fetchIngredientsForId = async (id) => {
-    if (!userId) return null;
-
-    const { data, error } = await supabase
-      .from("user_analyses")
-      .select("ingredients_list")
-      .eq("user_id", userId)
-      .eq("id", id)
-      .maybeSingle();
-
-    if (error) {
-      console.error("fetchIngredientsForId error:", error);
-      return null;
-    }
-
-    if (!data?.ingredients_list) return null;
-
-    setAnalysisIngredients((prev) => ({ ...prev, [id]: data.ingredients_list }));
-    return data.ingredients_list;
-  };
-
-  const findMarketDupes = async ({ force = false } = {}) => {
-    if (!selectedProduct || !selectedProductId || !userId) return;
-
-    setFindingDupes(true);
-    setMarketDupes([]);
-    setDupeError(null);
-    setDupeProgress(10);
-    setDupeStage("Analyzing ingredients");
-
-    try {
-      if (!force) {
-        const cached = readMarketDupeCache(userId, selectedProductId);
-        if (cached && cached.length > 0) {
-          setMarketDupes(cached);
-          setDupeStage("Loaded from cache");
-          setDupeProgress(100);
-          return;
-        }
-      }
-
-      setDupeStage("Loading ingredients");
-      setDupeProgress(30);
-
-      await loadIngredientsForIds([selectedProductId]);
-
-      let ingredientText = analysisIngredients[selectedProductId];
-      if (!ingredientText) ingredientText = await fetchIngredientsForId(selectedProductId);
-      if (!ingredientText) ingredientText = "";
-
-      setDupeStage("Finding market matches");
-      setDupeProgress(60);
-
-      const ingredients = ingredientText
-        .split(/[,;\n]+/)
-        .map((i) => i.trim())
-        .filter(Boolean);
-
-      let data;
-      try {
-        data = await invokeFunction("find-dupes", {
-          productName: selectedProduct.product_name,
-          brand: selectedProduct.brand,
-          ingredients,
-          category: selectedProduct.category || "face",
-          skinType: skinProfile.skinType,
-          concerns: skinProfile.concerns,
-        });
-
-        setDupeStage("Verifying ingredients");
-        setDupeProgress(80);
-      } catch (err) {
-        console.error("find-dupes error:", err);
-        setDupeError("Failed to find dupes");
-        setDupeStage("Error finding dupes");
-        setDupeProgress(100);
-        return;
-      }
-
-      if (data?.error) {
-        setDupeError(data.error);
-        setDupeStage("Error finding dupes");
-        setDupeProgress(100);
-        return;
-      }
-
-      const rawDupes = Array.isArray(data?.dupes) ? data.dupes : [];
-      const normalizedDupes = rawDupes
-        .map((d) => normalizeDupe(d, selectedProduct.category || "face"))
-        .filter(Boolean);
-
-      setDupeStage("Results ready");
-      setDupeProgress(100);
-
-      setMarketDupes(normalizedDupes);
-      writeMarketDupeCache(userId, selectedProductId, normalizedDupes);
-
-      if (rawDupes.length > 0 && normalizedDupes.length === 0) {
-        toast({
-          title: "No valid dupes returned",
-          description: "Try again in a moment.",
-          variant: "destructive",
-        });
-      }
-    } catch (error) {
-      console.error("Error finding dupes:", error);
-
-      const message = error instanceof Error ? error.message : "";
-      const friendlyMessage =
-        message.includes("402") || message.includes("Payment Required")
-          ? "Dupe search is temporarily unavailable. Please try again later."
-          : "Please try again later.";
-
-      setDupeError(friendlyMessage);
-      setDupeStage("Error finding dupes");
-      setDupeProgress(100);
-
-      toast({
-        title: "Error finding dupes",
-        description: friendlyMessage,
-        variant: "destructive",
-      });
-    } finally {
-      setFindingDupes(false);
-    }
-  };
-
-  const myProductMatches = useMemo(() => {
-    if (!selectedProduct || !selectedProductId || analyses.length < 2) return [];
-    if (!analysisIngredients[selectedProductId]) return [];
-    return [];
-  }, [selectedProduct, selectedProductId, analyses, analysisIngredients]);
-
-  useEffect(() => {
-    if (!selectedProductId || !userId) return;
     setDupeError(null);
     setDupeProgress(0);
-    setDupeStage("Preparing search");
-    setMarketDupesHydratedFor(null);
-  }, [selectedProductId, userId]);
+    setDupeStage("Ready");
+    hydrateCachedDupesForSelection(userId, selectedProductId);
 
-  useEffect(() => {
-    if (!selectedProductId || !userId) return;
-
-    const cached = readMarketDupeCache(userId, selectedProductId);
-    if (cached && cached.length > 0) {
-      setMarketDupes(cached);
-      setMarketDupesHydratedFor(selectedProductId);
-      return;
-    }
-
-    setMarketDupes([]);
-    setMarketDupesHydratedFor(selectedProductId);
-  }, [selectedProductId, userId]);
-
-  useEffect(() => {
-    if (!selectedProductId || !userId) return;
-    if (marketDupesHydratedFor !== selectedProductId) return;
-    if (findingDupes || dupeError) return;
-    if (marketDupes.length > 0) return;
-    if (autoDupeStartedRef.current.has(selectedProductId)) return;
-
-    autoDupeStartedRef.current.add(selectedProductId);
-    findMarketDupes();
-  }, [selectedProductId, userId, marketDupesHydratedFor, marketDupes.length, findingDupes, dupeError]);
-
-  useEffect(() => {
-    if (!selectedProductId || !userId) return;
-    loadIngredientsForIds([selectedProductId]);
-  }, [selectedProductId, userId]);
-
-  useEffect(() => {
-    if (activeTab !== "myproducts") return;
-    if (!userId || analyses.length === 0) return;
-    loadIngredientsForIds(analyses.map((a) => a.id));
-  }, [activeTab, analyses, userId]);
-
-  const toggleSaveMarketDupe = async (dupe) => {
-    if (!userId || !selectedProductId) return;
-
-    const safeName = norm(dupe?.name);
-    const safeBrand = norm(dupe?.brand);
-
-    const key = savedKeyForMarketDupe({ name: safeName, brand: safeBrand }, selectedProductId);
-    const isSaved = savedDupes.has(key);
-
-    if (isSaved) {
-      const { error } = await supabase
-        .from("saved_dupes")
-        .delete()
-        .eq("user_id", userId)
-        .eq("source_product_id", selectedProductId)
-        .eq("product_name", safeName)
-        .eq("brand", safeBrand);
-
-      if (!error) {
-        setSavedDupes((prev) => {
-          const next = new Set(prev);
-          next.delete(key);
-          return next;
-        });
-        toast({ title: "Removed from favorites" });
-      } else {
-        console.error("Error removing saved dupe:", error);
-        toast({
-          title: "Failed to remove favorite",
-          description: error.message || "Try again later.",
-          variant: "destructive",
-        });
-      }
-    } else {
-      const { error } = await supabase.from("saved_dupes").insert({
-        user_id: userId,
-        source_product_id: selectedProductId,
-        product_name: safeName,
-        brand: safeBrand,
-        image_url: dupe?.imageUrl || null,
-        price_estimate: dupe?.price ?? null,
-        saved_at: new Date().toISOString(),
-      });
-
-      if (!error) {
-        setSavedDupes((prev) => new Set(prev).add(key));
-        toast({ title: "Saved to favorites ❤️" });
-      } else {
-        console.error("Error saving dupe:", error);
-        toast({
-          title: "Failed to save favorite",
-          description: error.message || "Try again later.",
-          variant: "destructive",
-        });
-      }
-    }
-  };
-
-  const toggleSaveMyProduct = async (match) => {
-    if (!userId || !selectedProductId) return;
-
-    const productName = norm(match?.product?.product_name);
-    const brand = norm(match?.product?.brand || "");
-
-    const key = `${norm(selectedProductId)}::${productName}::${brand}`;
-    const isSaved = savedDupes.has(key);
-
-    if (isSaved) {
-      const { error } = await supabase
-        .from("saved_dupes")
-        .delete()
-        .eq("user_id", userId)
-        .eq("source_product_id", selectedProductId)
-        .eq("product_name", productName)
-        .eq("brand", brand);
-
-      if (!error) {
-        setSavedDupes((prev) => {
-          const next = new Set(prev);
-          next.delete(key);
-          return next;
-        });
-        toast({ title: "Removed from favorites" });
-      } else {
-        console.error("Error removing saved my-product dupe:", error);
-        toast({
-          title: "Failed to remove favorite",
-          description: error.message || "Try again later.",
-          variant: "destructive",
-        });
-      }
-    } else {
-      const { error } = await supabase.from("saved_dupes").insert({
-        user_id: userId,
-        source_product_id: selectedProductId,
-        product_name: productName,
-        brand,
-        reasons: match?.whyDupe ?? null,
-        shared_ingredients: match?.sharedIngredients ?? null,
-        price_estimate: match?.product?.product_price ? `$${match.product.product_price}` : null,
-        image_url: match?.product?.image_url ?? null,
-        saved_at: new Date().toISOString(),
-      });
-
-      if (!error) {
-        setSavedDupes((prev) => new Set(prev).add(key));
-        toast({ title: "Saved to favorites ❤️" });
-      } else {
-        console.error("Error saving my-product dupe:", error);
-        toast({
-          title: "Failed to save favorite",
-          description: error.message || "Try again later.",
-          variant: "destructive",
-        });
-      }
-    }
-  };
-
-  const filteredMarketDupes = useMemo(() => {
-    if (categoryFilter === "all") return marketDupes;
-    return marketDupes.filter((d) => d.category === categoryFilter);
-  }, [marketDupes, categoryFilter]);
-
-  const getScoreColor = (score) => {
-    if (!score) return "text-muted-foreground";
-    if (score >= 70) return "text-emerald-500";
-    if (score >= 50) return "text-amber-500";
-    return "text-red-500";
-  };
+    loadIngredientsForId(userId, selectedProductId).catch(() => {});
+  }, [userId, selectedProductId]);
 
   if (loading) {
     return (
@@ -717,7 +539,7 @@ export default function Compare() {
                           {findingDupes ? (
                             <>
                               <Loader2 className="w-4 h-4 animate-spin" />
-                              Finding...
+                              Refreshing...
                             </>
                           ) : (
                             <>
@@ -742,6 +564,21 @@ export default function Compare() {
                               <p className="text-sm text-muted-foreground">${selectedProduct.product_price}</p>
                             )}
                           </div>
+                        </div>
+                      )}
+
+                      <div className="text-sm text-muted-foreground">
+                        <span className="mr-2">Status:</span>
+                        <span>{dupeStage}</span>
+                      </div>
+
+                      {findingDupes && (
+                        <div className="space-y-2">
+                          <div className="flex items-center justify-between text-sm text-muted-foreground">
+                            <span>Searching</span>
+                            <span>{dupeProgress}%</span>
+                          </div>
+                          <Progress value={dupeProgress} className="h-2" />
                         </div>
                       )}
                     </CardContent>
@@ -785,8 +622,7 @@ export default function Compare() {
                   </TabsList>
 
                   <p className="text-sm text-muted-foreground">
-                    Market Dupes compares your selected product to popular retail formulas. My Products compares it to
-                    your own scans.
+                    Market Dupes shows your last results instantly. Tap Find Market Dupes to refresh.
                   </p>
 
                   <div className="flex gap-2 flex-wrap">
@@ -804,24 +640,7 @@ export default function Compare() {
                   </div>
 
                   <TabsContent value="market" className="space-y-6">
-                    {findingDupes ? (
-                      <div className="text-center py-12 space-y-4">
-                        <div className="relative w-20 h-20 mx-auto">
-                          <div className="absolute inset-0 rounded-full border-4 border-primary/20" />
-                          <div className="absolute inset-0 rounded-full border-4 border-primary border-t-transparent animate-spin" />
-                          <Search className="absolute inset-0 m-auto w-8 h-8 text-primary" />
-                        </div>
-                        <div className="space-y-2">
-                          <p className="text-muted-foreground">🔍 {dupeStage}...</p>
-                          <div className="flex items-center justify-center gap-3 text-sm text-muted-foreground">
-                            <span>{dupeProgress}%</span>
-                            <div className="w-48">
-                              <Progress value={dupeProgress} className="h-2" />
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    ) : dupeError ? (
+                    {dupeError ? (
                       <Card className="border-dashed">
                         <CardContent className="py-12 text-center space-y-2">
                           <AlertTriangle className="w-10 h-10 mx-auto text-muted-foreground/60" />
@@ -841,26 +660,86 @@ export default function Compare() {
                               <DupeCard
                                 dupe={dupe}
                                 isSaved={savedDupes.has(key)}
-                                onToggleSave={() => toggleSaveMarketDupe(dupe)}
+                                onToggleSave={async () => {
+                                  const safeName = norm(dupe?.name);
+                                  const safeBrand = norm(dupe?.brand);
+                                  const savedKey = savedKeyForMarketDupe({ name: safeName, brand: safeBrand }, selectedProductId);
+                                  const isSaved = savedDupes.has(savedKey);
+
+                                  if (isSaved) {
+                                    const { error } = await supabase
+                                      .from("saved_dupes")
+                                      .delete()
+                                      .eq("user_id", userId)
+                                      .eq("source_product_id", selectedProductId)
+                                      .eq("product_name", safeName)
+                                      .eq("brand", safeBrand);
+
+                                    if (!error) {
+                                      setSavedDupes((prev) => {
+                                        const next = new Set(prev);
+                                        next.delete(savedKey);
+                                        return next;
+                                      });
+                                      toast({ title: "Removed from favorites" });
+                                    } else {
+                                      console.error("Error removing saved dupe:", error);
+                                      toast({
+                                        title: "Failed to remove favorite",
+                                        description: error.message || "Try again later.",
+                                        variant: "destructive",
+                                      });
+                                    }
+                                  } else {
+                                    const { error } = await supabase.from("saved_dupes").insert({
+                                      user_id: userId,
+                                      source_product_id: selectedProductId,
+                                      product_name: safeName,
+                                      brand: safeBrand,
+                                      image_url: dupe?.imageUrl || null,
+                                      price_estimate: dupe?.price ?? null,
+                                      saved_at: new Date().toISOString(),
+                                    });
+
+                                    if (!error) {
+                                      setSavedDupes((prev) => new Set(prev).add(savedKey));
+                                      toast({ title: "Saved to favorites ❤️" });
+                                    } else {
+                                      console.error("Error saving dupe:", error);
+                                      toast({
+                                        title: "Failed to save favorite",
+                                        description: error.message || "Try again later.",
+                                        variant: "destructive",
+                                      });
+                                    }
+                                  }
+                                }}
                               />
                             </div>
                           );
                         })}
                       </div>
-                    ) : marketDupes.length === 0 ? (
+                    ) : (
                       <Card className="border-dashed">
                         <CardContent className="py-12 text-center">
                           <Sparkles className="w-12 h-12 mx-auto text-muted-foreground/50 mb-4" />
-                          <h3 className="text-lg font-medium mb-2">Finding dupes for your selection</h3>
-                          <p className="text-muted-foreground text-sm max-w-md mx-auto">
-                            We’re searching for similar formulas now. If this takes too long, try again.
+                          <h3 className="text-lg font-medium mb-2">No saved dupes yet</h3>
+                          <p className="text-muted-foreground text-sm max-w-md mx-auto mb-4">
+                            Tap Find Market Dupes to run a fresh search. Next time, results show instantly here.
                           </p>
-                        </CardContent>
-                      </Card>
-                    ) : (
-                      <Card className="border-dashed">
-                        <CardContent className="py-8 text-center">
-                          <p className="text-muted-foreground">No dupes found in this category.</p>
+                          <Button onClick={() => findMarketDupes({ force: true })} disabled={findingDupes} className="gap-2">
+                            {findingDupes ? (
+                              <>
+                                <Loader2 className="w-4 h-4 animate-spin" />
+                                Searching...
+                              </>
+                            ) : (
+                              <>
+                                <Sparkles className="w-4 h-4" />
+                                Find Market Dupes
+                              </>
+                            )}
+                          </Button>
                         </CardContent>
                       </Card>
                     )}
@@ -892,7 +771,7 @@ export default function Compare() {
                                   whereToBuy: null,
                                 }}
                                 isSaved={savedDupes.has(key)}
-                                onToggleSave={() => toggleSaveMyProduct(match)}
+                                onToggleSave={() => {}}
                               />
                             </div>
                           );
@@ -903,11 +782,7 @@ export default function Compare() {
                         <CardContent className="py-12 text-center">
                           <Package className="w-12 h-12 mx-auto text-muted-foreground/50 mb-4" />
                           <p className="text-muted-foreground">
-                            {analyses.length < 2
-                              ? "Analyze at least 2 products to compare your collection."
-                              : activeTab === "myproducts" && !analysisIngredients[selectedProductId || ""]
-                                ? "Loading ingredients to compare your collection..."
-                                : "No similar products found in your collection."}
+                            Analyze at least 2 products to compare your collection.
                           </p>
                         </CardContent>
                       </Card>

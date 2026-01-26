@@ -2,22 +2,29 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 
 /**
- * Goals
- * 1. Keep AI + OBF together. OBF enriches, AI proposes.
- * 2. Always return usable UI fields, even when OBF is blocked.
- * 3. priceEstimate should show up when AI provides it.
- * 4. Include productUrl (if available) plus an internalLink you control.
- * 5. Never force UI to send users back to OBF.
+ * OPTIMIZED FIND-DUPES EDGE FUNCTION
+ * 
+ * Key fixes:
+ * 1. Better request deduplication to prevent multiple simultaneous calls
+ * 2. Smarter caching with request fingerprinting
+ * 3. Reduced OBF calls with batch limiting
+ * 4. Early return optimization
+ * 5. Request coalescing for identical queries
  */
 
-// CORS
+// ============================================================================
+// CORS HEADERS
+// ============================================================================
+
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-// Cache
-const aiCache = new Map<string, { value: any[]; expiresAt: number }>();
+// ============================================================================
+// TYPES
+// ============================================================================
+
 type ObfEnriched = {
   imageUrl: string | null;
   productUrl: string | null;
@@ -33,65 +40,339 @@ type ObfEnriched = {
   packaging?: string | null;
   storeLocation?: string | null;
 };
-const obfCache = new Map<string, { value: ObfEnriched | null; expiresAt: number }>();
 
-const getCache = <T>(cache: Map<string, { value: T; expiresAt: number }>, key: string): T | undefined => {
-  const entry = cache.get(key);
-  if (!entry) return undefined;
-  if (Date.now() > entry.expiresAt) {
-    cache.delete(key);
-    return undefined;
-  }
-  return entry.value;
+type CacheEntry<T> = {
+  value: T;
+  expiresAt: number;
 };
 
-const setCache = <T>(cache: Map<string, { value: T; expiresAt: number }>, key: string, value: T, ttlMs: number) => {
-  cache.set(key, { value, expiresAt: Date.now() + ttlMs });
+type PendingRequest = {
+  promise: Promise<any>;
+  timestamp: number;
 };
 
-// Models
-const OPENROUTER_MODEL = "qwen/qwen3-coder:free"; // updated per user request
-// If you want fastest free, swap to: "google/gemma-3-4b:free" or "qwen/qwen3-4b:free"
+// ============================================================================
+// CACHE MANAGEMENT
+// ============================================================================
 
-serve(async (req: Request): Promise<Response> => {
-  if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
+class CacheManager {
+  private static aiCache = new Map<string, CacheEntry<any[]>>();
+  private static obfCache = new Map<string, CacheEntry<ObfEnriched | null>>();
+  private static pendingRequests = new Map<string, PendingRequest>();
+  
+  // Cache TTLs
+  private static readonly AI_CACHE_TTL = 10 * 60 * 1000; // 10 minutes
+  private static readonly OBF_CACHE_TTL = 30 * 60 * 1000; // 30 minutes
+  private static readonly PENDING_REQUEST_TIMEOUT = 30 * 1000; // 30 seconds
 
-  try {
-    const body = await req.json();
-    const productName = typeof body?.productName === "string" ? body.productName.trim() : "";
-    const brand = typeof body?.brand === "string" ? body.brand.trim() : "";
-    const category = typeof body?.category === "string" ? body.category.trim() : "";
-    const skinType = typeof body?.skinType === "string" ? body.skinType.trim() : "";
-    const concerns = typeof body?.concerns === "string" ? body.concerns.trim() : "";
-    const ingredients = Array.isArray(body?.ingredients) ? body.ingredients : [];
-
-    if (!productName) {
-      return new Response(JSON.stringify({ dupes: [], error: "productName is required" }), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+  static get<T>(cache: Map<string, CacheEntry<T>>, key: string): T | undefined {
+    const entry = cache.get(key);
+    if (!entry) return undefined;
+    
+    if (Date.now() > entry.expiresAt) {
+      cache.delete(key);
+      return undefined;
     }
+    
+    return entry.value;
+  }
+
+  static set<T>(cache: Map<string, CacheEntry<T>>, key: string, value: T, ttlMs: number): void {
+    cache.set(key, { value, expiresAt: Date.now() + ttlMs });
+  }
+
+  static getAI(key: string): any[] | undefined {
+    return this.get(this.aiCache, key);
+  }
+
+  static setAI(key: string, value: any[]): void {
+    this.set(this.aiCache, key, value, this.AI_CACHE_TTL);
+  }
+
+  static getOBF(key: string): ObfEnriched | null | undefined {
+    return this.get(this.obfCache, key);
+  }
+
+  static setOBF(key: string, value: ObfEnriched | null): void {
+    this.set(this.obfCache, key, value, this.OBF_CACHE_TTL);
+  }
+
+  // Request deduplication
+  static getPendingRequest(key: string): Promise<any> | undefined {
+    const pending = this.pendingRequests.get(key);
+    if (!pending) return undefined;
+    
+    // Check if request has timed out
+    if (Date.now() - pending.timestamp > this.PENDING_REQUEST_TIMEOUT) {
+      this.pendingRequests.delete(key);
+      return undefined;
+    }
+    
+    return pending.promise;
+  }
+
+  static setPendingRequest(key: string, promise: Promise<any>): void {
+    this.pendingRequests.set(key, {
+      promise,
+      timestamp: Date.now(),
+    });
+  }
+
+  static removePendingRequest(key: string): void {
+    this.pendingRequests.delete(key);
+  }
+
+  // Periodic cleanup
+  static cleanup(): void {
+    const now = Date.now();
+    
+    // Clean expired AI cache
+    for (const [key, entry] of this.aiCache.entries()) {
+      if (now > entry.expiresAt) this.aiCache.delete(key);
+    }
+    
+    // Clean expired OBF cache
+    for (const [key, entry] of this.obfCache.entries()) {
+      if (now > entry.expiresAt) this.obfCache.delete(key);
+    }
+    
+    // Clean stale pending requests
+    for (const [key, pending] of this.pendingRequests.entries()) {
+      if (now - pending.timestamp > this.PENDING_REQUEST_TIMEOUT) {
+        this.pendingRequests.delete(key);
+      }
+    }
+  }
+}
+
+// Run cleanup every 5 minutes
+setInterval(() => CacheManager.cleanup(), 5 * 60 * 1000);
+
+// ============================================================================
+// CONFIGURATION
+// ============================================================================
+
+const CONFIG = {
+  OPENROUTER_MODEL: "qwen/qwen3-coder:free",
+  MAX_DUPES_TO_RETURN: 5,
+  MAX_DUPES_TO_ENRICH: 3, // Only enrich top 3 with OBF to reduce API calls
+  MAX_PROMPT_INGREDIENTS: 40,
+  AI_TIMEOUT: 15000, // 15 seconds
+  OBF_TIMEOUT: 5000, // 5 seconds per OBF call
+};
+
+// ============================================================================
+// UTILITY FUNCTIONS
+// ============================================================================
+
+const Utils = {
+  normalizeIngredient(value: string): string {
+    return (value || "")
+      .toLowerCase()
+      .replace(/\(.*?\)/g, " ")
+      .replace(/[^a-z0-9\s]/g, " ")
+      .replace(/\s+/g, " ")
+      .trim();
+  },
+
+  normalizeIngredientList(items: string[]): string[] {
+    const seen = new Set<string>();
+    for (const item of items) {
+      const norm = this.normalizeIngredient(item);
+      if (norm.length > 2) seen.add(norm);
+    }
+    return Array.from(seen);
+  },
+
+  normalizeText(value: string): string {
+    return (value || "")
+      .toLowerCase()
+      .replace(/[^a-z0-9\s]/g, " ")
+      .replace(/\s+/g, " ")
+      .trim();
+  },
+
+  buildTokenSet(value: string): Set<string> {
+    const tokens = this.normalizeText(value)
+      .split(" ")
+      .filter((t) => t.length > 1);
+    return new Set(tokens);
+  },
+
+  computeTokenSimilarity(left: string, right: string): number {
+    if (!left || !right) return 0;
+    const leftTokens = this.buildTokenSet(left);
+    const rightTokens = this.buildTokenSet(right);
+    if (!leftTokens.size || !rightTokens.size) return 0;
+
+    let intersection = 0;
+    for (const t of leftTokens) {
+      if (rightTokens.has(t)) intersection += 1;
+    }
+
+    const union = new Set([...leftTokens, ...rightTokens]).size;
+    return union ? intersection / union : 0;
+  },
+
+  computeOverlapStats(sourceList: string[], targetList: string[]) {
+    const sourceIngredients = this.normalizeIngredientList(sourceList);
+    const targetIngredients = this.normalizeIngredientList(targetList);
+    
+    if (!sourceIngredients.length || !targetIngredients.length) return null;
+
+    let matched = 0;
+    for (const sourceItem of sourceIngredients) {
+      const isMatch = targetIngredients.some(
+        (targetItem) => targetItem.includes(sourceItem) || sourceItem.includes(targetItem)
+      );
+      if (isMatch) matched += 1;
+    }
+    
+    if (matched === 0) return null;
+
+    return {
+      percent: Math.round((matched / sourceIngredients.length) * 100),
+      matchedCount: matched,
+      sourceCount: sourceIngredients.length,
+    };
+  },
+
+  isPlaceholderImage(url?: string): boolean {
+    if (!url) return true;
+    return url.includes("images.unsplash.com");
+  },
+
+  stableHash(str: string): string {
+    let hash = 5381;
+    for (let i = 0; i < str.length; i++) {
+      hash = (hash << 5) + hash + str.charCodeAt(i);
+      hash = hash & 0xffffffff;
+    }
+    return Math.abs(hash).toString(36);
+  },
+
+  createRequestFingerprint(body: any): string {
+    return Utils.stableHash(
+      JSON.stringify({
+        productName: body?.productName || "",
+        brand: body?.brand || "",
+        category: body?.category || "",
+        ingredients: (body?.ingredients || []).slice(0, 20), // Limit to first 20 for fingerprint
+      })
+    );
+  },
+};
+
+// ============================================================================
+// SCENT ANALYSIS
+// ============================================================================
+
+const ScentAnalyzer = {
+  keywords: [
+    "vanilla", "coconut", "shea", "cocoa", "chocolate", "almond", "honey",
+    "oat", "oatmeal", "lavender", "rose", "jasmine", "citrus", "orange",
+    "lemon", "grapefruit", "bergamot", "sandalwood", "musk", "amber",
+    "cherry", "berry", "mint", "eucalyptus", "tea tree", "chamomile",
+    "aloe", "argan", "jojoba", "cinnamon", "caramel", "sugar", "butter",
+  ],
+
+  extractTokens(value: string): string[] {
+    const text = Utils.normalizeText(value);
+    const tokens: string[] = [];
+    for (const keyword of this.keywords) {
+      if (text.includes(keyword)) tokens.push(keyword);
+    }
+    return Array.from(new Set(tokens));
+  },
+
+  computeSimilarity(sourceTokens: string[], targetText: string): number {
+    if (!sourceTokens.length) return 0;
+    const targetTokens = this.extractTokens(targetText);
+    if (!targetTokens.length) return 0;
+    
+    let matched = 0;
+    for (const token of sourceTokens) {
+      if (targetTokens.includes(token)) matched += 1;
+    }
+    
+    return matched / sourceTokens.length;
+  },
+
+  isScentFocused(category: string, productName: string): boolean {
+    const context = `${category} ${productName}`.toLowerCase();
+    return (
+      context.includes("body") ||
+      context.includes("lotion") ||
+      context.includes("butter") ||
+      context.includes("cream") ||
+      context.includes("mist")
+    );
+  },
+};
+
+// ============================================================================
+// AI PROVIDER
+// ============================================================================
+
+class AIProvider {
+  private static async callWithTimeout(
+    fetchPromise: Promise<Response>,
+    timeoutMs: number
+  ): Promise<Response> {
+    const timeoutPromise = new Promise<Response>((_, reject) =>
+      setTimeout(() => reject(new Error("Request timeout")), timeoutMs)
+    );
+    return Promise.race([fetchPromise, timeoutPromise]);
+  }
+
+  private static async safeReadText(response: Response): Promise<string> {
+    try {
+      return await response.text();
+    } catch {
+      return "";
+    }
+  }
+
+  private static parseAIArray(content: string | null): any[] {
+    if (!content) return [];
+    
+    const clean = content
+      .replace(/```json\n?/gi, "")
+      .replace(/```\n?/g, "")
+      .trim();
+    
+    const match = clean.match(/\[[\s\S]*\]/);
+    
+    try {
+      const parsed = JSON.parse(match ? match[0] : clean);
+      if (Array.isArray(parsed)) return parsed;
+      if (Array.isArray(parsed?.dupes)) return parsed.dupes;
+      return [];
+    } catch {
+      return [];
+    }
+  }
+
+  static async getDupes(params: {
+    productName: string;
+    brand: string;
+    ingredients: string[];
+    category: string;
+    skinType: string;
+    concerns: string;
+  }): Promise<any[]> {
+    const { productName, brand, ingredients, category, skinType, concerns } = params;
 
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     const GEMINI_API_KEY = Deno.env.get("GEMINI_API_KEY");
     const OPENROUTER_API_KEY = Deno.env.get("OPENROUTER_API_KEY");
 
     if (!LOVABLE_API_KEY && !GEMINI_API_KEY && !OPENROUTER_API_KEY) {
-      return new Response(JSON.stringify({ dupes: [], error: "AI provider is not configured" }), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      throw new Error("AI provider is not configured");
     }
 
-    const promptIngredients: string[] = Array.isArray(ingredients)
-      ? ingredients.filter((x: any) => typeof x === "string").slice(0, 40)
-      : [];
-
-    const scentContext = `${category} ${productName}`.toLowerCase();
-    const isScentFocused =
-      scentContext.includes("body") ||
-      scentContext.includes("lotion") ||
-      scentContext.includes("butter") ||
-      scentContext.includes("cream") ||
-      scentContext.includes("mist");
+    const promptIngredients = ingredients.slice(0, CONFIG.MAX_PROMPT_INGREDIENTS);
+    const isScentFocused = ScentAnalyzer.isScentFocused(category, productName);
 
     const systemPrompt = `
 You are a skincare expert that finds REAL, existing product dupes.
@@ -129,40 +410,14 @@ Rules:
       .filter(Boolean)
       .join("\n");
 
-    const aiCacheKey = JSON.stringify({ productName, brand, promptIngredients, category, skinType, concerns });
-    let dupes: any[] = [];
+    const errorLog: string[] = [];
+    let aiContent: string | null = null;
 
-    const cachedDupes = getCache(aiCache, aiCacheKey);
-    if (cachedDupes) {
-      dupes = cachedDupes;
-    } else {
-      let aiContent: string | null = null;
-      const errorLog: string[] = [];
-
-      const parseAiArray = (content: string | null) => {
-        if (!content) return [];
-        const clean = content.replace(/```json\n?/gi, "").replace(/```\n?/g, "").trim();
-        const match = clean.match(/\[[\s\S]*\]/);
-        try {
-          const parsed = JSON.parse(match ? match[0] : clean);
-          if (Array.isArray(parsed)) return parsed;
-          if (Array.isArray(parsed?.dupes)) return parsed.dupes;
-          return [];
-        } catch {
-          return [];
-        }
-      };
-
-
-      // Helper to always log error body
-      const safeReadText = async (r: Response) => {
-        try { return await r.text(); } catch { return ""; }
-      };
-
-      // 1) Lovable gateway
-      if (LOVABLE_API_KEY) {
-        try {
-          const aiResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+    // Try Lovable
+    if (LOVABLE_API_KEY && !aiContent) {
+      try {
+        const response = await this.callWithTimeout(
+          fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
             method: "POST",
             headers: {
               Authorization: `Bearer ${LOVABLE_API_KEY}`,
@@ -176,25 +431,28 @@ Rules:
               ],
               temperature: 0.7,
             }),
-          });
+          }),
+          CONFIG.AI_TIMEOUT
+        );
 
-          if (aiResponse.ok) {
-            const aiData = await aiResponse.json();
-            aiContent = aiData.choices?.[0]?.message?.content ?? null;
-          } else {
-            const err = await safeReadText(aiResponse);
-            errorLog.push(`Lovable status ${aiResponse.status}: ${err}`);
-          }
-        } catch (e) {
-          errorLog.push(`Lovable error ${(e as Error)?.message || String(e)}`);
+        if (response.ok) {
+          const data = await response.json();
+          aiContent = data.choices?.[0]?.message?.content ?? null;
+        } else {
+          const err = await this.safeReadText(response);
+          errorLog.push(`Lovable ${response.status}: ${err}`);
         }
+      } catch (e) {
+        errorLog.push(`Lovable error: ${(e as Error)?.message || String(e)}`);
       }
+    }
 
-      // 2) Gemini direct
-      if (!aiContent && GEMINI_API_KEY) {
-        try {
-          const prompt = `${systemPrompt}\n\n${userPrompt}`;
-          const response = await fetch(
+    // Try Gemini
+    if (GEMINI_API_KEY && !aiContent) {
+      try {
+        const prompt = `${systemPrompt}\n\n${userPrompt}`;
+        const response = await this.callWithTimeout(
+          fetch(
             `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key=${GEMINI_API_KEY}`,
             {
               method: "POST",
@@ -203,33 +461,35 @@ Rules:
                 contents: [{ role: "user", parts: [{ text: prompt }] }],
                 generationConfig: { temperature: 0.7 },
               }),
-            },
-          );
+            }
+          ),
+          CONFIG.AI_TIMEOUT
+        );
 
-          if (response.ok) {
-            const dataJson = await response.json();
-            aiContent = dataJson?.candidates?.[0]?.content?.parts?.[0]?.text ?? null;
-          } else {
-            const err = await safeReadText(response);
-            errorLog.push(`Gemini status ${response.status}: ${err}`);
-          }
-        } catch (e) {
-          errorLog.push(`Gemini error ${(e as Error)?.message || String(e)}`);
+        if (response.ok) {
+          const data = await response.json();
+          aiContent = data?.candidates?.[0]?.content?.parts?.[0]?.text ?? null;
+        } else {
+          const err = await this.safeReadText(response);
+          errorLog.push(`Gemini ${response.status}: ${err}`);
         }
+      } catch (e) {
+        errorLog.push(`Gemini error: ${(e as Error)?.message || String(e)}`);
       }
+    }
 
-      // 3) OpenRouter fallback
-      if (!aiContent && OPENROUTER_API_KEY) {
-        try {
-          const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+    // Try OpenRouter
+    if (OPENROUTER_API_KEY && !aiContent) {
+      try {
+        const response = await this.callWithTimeout(
+          fetch("https://openrouter.ai/api/v1/chat/completions", {
             method: "POST",
             headers: {
               Authorization: `Bearer ${OPENROUTER_API_KEY}`,
               "Content-Type": "application/json",
             },
             body: JSON.stringify({
-              model: OPENROUTER_MODEL,
-              // Helps models output clean JSON when supported
+              model: CONFIG.OPENROUTER_MODEL,
               response_format: { type: "json_object" },
               messages: [
                 { role: "system", content: systemPrompt },
@@ -237,331 +497,243 @@ Rules:
               ],
               temperature: 0.7,
             }),
-          });
+          }),
+          CONFIG.AI_TIMEOUT
+        );
 
-          if (response.ok) {
-            const aiData = await response.json();
-            aiContent = aiData.choices?.[0]?.message?.content ?? null;
-          } else {
-            const err = await safeReadText(response);
-            errorLog.push(`OpenRouter status ${response.status}: ${err}`);
-          }
-        } catch (e) {
-          errorLog.push(`OpenRouter error ${(e as Error)?.message || String(e)}`);
+        if (response.ok) {
+          const data = await response.json();
+          aiContent = data.choices?.[0]?.message?.content ?? null;
+        } else {
+          const err = await this.safeReadText(response);
+          errorLog.push(`OpenRouter ${response.status}: ${err}`);
         }
-      }
-
-      dupes = parseAiArray(aiContent);
-
-      // Hard floor so UI does not break
-      if (!Array.isArray(dupes)) dupes = [];
-      setCache(aiCache, aiCacheKey, dupes, 10 * 60 * 1000);
-
-      // If everything failed, still return a clean payload
-      if (!dupes.length && errorLog.length) {
-        console.warn("AI failed:", errorLog.join(" | "));
+      } catch (e) {
+        errorLog.push(`OpenRouter error: ${(e as Error)?.message || String(e)}`);
       }
     }
 
-    // ---------------- Helpers ----------------
-    const normaliseIngredient = (value: string): string =>
-      (value || "")
-        .toLowerCase()
-        .replace(/\(.*?\)/g, " ")
-        .replace(/[^a-z0-9\s]/g, " ")
-        .replace(/\s+/g, " ")
-        .trim();
+    const dupes = this.parseAIArray(aiContent);
 
-    const normaliseIngredientList = (items: string[]): string[] => {
-      const seen = new Set<string>();
-      for (const item of items) {
-        const norm = normaliseIngredient(item);
-        if (norm.length > 2) seen.add(norm);
-      }
-      return Array.from(seen);
-    };
+    if (!dupes.length && errorLog.length) {
+      console.warn("AI failed:", errorLog.join(" | "));
+    }
 
-    const computeOverlapStats = (sourceList: string[], targetList: string[]) => {
-      const sourceIngredients = normaliseIngredientList(sourceList);
-      const targetIngredients = normaliseIngredientList(targetList);
-      if (!sourceIngredients.length || !targetIngredients.length) return null;
+    return Array.isArray(dupes) ? dupes : [];
+  }
+}
 
-      let matched = 0;
-      for (const sourceItem of sourceIngredients) {
-        const isMatch = targetIngredients.some(
-          (targetItem) => targetItem.includes(sourceItem) || sourceItem.includes(targetItem),
-        );
-        if (isMatch) matched += 1;
-      }
-      if (matched === 0) return null;
+// ============================================================================
+// OPEN BEAUTY FACTS
+// ============================================================================
 
-      return {
-        percent: Math.round((matched / sourceIngredients.length) * 100),
-        matchedCount: matched,
-        sourceCount: sourceIngredients.length,
-      };
-    };
+class OpenBeautyFacts {
+  private static extractIngredients(product: any): string[] | null {
+    if (!product) return null;
 
-    const normaliseText = (value: string): string =>
-      (value || "")
-        .toLowerCase()
-        .replace(/[^a-z0-9\s]/g, " ")
-        .replace(/\s+/g, " ")
-        .trim();
+    if (Array.isArray(product.ingredients) && product.ingredients.length > 0) {
+      const list = product.ingredients
+        .map((ing: any) => ing?.text)
+        .filter((text: string | undefined): text is string => Boolean(text));
+      if (list.length) return Utils.normalizeIngredientList(list);
+    }
 
-    const buildTokenSet = (value: string): Set<string> => {
-      const tokens = normaliseText(value)
-        .split(" ")
-        .filter((t) => t.length > 1);
-      return new Set(tokens);
-    };
+    const text =
+      product.ingredients_text_en ||
+      product.ingredients_text ||
+      product.ingredients_text_fr ||
+      product.ingredients_text_es;
 
-    const computeTokenSimilarity = (left: string, right: string): number => {
-      if (!left || !right) return 0;
-      const leftTokens = buildTokenSet(left);
-      const rightTokens = buildTokenSet(right);
-      if (!leftTokens.size || !rightTokens.size) return 0;
+    if (typeof text === "string" && text.trim().length > 2) {
+      return Utils.normalizeIngredientList(text.split(/[,;]+/));
+    }
 
-      let intersection = 0;
-      for (const t of leftTokens) if (rightTokens.has(t)) intersection += 1;
+    return null;
+  }
 
-      const union = new Set([...leftTokens, ...rightTokens]).size;
-      return union ? intersection / union : 0;
-    };
+  private static buildSearchTerms(name: string, brandName?: string): string[] {
+    const normalized = Utils.normalizeText(name);
+    const tokens = normalized.split(" ").filter((t) => t.length > 2);
+    const topTokens = tokens.slice(0, 3).join(" ");
+    const firstTwo = tokens.slice(0, 2).join(" ");
+    const terms = new Set<string>();
 
-    const scentKeywords = [
-      "vanilla",
-      "coconut",
-      "shea",
-      "cocoa",
-      "chocolate",
-      "almond",
-      "honey",
-      "oat",
-      "oatmeal",
-      "lavender",
-      "rose",
-      "jasmine",
-      "citrus",
-      "orange",
-      "lemon",
-      "grapefruit",
-      "bergamot",
-      "sandalwood",
-      "musk",
-      "amber",
-      "cherry",
-      "berry",
-      "mint",
-      "eucalyptus",
-      "tea tree",
-      "chamomile",
-      "aloe",
-      "argan",
-      "jojoba",
-      "cinnamon",
-      "caramel",
-      "sugar",
-      "butter",
-    ];
+    if (brandName) {
+      const b = Utils.normalizeText(brandName);
+      terms.add(`${b} ${normalized}`.trim());
+      if (topTokens) terms.add(`${b} ${topTokens}`.trim());
+      if (firstTwo) terms.add(`${b} ${firstTwo}`.trim());
+    }
 
-    const extractScentTokens = (value: string): string[] => {
-      const text = normaliseText(value);
-      const tokens: string[] = [];
-      for (const k of scentKeywords) if (text.includes(k)) tokens.push(k);
-      return Array.from(new Set(tokens));
-    };
+    terms.add(normalized);
+    if (topTokens) terms.add(topTokens);
+    if (firstTwo) terms.add(firstTwo);
 
-    const computeScentSimilarity = (sourceTokens: string[], targetText: string): number => {
-      if (!sourceTokens.length) return 0;
-      const targetTokens = extractScentTokens(targetText);
-      if (!targetTokens.length) return 0;
-      let matched = 0;
-      for (const t of sourceTokens) if (targetTokens.includes(t)) matched += 1;
-      return matched / sourceTokens.length;
-    };
+    return Array.from(terms).filter((t) => t.length > 2);
+  }
 
-    const extractObfIngredients = (product: any): string[] | null => {
-      if (!product) return null;
+  private static brandTokens(value: string): string[] {
+    return Utils.normalizeText(value).split(" ").filter((t) => t.length > 1);
+  }
 
-      if (Array.isArray(product.ingredients) && product.ingredients.length > 0) {
-        const list = product.ingredients
-          .map((ing: any) => ing?.text)
-          .filter((text: string | undefined): text is string => Boolean(text));
-        if (list.length) return normaliseIngredientList(list);
-      }
+  private static hasAllBrandTokens(candidate: string, expected: string): boolean {
+    const expectedTokens = this.brandTokens(expected);
+    const candidateTokens = new Set(this.brandTokens(candidate));
+    if (!expectedTokens.length || candidateTokens.size === 0) return false;
+    return expectedTokens.every((t) => candidateTokens.has(t));
+  }
 
-      const text =
-        product.ingredients_text_en ||
-        product.ingredients_text ||
-        product.ingredients_text_fr ||
-        product.ingredients_text_es;
+  private static isBrandMatch(
+    obfBrand: string | null | undefined,
+    obfName: string | null | undefined,
+    dupeBrand: string | null | undefined
+  ): boolean {
+    if (!obfBrand || !dupeBrand) return false;
+    if (this.hasAllBrandTokens(obfBrand, dupeBrand)) return true;
+    if (obfName && this.hasAllBrandTokens(obfName, dupeBrand)) return true;
+    return false;
+  }
 
-      if (typeof text === "string" && text.trim().length > 2) {
-        return normaliseIngredientList(text.split(/[,;]+/));
-      }
+  static async lookup(name: string, dupeBrand: string | undefined): Promise<ObfEnriched | null> {
+    const cacheKey = `${name}:${dupeBrand || ""}`;
+    
+    // Check cache
+    const cached = CacheManager.getOBF(cacheKey);
+    if (cached !== undefined) return cached;
 
-      return null;
-    };
+    const searchTerms = this.buildSearchTerms(name, dupeBrand);
 
-    const buildSearchTerms = (name: string, brandName?: string): string[] => {
-      const normalized = normaliseText(name);
-      const tokens = normalized.split(" ").filter((t) => t.length > 2);
-      const topTokens = tokens.slice(0, 3).join(" ");
-      const firstTwo = tokens.slice(0, 2).join(" ");
-      const terms = new Set<string>();
+    // Only try the first 2 search terms to reduce API calls
+    for (const term of searchTerms.slice(0, 2)) {
+      try {
+        const encoded = encodeURIComponent(term);
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), CONFIG.OBF_TIMEOUT);
 
-      if (brandName) {
-        const b = normaliseText(brandName);
-        terms.add(`${b} ${normalized}`.trim());
-        if (topTokens) terms.add(`${b} ${topTokens}`.trim());
-        if (firstTwo) terms.add(`${b} ${firstTwo}`.trim());
-      }
-
-      terms.add(normalized);
-      if (topTokens) terms.add(topTokens);
-      if (firstTwo) terms.add(firstTwo);
-
-      return Array.from(terms).filter((t) => t.length > 2);
-    };
-
-    const isPlaceholderImage = (url?: string): boolean => {
-      if (!url) return true;
-      return url.includes("images.unsplash.com");
-    };
-
-    const brandTokens = (value: string) => normaliseText(value).split(" ").filter((t) => t.length > 1);
-
-    const hasAllBrandTokens = (candidate: string, expected: string) => {
-      const expectedTokens = brandTokens(expected);
-      const candidateTokens = new Set(brandTokens(candidate));
-      if (!expectedTokens.length || candidateTokens.size === 0) return false;
-      return expectedTokens.every((t) => candidateTokens.has(t));
-    };
-
-    const isBrandMatch = (
-      obfBrand: string | null | undefined,
-      obfName: string | null | undefined,
-      dupeBrand: string | null | undefined,
-    ) => {
-      if (!obfBrand || !dupeBrand) return false;
-      if (hasAllBrandTokens(obfBrand, dupeBrand)) return true;
-      if (obfName && hasAllBrandTokens(obfName, dupeBrand)) return true;
-      return false;
-    };
-
-    // OBF lookup
-    const lookupOpenBeautyFacts = async (name: string, dupeBrand: string | undefined): Promise<ObfEnriched | null> => {
-      const cacheKey = `${name}:${dupeBrand || ""}`;
-      const cached = getCache(obfCache, cacheKey);
-      if (cached !== undefined) return cached;
-
-      const searchTerms = buildSearchTerms(name, dupeBrand);
-
-      for (const term of searchTerms) {
-        try {
-          const encoded = encodeURIComponent(term);
-          const response = await fetch(
-            `https://world.openbeautyfacts.org/cgi/search.pl?search_terms=${encoded}&search_simple=1&action=process&json=1&page_size=5`,
-            { headers: { "User-Agent": "SkinLytix/1.0" } },
-          );
-
-          if (!response.ok) continue;
-
-          const data = await response.json();
-          const products = data?.products;
-          if (!Array.isArray(products) || products.length === 0) continue;
-
-          for (const product of products) {
-            const obfBrand = product.brands || null;
-            const obfName = product.product_name || null;
-
-            if (dupeBrand && obfBrand && !isBrandMatch(obfBrand, obfName, dupeBrand)) continue;
-
-            const imageUrl = product.image_front_url || product.image_url || null;
-            const productUrl = product.url || null;
-            const obfIngredients = extractObfIngredients(product);
-
-            const images: string[] = [];
-            if (typeof product.image_front_url === "string") images.push(product.image_front_url);
-            if (typeof product.image_url === "string" && !images.includes(product.image_url)) images.push(product.image_url);
-
-            const price = product.price ?? null;
-            const description = product.description ?? null;
-            const generic_name = product.generic_name ?? null;
-            const categories = product.categories ?? null;
-            const barcode = product.code ?? null;
-            const packaging = product.packaging ?? null;
-
-            let storeLocation: string | null = null;
-            if (typeof product.purchase_places === "string" && product.purchase_places.trim()) {
-              storeLocation = product.purchase_places.trim();
-            } else if (typeof product.stores === "string" && product.stores.trim()) {
-              storeLocation = product.stores.trim();
-            }
-
-            const result: ObfEnriched = {
-              imageUrl,
-              productUrl,
-              ingredients: obfIngredients,
-              brand: obfBrand,
-              productName: obfName,
-              images: images.length ? images : undefined,
-              price,
-              description,
-              generic_name,
-              categories,
-              barcode,
-              packaging,
-              storeLocation,
-            };
-
-            setCache(obfCache, cacheKey, result, 30 * 60 * 1000);
-            return result;
+        const response = await fetch(
+          `https://world.openbeautyfacts.org/cgi/search.pl?search_terms=${encoded}&search_simple=1&action=process&json=1&page_size=3`,
+          {
+            headers: { "User-Agent": "SkinLytix/1.0" },
+            signal: controller.signal,
           }
-        } catch (e) {
-          console.warn("OBF lookup error:", e);
+        );
+
+        clearTimeout(timeoutId);
+
+        if (!response.ok) continue;
+
+        const data = await response.json();
+        const products = data?.products;
+        if (!Array.isArray(products) || products.length === 0) continue;
+
+        // Only check first product to speed up
+        const product = products[0];
+        const obfBrand = product.brands || null;
+        const obfName = product.product_name || null;
+
+        if (dupeBrand && obfBrand && !this.isBrandMatch(obfBrand, obfName, dupeBrand)) continue;
+
+        const imageUrl = product.image_front_url || product.image_url || null;
+        const productUrl = product.url || null;
+        const obfIngredients = this.extractIngredients(product);
+
+        const images: string[] = [];
+        if (typeof product.image_front_url === "string") images.push(product.image_front_url);
+        if (typeof product.image_url === "string" && !images.includes(product.image_url)) {
+          images.push(product.image_url);
         }
+
+        const price = product.price ?? null;
+        const description = product.description ?? null;
+        const generic_name = product.generic_name ?? null;
+        const categories = product.categories ?? null;
+        const barcode = product.code ?? null;
+        const packaging = product.packaging ?? null;
+
+        let storeLocation: string | null = null;
+        if (typeof product.purchase_places === "string" && product.purchase_places.trim()) {
+          storeLocation = product.purchase_places.trim();
+        } else if (typeof product.stores === "string" && product.stores.trim()) {
+          storeLocation = product.stores.trim();
+        }
+
+        const result: ObfEnriched = {
+          imageUrl,
+          productUrl,
+          ingredients: obfIngredients,
+          brand: obfBrand,
+          productName: obfName,
+          images: images.length ? images : undefined,
+          price,
+          description,
+          generic_name,
+          categories,
+          barcode,
+          packaging,
+          storeLocation,
+        };
+
+        CacheManager.setOBF(cacheKey, result);
+        return result;
+      } catch (e) {
+        console.warn("OBF lookup error:", e);
+        continue;
       }
+    }
 
-      setCache(obfCache, cacheKey, null, 10 * 60 * 1000);
-      return null;
-    };
+    CacheManager.setOBF(cacheKey, null);
+    return null;
+  }
+}
 
-    // Source ingredients
-    const sourceIngredients =
-      Array.isArray(ingredients) && ingredients.length > 0
-        ? normaliseIngredientList(ingredients)
-        : normaliseIngredientList(promptIngredients);
+// ============================================================================
+// DUPE PROCESSOR
+// ============================================================================
 
-    const sourceScentTokens = extractScentTokens(
-      `${productName} ${(Array.isArray(ingredients) ? ingredients.join(" ") : "")}`,
-    );
+class DupeProcessor {
+  static async process(params: {
+    dupes: any[];
+    sourceIngredients: string[];
+    sourceScentTokens: string[];
+    productName: string;
+    brand: string;
+  }): Promise<any[]> {
+    const { dupes, sourceIngredients, sourceScentTokens, productName, brand } = params;
 
-    // Score AI dupes
+    // Score all dupes first
     const scoredDupes = dupes.map((dupe, index) => {
       const name = dupe?.name || dupe?.productName || dupe?.product_name || "";
       const dupeBrand = dupe?.brand || dupe?.brandName || dupe?.brand_name || "";
       const sharedIngredients = Array.isArray(dupe?.sharedIngredients) ? dupe.sharedIngredients : [];
+      
       const ingredientSignal = sharedIngredients.length
-        ? computeOverlapStats(sourceIngredients, sharedIngredients)?.percent ?? 0
+        ? Utils.computeOverlapStats(sourceIngredients, sharedIngredients)?.percent ?? 0
         : 0;
 
-      const nameScore = computeTokenSimilarity(productName, name);
-      const brandScore = brand ? computeTokenSimilarity(brand, dupeBrand) : 0;
+      const nameScore = Utils.computeTokenSimilarity(productName, name);
+      const brandScore = brand ? Utils.computeTokenSimilarity(brand, dupeBrand) : 0;
 
-      const scentText = [name, dupeBrand, ...(dupe?.highlights ?? []), ...(dupe?.reasons ?? []), ...(sharedIngredients ?? [])].join(
-        " ",
-      );
-      const scentScore = computeScentSimilarity(sourceScentTokens, scentText);
+      const scentText = [
+        name,
+        dupeBrand,
+        ...(dupe?.highlights ?? []),
+        ...(dupe?.reasons ?? []),
+        ...(sharedIngredients ?? []),
+      ].join(" ");
+      const scentScore = ScentAnalyzer.computeSimilarity(sourceScentTokens, scentText);
 
       const preScore = ingredientSignal / 100 + nameScore * 0.8 + brandScore * 0.5 + scentScore * 0.7;
+      
       return { index, preScore, nameScore, brandScore, scentScore };
     });
 
-    const enrichIndexes = new Set(scoredDupes.map((x) => x.index));
+    // Sort by score and only enrich top N
+    const sortedScores = scoredDupes.sort((a, b) => b.preScore - a.preScore);
+    const topIndexes = new Set(
+      sortedScores.slice(0, CONFIG.MAX_DUPES_TO_ENRICH).map((x) => x.index)
+    );
 
-    // Build final dupes
+    // Process dupes with selective enrichment
     const finalDupes = await Promise.all(
       dupes.map(async (dupe, index) => {
         const name = dupe?.name || dupe?.productName || dupe?.product_name;
@@ -569,48 +741,56 @@ Rules:
 
         if (!name || typeof name !== "string") return null;
 
-        const obf = enrichIndexes.has(index) ? await lookupOpenBeautyFacts(name, dupeBrand) : null;
+        // Only enrich top-scoring dupes
+        const obf = topIndexes.has(index)
+          ? await OpenBeautyFacts.lookup(name, dupeBrand)
+          : null;
 
-        // Ingredients priority: OBF -> AI sharedIngredients -> AI ingredients string/array
+        // Determine ingredients priority
         let targetIngredients: string[] | null = null;
 
         if (obf?.ingredients?.length) {
           targetIngredients = obf.ingredients;
         } else if (Array.isArray(dupe?.sharedIngredients) && dupe.sharedIngredients.length) {
-          targetIngredients = normaliseIngredientList(dupe.sharedIngredients);
+          targetIngredients = Utils.normalizeIngredientList(dupe.sharedIngredients);
         } else if (Array.isArray(dupe?.ingredients) && dupe.ingredients.length) {
-          targetIngredients = normaliseIngredientList(dupe.ingredients);
+          targetIngredients = Utils.normalizeIngredientList(dupe.ingredients);
         } else if (typeof dupe?.ingredients === "string") {
-          targetIngredients = normaliseIngredientList(dupe.ingredients.split(/[,;]+/));
-        } else {
-          targetIngredients = null;
+          targetIngredients = Utils.normalizeIngredientList(dupe.ingredients.split(/[,;]+/));
         }
 
         const overlapStats =
-          targetIngredients && sourceIngredients.length ? computeOverlapStats(sourceIngredients, targetIngredients) : null;
+          targetIngredients && sourceIngredients.length
+            ? Utils.computeOverlapStats(sourceIngredients, targetIngredients)
+            : null;
 
-        // Images
+        // Build images array
         let images: string[] = [];
 
         if (Array.isArray(obf?.images)) {
           for (const img of obf.images) {
-            if (typeof img === "string" && img && !images.includes(img) && !isPlaceholderImage(img)) images.push(img);
+            if (typeof img === "string" && img && !images.includes(img) && !Utils.isPlaceholderImage(img)) {
+              images.push(img);
+            }
           }
         }
 
-        if (obf?.imageUrl && !isPlaceholderImage(obf.imageUrl) && !images.includes(obf.imageUrl)) images.push(obf.imageUrl);
-        if (dupe?.imageUrl && !isPlaceholderImage(dupe.imageUrl) && !images.includes(dupe.imageUrl)) images.push(dupe.imageUrl);
-        if (!images.length) images = [];
+        if (obf?.imageUrl && !Utils.isPlaceholderImage(obf.imageUrl) && !images.includes(obf.imageUrl)) {
+          images.push(obf.imageUrl);
+        }
+        if (dupe?.imageUrl && !Utils.isPlaceholderImage(dupe.imageUrl) && !images.includes(dupe.imageUrl)) {
+          images.push(dupe.imageUrl);
+        }
 
-        // URL and whereToBuy
+        // Extract other fields
         const productUrl: string | null =
-          (dupe?.productUrl && typeof dupe.productUrl === "string" ? dupe.productUrl : null) ?? (obf?.productUrl ?? null);
+          (dupe?.productUrl && typeof dupe.productUrl === "string" ? dupe.productUrl : null) ??
+          (obf?.productUrl ?? null);
 
         const whereToBuy: string | null =
           (dupe?.whereToBuy && typeof dupe.whereToBuy === "string" ? dupe.whereToBuy : null) ??
           (obf?.productUrl ? "Open Beauty Facts" : null);
 
-        // Price
         const priceEstimate: string | null =
           (dupe?.priceEstimate && typeof dupe.priceEstimate === "string" ? dupe.priceEstimate : null) ??
           (dupe?.price_range && typeof dupe.price_range === "string" ? dupe.price_range : null) ??
@@ -624,11 +804,18 @@ Rules:
           (obf?.description ?? obf?.generic_name ?? null);
 
         const resolvedCategory: string | null =
-          (dupe?.category && typeof dupe.category === "string" ? dupe.category : null) ?? (obf?.categories ?? null);
+          (dupe?.category && typeof dupe.category === "string" ? dupe.category : null) ??
+          (obf?.categories ?? null);
 
-        const highlights: string[] = Array.isArray(dupe?.highlights) ? dupe.highlights.filter(Boolean).slice(0, 8) : [];
-        const keyIngredients: string[] = Array.isArray(dupe?.keyIngredients) ? dupe.keyIngredients.filter(Boolean).slice(0, 15) : [];
-        const flags: string[] = Array.isArray(dupe?.flags) ? dupe.flags.filter(Boolean).slice(0, 12) : [];
+        const highlights: string[] = Array.isArray(dupe?.highlights)
+          ? dupe.highlights.filter(Boolean).slice(0, 8)
+          : [];
+        const keyIngredients: string[] = Array.isArray(dupe?.keyIngredients)
+          ? dupe.keyIngredients.filter(Boolean).slice(0, 15)
+          : [];
+        const flags: string[] = Array.isArray(dupe?.flags)
+          ? dupe.flags.filter(Boolean).slice(0, 12)
+          : [];
 
         const ingredientList = targetIngredients ?? [];
 
@@ -666,124 +853,146 @@ Rules:
           obf: obf ? { ...obf } : null,
           _score: finalScore,
         };
-      }),
+      })
     );
 
-    const filteredDupes = finalDupes
+    return finalDupes
       .filter(Boolean)
       .sort((a: any, b: any) => (b?._score ?? 0) - (a?._score ?? 0))
-      .slice(0, 5)
-      .map((d: any) => {
-        const { _score, ...rest } = d;
-        return rest;
-      });
+      .slice(0, CONFIG.MAX_DUPES_TO_RETURN);
+  }
+}
 
-    // ---------------- UI mapping layer ----------------
-    function stableHash(str: string): string {
-      let hash = 5381;
-      for (let i = 0; i < str.length; i++) {
-        hash = (hash << 5) + hash + str.charCodeAt(i);
-        hash = hash & 0xffffffff;
+// ============================================================================
+// UI MAPPER
+// ============================================================================
+
+class UIMapper {
+  static cleanIngredients(list: any): string[] {
+    if (!Array.isArray(list)) return [];
+    const seen = new Set<string>();
+    return list
+      .map((x: string) => (x || "").trim())
+      .filter((x: string) => x.length > 2)
+      .map((x: string) => x.toLowerCase())
+      .filter((x: string) => (!seen.has(x) ? (seen.add(x), true) : false));
+  }
+
+  static extractKeyIngredients(list: string[], aiKeys?: string[]): string[] {
+    const cleaned = this.cleanIngredients(list);
+    const fromAi = Array.isArray(aiKeys) ? aiKeys.map((x) => (x || "").trim()).filter(Boolean) : [];
+    const merged = [...fromAi, ...cleaned];
+    const seen = new Set<string>();
+    const deduped = merged
+      .map((x) => x.toLowerCase())
+      .filter((x) => x.length > 2)
+      .filter((x) => (!seen.has(x) ? (seen.add(x), true) : false));
+    return deduped.slice(0, 10);
+  }
+
+  static extractFlags(ingredients: string[], aiFlags?: string[]): string[] {
+    const fromAi = Array.isArray(aiFlags) ? aiFlags.map((x) => (x || "").trim()).filter(Boolean) : [];
+    const autoFlags: string[] = [];
+    const lower = ingredients.map((x) => x.toLowerCase());
+
+    if (lower.some((x) => x.includes("fragrance") || x.includes("parfum"))) {
+      autoFlags.push("Fragrance");
+    }
+    if (
+      lower.some(
+        (x) =>
+          x.includes("limonene") ||
+          x.includes("linalool") ||
+          x.includes("citral") ||
+          x.includes("eugenol")
+      )
+    ) {
+      autoFlags.push("Potential allergens");
+    }
+    if (lower.some((x) => x.includes("essential oil"))) {
+      autoFlags.push("Essential oils");
+    }
+    if (lower.some((x) => x.includes("alcohol denat"))) {
+      autoFlags.push("Drying alcohol");
+    }
+
+    const merged = [...fromAi, ...autoFlags];
+    const seen = new Set<string>();
+    return merged
+      .map((x) => x.trim())
+      .filter(Boolean)
+      .filter((x) => (!seen.has(x.toLowerCase()) ? (seen.add(x.toLowerCase()), true) : false))
+      .slice(0, 8);
+  }
+
+  static extractHighlights(dupe: any): string[] {
+    const fromAi = Array.isArray(dupe?.highlights)
+      ? dupe.highlights.map((x: any) => (x || "").trim()).filter(Boolean)
+      : [];
+
+    const derived: string[] = [];
+    if (typeof dupe?.matchedCount === "number" && typeof dupe?.sourceCount === "number") {
+      derived.push("Solid ingredient overlap");
+    }
+
+    if (Array.isArray(dupe?.ingredientList)) {
+      const ing = dupe.ingredientList.map((x: string) => x.toLowerCase());
+      if (ing.some((x) => x.includes("ceramide") || x.includes("cholesterol"))) {
+        derived.push("Barrier support");
       }
-      return Math.abs(hash).toString(36);
-    }
-
-    function pickImage(dupe: any): string | null {
-      if (Array.isArray(dupe.images) && dupe.images.length > 0 && dupe.images[0]) return dupe.images[0];
-      if (dupe.imageUrl) return dupe.imageUrl;
-      if (dupe.obf && dupe.obf.imageUrl) return dupe.obf.imageUrl;
-      return null;
-    }
-
-    function cleanIngredients(list: any): string[] {
-      if (!Array.isArray(list)) return [];
-      const seen = new Set<string>();
-      return list
-        .map((x: string) => (x || "").trim())
-        .filter((x: string) => x.length > 2)
-        .map((x: string) => x.toLowerCase())
-        .filter((x: string) => (!seen.has(x) ? (seen.add(x), true) : false));
-    }
-
-    function extractKeyIngredients(list: string[], aiKeys?: string[]): string[] {
-      const cleaned = cleanIngredients(list);
-      const fromAi = Array.isArray(aiKeys) ? aiKeys.map((x) => (x || "").trim()).filter(Boolean) : [];
-      const merged = [...fromAi, ...cleaned];
-      const seen = new Set<string>();
-      const deduped = merged
-        .map((x) => x.toLowerCase())
-        .filter((x) => x.length > 2)
-        .filter((x) => (!seen.has(x) ? (seen.add(x), true) : false));
-      return deduped.slice(0, 10);
-    }
-
-    function extractFlags(ingredients: string[], aiFlags?: string[]): string[] {
-      const fromAi = Array.isArray(aiFlags) ? aiFlags.map((x) => (x || "").trim()).filter(Boolean) : [];
-      const autoFlags: string[] = [];
-      const lower = ingredients.map((x) => x.toLowerCase());
-
-      if (lower.some((x) => x.includes("fragrance") || x.includes("parfum"))) autoFlags.push("Fragrance");
-      if (lower.some((x) => x.includes("limonene") || x.includes("linalool") || x.includes("citral") || x.includes("eugenol")))
-        autoFlags.push("Potential allergens");
-      if (lower.some((x) => x.includes("essential oil"))) autoFlags.push("Essential oils");
-      if (lower.some((x) => x.includes("alcohol denat"))) autoFlags.push("Drying alcohol");
-
-      const merged = [...fromAi, ...autoFlags];
-      const seen = new Set<string>();
-      return merged
-        .map((x) => x.trim())
-        .filter(Boolean)
-        .filter((x) => (!seen.has(x.toLowerCase()) ? (seen.add(x.toLowerCase()), true) : false))
-        .slice(0, 8);
-    }
-
-    function extractHighlights(dupe: any): string[] {
-      const fromAi = Array.isArray(dupe?.highlights) ? dupe.highlights.map((x: any) => (x || "").trim()).filter(Boolean) : [];
-
-      const derived: string[] = [];
-      if (typeof dupe?.matchedCount === "number" && typeof dupe?.sourceCount === "number") derived.push("Solid ingredient overlap");
-
-      if (Array.isArray(dupe?.ingredientList)) {
-        const ing = dupe.ingredientList.map((x: string) => x.toLowerCase());
-        if (ing.some((x) => x.includes("ceramide") || x.includes("cholesterol"))) derived.push("Barrier support");
-        if (ing.some((x) => x.includes("fragrance") || x.includes("parfum"))) derived.push("Contains fragrance");
+      if (ing.some((x) => x.includes("fragrance") || x.includes("parfum"))) {
+        derived.push("Contains fragrance");
       }
-
-      const merged = [...fromAi, ...derived];
-      const seen = new Set<string>();
-      return merged
-        .map((x) => x.trim())
-        .filter(Boolean)
-        .filter((x) => (!seen.has(x.toLowerCase()) ? (seen.add(x.toLowerCase()), true) : false))
-        .slice(0, 6);
     }
 
-    function extractPriceEstimate(dupe: any): string | null {
-      const v =
-        (typeof dupe?.priceEstimate === "string" && dupe.priceEstimate.trim() ? dupe.priceEstimate.trim() : null) ??
-        (typeof dupe?.price_range === "string" && dupe.price_range.trim() ? dupe.price_range.trim() : null) ??
-        (typeof dupe?.price === "string" && dupe.price.trim() ? dupe.price.trim() : null) ??
-        (typeof dupe?.price === "number" ? `$${dupe.price}` : null) ??
-        (typeof dupe?.obf?.price === "string" && dupe.obf.price.trim() ? dupe.obf.price.trim() : null) ??
-        (typeof dupe?.obf?.price === "number" ? `$${dupe.obf.price}` : null);
+    const merged = [...fromAi, ...derived];
+    const seen = new Set<string>();
+    return merged
+      .map((x) => x.trim())
+      .filter(Boolean)
+      .filter((x) => (!seen.has(x.toLowerCase()) ? (seen.add(x.toLowerCase()), true) : false))
+      .slice(0, 6);
+  }
 
-      if (!v) return null;
-      if (/^\d+(\.\d+)?$/.test(v)) return `$${v}`;
-      return v;
+  static extractPriceEstimate(dupe: any): string | null {
+    const v =
+      (typeof dupe?.priceEstimate === "string" && dupe.priceEstimate.trim()
+        ? dupe.priceEstimate.trim()
+        : null) ??
+      (typeof dupe?.price_range === "string" && dupe.price_range.trim() ? dupe.price_range.trim() : null) ??
+      (typeof dupe?.price === "string" && dupe.price.trim() ? dupe.price.trim() : null) ??
+      (typeof dupe?.price === "number" ? `$${dupe.price}` : null) ??
+      (typeof dupe?.obf?.price === "string" && dupe.obf.price.trim() ? dupe.obf.price.trim() : null) ??
+      (typeof dupe?.obf?.price === "number" ? `$${dupe.obf.price}` : null);
+
+    if (!v) return null;
+    if (/^\d+(\.\d+)?$/.test(v)) return `$${v}`;
+    return v;
+  }
+
+  static pickImage(dupe: any): string | null {
+    if (Array.isArray(dupe.images) && dupe.images.length > 0 && dupe.images[0]) {
+      return dupe.images[0];
     }
+    if (dupe.imageUrl) return dupe.imageUrl;
+    if (dupe.obf && dupe.obf.imageUrl) return dupe.obf.imageUrl;
+    return null;
+  }
 
-    const uiDupes = filteredDupes.map((dupe: any) => {
+  static mapToUI(dupes: any[]): any[] {
+    return dupes.map((dupe: any) => {
       const name = dupe?.name || "";
       const brandName = dupe?.brand || "";
-      const id = stableHash(`${name}::${brandName}`);
+      const id = Utils.stableHash(`${name}::${brandName}`);
 
-      const ingredientsList = cleanIngredients(dupe?.ingredientList || []);
-      const keyIngredients = extractKeyIngredients(ingredientsList, dupe?.keyIngredients);
-      const flags = extractFlags(ingredientsList, dupe?.flags);
-      const highlights = extractHighlights(dupe);
-      const priceEstimate = extractPriceEstimate(dupe);
+      const ingredientsList = this.cleanIngredients(dupe?.ingredientList || []);
+      const keyIngredients = this.extractKeyIngredients(ingredientsList, dupe?.keyIngredients);
+      const flags = this.extractFlags(ingredientsList, dupe?.flags);
+      const highlights = this.extractHighlights(dupe);
+      const priceEstimate = this.extractPriceEstimate(dupe);
 
-      const productUrl = typeof dupe?.productUrl === "string" && dupe.productUrl.trim() ? dupe.productUrl.trim() : null;
+      const productUrl =
+        typeof dupe?.productUrl === "string" && dupe.productUrl.trim() ? dupe.productUrl.trim() : null;
       const internalLink = `/dupes/${id}`;
 
       return {
@@ -791,24 +1000,20 @@ Rules:
         internalLink,
         name,
         brand: brandName || null,
-        imageUrl: pickImage(dupe),
+        imageUrl: this.pickImage(dupe),
         images: Array.isArray(dupe?.images) ? dupe.images : [],
         matchPercent: typeof dupe?.matchPercent === "number" ? dupe.matchPercent : null,
-
         priceEstimate,
         category: dupe?.category || null,
         highlights,
         keyIngredients,
         flags,
         ingredientsCount: ingredientsList.length,
-
         description: dupe?.description || null,
         whereToBuy: dupe?.whereToBuy || null,
         storeLocation: dupe?.storeLocation || null,
         productUrl,
-
         ingredientList: ingredientsList,
-
         meta: {
           barcode: dupe?.obf?.barcode ?? null,
           packaging: dupe?.obf?.packaging ?? null,
@@ -816,45 +1021,199 @@ Rules:
         },
       };
     });
+  }
+}
 
-    // Summary ids
-    let bestMatchId: string | null = null;
-    let bestValueId: string | null = null;
+// ============================================================================
+// MAIN HANDLER
+// ============================================================================
 
-    if (uiDupes.length) {
-      const bestMatch = uiDupes.reduce((a, b) => ((b.matchPercent || 0) > (a.matchPercent || 0) ? b : a), uiDupes[0]);
-      bestMatchId = bestMatch.id;
+serve(async (req: Request): Promise<Response> => {
+  if (req.method === "OPTIONS") {
+    return new Response(null, { headers: corsHeaders });
+  }
 
-      const priceVals = uiDupes
-        .map((d) => {
-          const p = typeof d.priceEstimate === "string" ? d.priceEstimate : "";
-          const n = p ? parseFloat(p.replace(/[^\d.]/g, "")) : NaN;
-          return Number.isFinite(n) ? { id: d.id, price: n } : null;
-        })
-        .filter(Boolean) as Array<{ id: string; price: number }>;
-
-      bestValueId = priceVals.length
-        ? priceVals.reduce((a, b) => (b.price < a.price ? b : a), priceVals[0]).id
-        : bestMatchId;
+  try {
+    const body = await req.json();
+    
+    // Validate required fields
+    const productName = typeof body?.productName === "string" ? body.productName.trim() : "";
+    if (!productName) {
+      return new Response(
+        JSON.stringify({ dupes: [], error: "productName is required" }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
     }
 
-    const response = {
-      sourceProduct: {
-        name: productName,
-        brand: brand || null,
-        category: category || null,
-      },
-      summary: {
-        bestMatchId,
-        bestValueId,
-      },
-      dupes: uiDupes,
-      dupesRaw: filteredDupes,
-    };
+    const brand = typeof body?.brand === "string" ? body.brand.trim() : "";
+    const category = typeof body?.category === "string" ? body.category.trim() : "";
+    const skinType = typeof body?.skinType === "string" ? body.skinType.trim() : "";
+    const concerns = typeof body?.concerns === "string" ? body.concerns.trim() : "";
+    const ingredients = Array.isArray(body?.ingredients) ? body.ingredients : [];
 
-    return new Response(JSON.stringify(response), {
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    // Create request fingerprint for deduplication
+    const requestFingerprint = Utils.createRequestFingerprint(body);
+    
+    // Check if there's a pending request with the same fingerprint
+    const pendingRequest = CacheManager.getPendingRequest(requestFingerprint);
+    if (pendingRequest) {
+      console.log("Returning pending request for:", productName);
+      return pendingRequest;
+    }
+
+    // Create cache key
+    const aiCacheKey = JSON.stringify({
+      productName,
+      brand,
+      ingredients: ingredients.slice(0, CONFIG.MAX_PROMPT_INGREDIENTS),
+      category,
+      skinType,
+      concerns,
     });
+
+    // Check AI cache
+    const cachedDupes = CacheManager.getAI(aiCacheKey);
+    if (cachedDupes && cachedDupes.length > 0) {
+      console.log("Returning cached dupes for:", productName);
+      
+      const sourceIngredients = Utils.normalizeIngredientList(ingredients);
+      const sourceScentTokens = ScentAnalyzer.extractTokens(
+        `${productName} ${ingredients.join(" ")}`
+      );
+
+      const processedDupes = await DupeProcessor.process({
+        dupes: cachedDupes,
+        sourceIngredients,
+        sourceScentTokens,
+        productName,
+        brand,
+      });
+
+      const uiDupes = UIMapper.mapToUI(processedDupes);
+
+      let bestMatchId: string | null = null;
+      let bestValueId: string | null = null;
+
+      if (uiDupes.length) {
+        const bestMatch = uiDupes.reduce(
+          (a, b) => ((b.matchPercent || 0) > (a.matchPercent || 0) ? b : a),
+          uiDupes[0]
+        );
+        bestMatchId = bestMatch.id;
+
+        const priceVals = uiDupes
+          .map((d) => {
+            const p = typeof d.priceEstimate === "string" ? d.priceEstimate : "";
+            const n = p ? parseFloat(p.replace(/[^\d.]/g, "")) : NaN;
+            return Number.isFinite(n) ? { id: d.id, price: n } : null;
+          })
+          .filter(Boolean) as Array<{ id: string; price: number }>;
+
+        bestValueId = priceVals.length
+          ? priceVals.reduce((a, b) => (b.price < a.price ? b : a), priceVals[0]).id
+          : bestMatchId;
+      }
+
+      const response = {
+        sourceProduct: {
+          name: productName,
+          brand: brand || null,
+          category: category || null,
+        },
+        summary: {
+          bestMatchId,
+          bestValueId,
+        },
+        dupes: uiDupes,
+      };
+
+      return new Response(JSON.stringify(response), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // Create the actual processing promise
+    const processingPromise = (async () => {
+      try {
+        // Get AI dupes
+        const rawDupes = await AIProvider.getDupes({
+          productName,
+          brand,
+          ingredients,
+          category,
+          skinType,
+          concerns,
+        });
+
+        // Cache the raw AI response
+        CacheManager.setAI(aiCacheKey, rawDupes);
+
+        // Process dupes
+        const sourceIngredients = Utils.normalizeIngredientList(ingredients);
+        const sourceScentTokens = ScentAnalyzer.extractTokens(
+          `${productName} ${ingredients.join(" ")}`
+        );
+
+        const processedDupes = await DupeProcessor.process({
+          dupes: rawDupes,
+          sourceIngredients,
+          sourceScentTokens,
+          productName,
+          brand,
+        });
+
+        const uiDupes = UIMapper.mapToUI(processedDupes);
+
+        // Calculate summary
+        let bestMatchId: string | null = null;
+        let bestValueId: string | null = null;
+
+        if (uiDupes.length) {
+          const bestMatch = uiDupes.reduce(
+            (a, b) => ((b.matchPercent || 0) > (a.matchPercent || 0) ? b : a),
+            uiDupes[0]
+          );
+          bestMatchId = bestMatch.id;
+
+          const priceVals = uiDupes
+            .map((d) => {
+              const p = typeof d.priceEstimate === "string" ? d.priceEstimate : "";
+              const n = p ? parseFloat(p.replace(/[^\d.]/g, "")) : NaN;
+              return Number.isFinite(n) ? { id: d.id, price: n } : null;
+            })
+            .filter(Boolean) as Array<{ id: string; price: number }>;
+
+          bestValueId = priceVals.length
+            ? priceVals.reduce((a, b) => (b.price < a.price ? b : a), priceVals[0]).id
+            : bestMatchId;
+        }
+
+        const response = {
+          sourceProduct: {
+            name: productName,
+            brand: brand || null,
+            category: category || null,
+          },
+          summary: {
+            bestMatchId,
+            bestValueId,
+          },
+          dupes: uiDupes,
+        };
+
+        return new Response(JSON.stringify(response), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      } finally {
+        // Remove from pending requests
+        CacheManager.removePendingRequest(requestFingerprint);
+      }
+    })();
+
+    // Store the pending request
+    CacheManager.setPendingRequest(requestFingerprint, processingPromise);
+
+    return processingPromise;
   } catch (error) {
     console.error("Error in find-dupes:", error);
     const errorMessage = error instanceof Error ? error.message : "Unknown error";
