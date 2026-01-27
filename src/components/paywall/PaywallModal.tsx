@@ -108,7 +108,18 @@ export function PaywallModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-lg p-0 overflow-hidden">
+      <DialogContent className="sm:max-w-lg p-0 overflow-hidden max-h-screen flex flex-col">
+        {/* Close button in top-right */}
+        <div className="absolute right-4 top-4 z-10">
+          <button
+            type="button"
+            onClick={() => onOpenChange(false)}
+            className="rounded-sm opacity-70 ring-offset-background transition-opacity data-[state=open]:bg-accent data-[state=open]:text-muted-foreground hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none"
+            aria-label="Close"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
         {/* Header with gradient */}
         <div className="bg-gradient-to-br from-primary/20 via-primary/10 to-transparent p-6 pb-4">
           <DialogHeader>
@@ -129,7 +140,8 @@ export function PaywallModal({
           </DialogHeader>
         </div>
 
-        <div className="p-6 pt-4 space-y-5">
+        {/* Make content scrollable if needed */}
+        <div className="p-6 pt-4 space-y-5 overflow-y-auto flex-1">
           {/* Social Proof Banner */}
           <div className="flex items-center gap-2 p-3 bg-accent/30 rounded-lg">
             <Users className="h-4 w-4 text-primary" />
