@@ -1,3 +1,4 @@
+// DupeCard.jsx
 import { useMemo, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
@@ -43,8 +44,8 @@ const deriveHighlights = (dupe) => {
   const mp = dupe?.matchPercent;
 
   if (typeof mp === "number") {
-    if (mp >= 60) fallback.push("Solid ingredient overlap");
-    else if (mp >= 40) fallback.push("Moderate ingredient overlap");
+    if (mp >= 60) fallback.push("High ingredient overlap");
+    else if (mp >= 40) fallback.push("Medium ingredient overlap");
     else fallback.push("Low ingredient overlap");
   }
 
@@ -141,8 +142,8 @@ export const DupeCard = ({
 
   const matchLabel =
     dupe?.matchPercent === null || dupe?.matchPercent === undefined
-      ? "Match N/A"
-      : `${dupe.matchPercent}% match`;
+      ? "Ingredient match N/A"
+      : `Ingredient match ${dupe.matchPercent}%`;
 
   const ingredientList = useMemo(() => deriveIngredientList(dupe), [dupe]);
   const highlights = useMemo(() => deriveHighlights(dupe), [dupe]);
@@ -174,7 +175,10 @@ export const DupeCard = ({
       { label: "Description", value: dupe?.description || dupe?.obf?.generic_name || "Not provided" },
       { label: "Store", value: dupe?.storeLocation || dupe?.obf?.storeLocation || "Not provided" },
       { label: "Where to buy", value: dupe?.whereToBuy || dupe?.obf?.whereToBuy || "Not provided" },
-      { label: "Ingredient match", value: matchedCount && sourceCount ? `${matchedCount} of ${sourceCount}` : "Not provided" },
+      {
+        label: "Ingredient match",
+        value: matchedCount && sourceCount ? `${matchedCount} of ${sourceCount}` : "Not provided",
+      },
       { label: "Match score", value: formatScore(dupe?.matchScore) },
       { label: "Name score", value: formatScore(dupe?.nameScore) },
       { label: "Brand score", value: formatScore(dupe?.brandScore) },

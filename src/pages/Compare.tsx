@@ -1,3 +1,4 @@
+// Compare.jsx
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
@@ -90,7 +91,6 @@ const normalizeDupe = (dupe) => {
     internalLink: dupe.internalLink ?? null,
     productUrl: dupe.productUrl ?? null,
 
-    // optional fields your edge function might return
     matchedCount: dupe.matchedCount ?? dupe.matchMeta?.matchedCount ?? null,
     sourceCount: dupe.sourceCount ?? dupe.matchMeta?.sourceCount ?? null,
   };
@@ -608,7 +608,7 @@ export default function Compare() {
     return () => {
       cancelled = true;
     };
-  }, [navigate]); // do not depend on location.search here
+  }, [navigate]);
 
   // ---------- URL change handling ----------
   useEffect(() => {
@@ -766,7 +766,7 @@ export default function Compare() {
             <Search className="w-6 h-6 text-primary" />
             Dupe Discovery
           </h1>
-          <p className="text-muted-foreground mt-1">Ingredient overlap vs your base product.</p>
+          <p className="text-muted-foreground mt-1">Find lookalike products by ingredient overlap.</p>
         </div>
 
         {analyses.length < 1 ? (
@@ -825,7 +825,7 @@ export default function Compare() {
                     ) : (
                       <>
                         <Sparkles className="w-4 h-4" />
-                        Refresh dupes
+                        Refresh results
                       </>
                     )}
                   </Button>
@@ -870,23 +870,25 @@ export default function Compare() {
                 </TabsTrigger>
                 <TabsTrigger value="myproducts" className="gap-2">
                   <Package className="w-4 h-4" />
-                  My Products Match
+                  My Scanned Matches
                 </TabsTrigger>
               </TabsList>
 
-              <div className="flex gap-2 flex-wrap">
-                {CATEGORY_FILTERS.map((cat) => (
-                  <Button
-                    key={cat}
-                    variant={categoryFilter === cat ? "default" : "outline"}
-                    size="sm"
-                    onClick={() => setCategoryFilter(cat)}
-                    className="capitalize"
-                  >
-                    {cat === "all" ? "All" : cat}
-                  </Button>
-                ))}
-              </div>
+              {activeTab === "market" ? (
+                <div className="flex gap-2 flex-wrap">
+                  {CATEGORY_FILTERS.map((cat) => (
+                    <Button
+                      key={cat}
+                      variant={categoryFilter === cat ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => setCategoryFilter(cat)}
+                      className="capitalize"
+                    >
+                      {cat === "all" ? "All" : cat}
+                    </Button>
+                  ))}
+                </div>
+              ) : null}
 
               <TabsContent value="market" className="space-y-6">
                 {dupeError ? (
@@ -908,8 +910,13 @@ export default function Compare() {
                 ) : filteredMarketDupes.length > 0 ? (
                   <div className="space-y-3">
                     <Card className="border-dashed">
-                      <CardContent className="py-3 text-sm text-muted-foreground">
-                        Comparing all results to: <span className="text-foreground font-medium">{baseName}</span>
+                      <CardContent className="py-3 text-sm text-muted-foreground space-y-1">
+                        <div>
+                          Showing market alternatives compared to:{" "}
+                          <span className="text-foreground font-medium">{baseName}</span>
+                        </div>
+                        <div>Ingredient match shows overlap with your base product.</div>
+                        <div>Open a card and review the ingredients before you buy.</div>
                       </CardContent>
                     </Card>
 
@@ -937,9 +944,9 @@ export default function Compare() {
                   <Card className="border-dashed">
                     <CardContent className="py-12 text-center">
                       <Sparkles className="w-12 h-12 mx-auto text-muted-foreground/50 mb-4" />
-                      <h3 className="text-lg font-medium mb-2">No dupes yet</h3>
+                      <h3 className="text-lg font-medium mb-2">No results yet</h3>
                       <p className="text-muted-foreground text-sm max-w-md mx-auto mb-4">
-                        Pick a base product, then refresh dupes.
+                        Pick a base product, then tap Refresh results.
                       </p>
                       <Button
                         onClick={async () => {
@@ -947,7 +954,7 @@ export default function Compare() {
                         }}
                         disabled={findingDupes || !selectedProduct}
                       >
-                        Find dupes
+                        Search dupes
                       </Button>
                     </CardContent>
                   </Card>
@@ -957,12 +964,16 @@ export default function Compare() {
               <TabsContent value="myproducts" className="space-y-6">
                 <Card className="border-dashed">
                   <CardHeader className="pb-2">
-                    <CardTitle className="text-base font-medium">What this compares</CardTitle>
+                    <CardTitle className="text-base font-medium">What this tab shows</CardTitle>
                   </CardHeader>
                   <CardContent className="text-sm text-muted-foreground space-y-2">
-                    <div>Base product at the top vs your other scanned products.</div>
-                    <div>Match percent is ingredient overlap with the base product.</div>
-                    <div>Tap Use and find dupes to switch base and load Market Dupes.</div>
+                    <div>
+                      Based on your base product, these are your scanned products with the most similar ingredient lists.
+                    </div>
+                    <div>Ingredient match shows overlap with your base product.</div>
+                    <div>Tap Set as base to compare everything to that product.</div>
+                    <div>Tap Set base and search dupes to jump to Market Dupes.</div>
+
                     <div className="flex gap-2 flex-wrap pt-2">
                       <Button
                         size="sm"
@@ -978,7 +989,7 @@ export default function Compare() {
                           topRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
                         }}
                       >
-                        Go to market dupes
+                        Go to Market Dupes
                       </Button>
                     </div>
                   </CardContent>
@@ -1007,7 +1018,7 @@ export default function Compare() {
                       <CardContent className="flex flex-col md:flex-row gap-3 md:items-center md:justify-between">
                         <div className="flex gap-2 flex-wrap">
                           <Button size="sm" variant="outline" onClick={() => setOnlySameCategory((v) => !v)}>
-                            {onlySameCategory ? "Same category only" : "All categories"}
+                            {onlySameCategory ? "Same category" : "All categories"}
                           </Button>
                         </div>
 
@@ -1015,7 +1026,7 @@ export default function Compare() {
                           <input
                             value={mySearch}
                             onChange={(e) => setMySearch(e.target.value)}
-                            placeholder="Search by name or brand"
+                            placeholder="Search your scans"
                             className="w-full md:w-[280px] h-10 rounded-md border bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-ring"
                           />
                           <Button variant="outline" onClick={() => setMySearch("")} className="whitespace-nowrap">
@@ -1040,7 +1051,7 @@ export default function Compare() {
                               <CardContent className="space-y-3">
                                 <div className="flex items-center justify-between">
                                   <Badge variant="secondary" className="text-xs">
-                                    Match {m.similarity}%
+                                    Ingredient match {m.similarity}%
                                   </Badge>
                                   <span className="text-xs text-muted-foreground">Shared {m.sharedCount}</span>
                                 </div>
@@ -1063,19 +1074,23 @@ export default function Compare() {
                                     variant="outline"
                                     onClick={async () => {
                                       await selectProduct(m.id, { goToMarket: false, scrollTop: true });
-                                      toast({ title: "Base product updated", description: "Now pick Market Dupes." });
+                                      toast({ title: "Base product updated", description: "Now review your matches." });
                                     }}
                                   >
-                                    Use as base
+                                    Set as base
                                   </Button>
 
                                   <Button
                                     size="sm"
                                     onClick={async () => {
-                                      await selectProduct(m.id, { goToMarket: true, scrollTop: true, autoFindDupes: true });
+                                      await selectProduct(m.id, {
+                                        goToMarket: true,
+                                        scrollTop: true,
+                                        autoFindDupes: true,
+                                      });
                                     }}
                                   >
-                                    Use and find dupes
+                                    Set base and search dupes
                                   </Button>
                                 </div>
                               </CardContent>
@@ -1087,7 +1102,9 @@ export default function Compare() {
                       <Card className="border-dashed">
                         <CardContent className="py-12 text-center">
                           <Package className="w-12 h-12 mx-auto text-muted-foreground/50 mb-4" />
-                          <p className="text-muted-foreground">No matches yet. Scan more products with full ingredient lists.</p>
+                          <p className="text-muted-foreground">
+                            No matches yet. Scan more products with full ingredient lists.
+                          </p>
                         </CardContent>
                       </Card>
                     )}
