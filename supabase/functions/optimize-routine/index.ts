@@ -1,22 +1,30 @@
+// @ts-expect-error - Deno edge runtime import
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+// @ts-expect-error - Deno edge runtime import
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.7.1";
+
+declare const Deno: {
+  env: {
+    get: (key: string) => string | undefined;
+  };
+};
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-serve(async (req) => {
+serve(async (req: Request) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
-  // Declare variables for AI response and fallback tracking at the top of the try block
-  let aiData;
-  let optimizationData;
-  let fallbackLevel = 0;
-  let aiResponse;
+    // Declare variables for AI response and fallback tracking at the top of the try block
+    let aiData;
+    let optimizationData;
+    let fallbackLevel = 0;
+    let aiResponse;
     const { routineId } = await req.json();
     console.log('Optimizing routine:', routineId);
 
@@ -123,7 +131,7 @@ serve(async (req) => {
     };
 
     // Prepare product data and categorize
-    const productsData = routineProducts.map(rp => ({
+  const productsData = routineProducts.map((rp: any) => ({
       name: rp.user_analyses.product_name,
       brand: rp.user_analyses.brand,
       category: rp.user_analyses.category,
@@ -135,10 +143,10 @@ serve(async (req) => {
     }));
 
     // Group products by type
-    const faceProducts = productsData.filter(p => p.productType === 'face');
-    const bodyProducts = productsData.filter(p => p.productType === 'body');
-    const hairProducts = productsData.filter(p => p.productType === 'hair');
-    const unknownProducts = productsData.filter(p => p.productType === 'unknown');
+  const faceProducts = productsData.filter((p: any) => p.productType === 'face');
+  const bodyProducts = productsData.filter((p: any) => p.productType === 'body');
+  const hairProducts = productsData.filter((p: any) => p.productType === 'hair');
+  const unknownProducts = productsData.filter((p: any) => p.productType === 'unknown');
 
     // Determine routine type
     const routineType = faceProducts.length > 0 && bodyProducts.length === 0 && hairProducts.length === 0 ? 'face' :
@@ -167,7 +175,7 @@ USER FACIAL SKIN PROFILE:
 - Facial Concerns: ${skinConcerns.join(', ')}
 
 ${routineType === 'mixed' ? 'FACIAL ' : ''}PRODUCTS IN ROUTINE:
-${faceProducts.map((p, i) => `
+${faceProducts.map((p: any, i: number) => `
 ${i + 1}. ${p.name}${p.brand ? ` by ${p.brand}` : ''}
    Category: ${p.category || 'unknown'}
    Price: $${p.price || 'unknown'}
@@ -186,7 +194,7 @@ USER BODY PROFILE:
 - Body Concerns: ${bodyConcerns.join(', ')}
 
 ${routineType === 'mixed' ? 'BODY CARE ' : ''}PRODUCTS IN ROUTINE:
-${bodyProducts.map((p, i) => `
+${bodyProducts.map((p: any, i: number) => `
 ${i + 1}. ${p.name}${p.brand ? ` by ${p.brand}` : ''}
    Category: ${p.category || 'unknown'}
    Price: $${p.price || 'unknown'}
@@ -207,7 +215,7 @@ USER SCALP/HAIR PROFILE:
 - Scalp Type: ${scalpType}
 
 ${routineType === 'mixed' ? 'HAIR CARE ' : ''}PRODUCTS IN ROUTINE:
-${hairProducts.map((p, i) => `
+${hairProducts.map((p: any, i: number) => `
 ${i + 1}. ${p.name}${p.brand ? ` by ${p.brand}` : ''}
    Category: ${p.category || 'unknown'}
    Price: $${p.price || 'unknown'}
@@ -244,7 +252,7 @@ Provide a comprehensive analysis covering:
 
 ${unknownProducts.length > 0 ? `
 6. OUT OF SCOPE PRODUCTS: The following products have unclear categories:
-${unknownProducts.map(p => `- ${p.name}`).join('\n')}
+${unknownProducts.map((p: any) => `- ${p.name}`).join('\n')}
 Please note these in the "outOfScope" section.
 ` : ''}
 
@@ -294,8 +302,6 @@ Format your response as a structured JSON:
   "summary": ""
 }`;
 
-    const aiResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
-
   aiResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
       method: 'POST',
       headers: {
@@ -314,11 +320,11 @@ Format your response as a structured JSON:
 
     if (!aiResponse.ok) {
       // Fallback to Gemini 2.5 Flash Lite direct call
-  fallbackLevel = 1;
+    fallbackLevel = 1;
       const geminiApiKey = Deno.env.get('GEMINI_API_KEY');
       if (!geminiApiKey) throw new Error('GEMINI_API_KEY not set');
       console.warn('Lovable API failed, falling back to Gemini direct:', aiResponse.status);
-  aiResponse = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key=' + geminiApiKey, {
+    aiResponse = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key=' + geminiApiKey, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -336,9 +342,9 @@ Format your response as a structured JSON:
       });
       if (!aiResponse.ok) {
         // Third-level fallback: Gemma model with user comfort message
-  fallbackLevel = 2;
+    fallbackLevel = 2;
         console.warn('Gemini Flash Lite failed, falling back to Gemma. Status:', aiResponse.status);
-  aiResponse = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemma-3-4b:generateContent?key=' + geminiApiKey, {
+    aiResponse = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemma-3-4b:generateContent?key=' + geminiApiKey, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -366,7 +372,7 @@ Format your response as a structured JSON:
           );
         }
         aiData = await aiResponse.json();
-        let content = aiData.candidates?.[0]?.content?.parts?.[0]?.text || aiData.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
+  const content = aiData.candidates?.[0]?.content?.parts?.[0]?.text || aiData.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
         try {
           optimizationData = JSON.parse(content);
         } catch (e) {
@@ -378,7 +384,7 @@ Format your response as a structured JSON:
         }
       } else {
         aiData = await aiResponse.json();
-        let content = aiData.candidates?.[0]?.content?.parts?.[0]?.text || aiData.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
+  const content = aiData.candidates?.[0]?.content?.parts?.[0]?.text || aiData.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
         try {
           optimizationData = JSON.parse(content);
         } catch (e) {
@@ -398,13 +404,13 @@ Format your response as a structured JSON:
     optimizationData.fallbackLevel = fallbackLevel;
     if (fallbackLevel > 0) {
       // Proactively log/flag fallback usage for quota monitoring
-      let fallbackName = fallbackLevel === 1 ? 'Gemini' : 'Gemma';
+  const fallbackName = fallbackLevel === 1 ? 'Gemini' : 'Gemma';
       console.warn(`AI fallback triggered: ${fallbackName} used for routineId ${routineId}`);
       // Optionally: send alert/notification here (e.g., webhook, email, etc.)
     }
 
     // Calculate total cost and add metadata
-    const totalCost = productsData.reduce((sum, p) => sum + (p.price || 0), 0);
+    const totalCost = productsData.reduce((sum: number, p: any) => sum + (p.price || 0), 0);
     optimizationData.totalRoutineCost = totalCost;
     optimizationData.routineType = routineType;
     optimizationData.productCounts = {

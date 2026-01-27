@@ -139,7 +139,7 @@ const extractIngredientSection = (text) => {
   const lower = (text || "").toLowerCase();
   const ingredientIndex = lower.search(/ingredients?\b/);
   let section = ingredientIndex >= 0 ? text.slice(ingredientIndex) : text;
-  section = section.replace(/ingredients?\s*[:\-]?\s*/i, "");
+  section = section.replace(/ingredients?\s*[:-]?\s*/i, "");
   section =
     section.split(/\bmay contain\b|\bcontains\b|\bwarning\b|\bdirections\b|\buse\b|\bkeep out\b|\bcaution\b/i)[0] ||
     section;
@@ -147,7 +147,7 @@ const extractIngredientSection = (text) => {
 };
 
 const cleanIngredientText = (text) => {
-  let cleaned = (text || "").replace(/[^a-zA-Z0-9\s,\-\(\)\/\.]/g, "");
+  let cleaned = (text || "").replace(/[^a-zA-Z0-9\s,()./-]/g, "");
   cleaned = cleaned.replace(/\s+/g, " ");
   cleaned = cleaned.replace(/\b\d+\b/g, "");
   cleaned = cleaned.trim();
@@ -172,7 +172,7 @@ const scoreIngredientLikeText = (rawText) => {
 
   const weirdRatio = (() => {
     const letters = (t.match(/[a-z]/gi) || []).length;
-    const weird = (t.match(/[^\w\s,().\-\/%:]/g) || []).length;
+    const weird = (t.match(/[^\w\s,()./%:-]/g) || []).length;
     if (letters === 0) return 50;
     return Math.min(50, Math.round((weird / letters) * 100));
   })();
@@ -560,7 +560,7 @@ const Upload = () => {
         !aiIngredients ||
         aiIngredients.length < 40 ||
         scoreIngredientLikeText(aiIngredients) < 10 ||
-        /[^\w\s,().\-\/%:+]/.test(aiIngredients);
+  /[^\w\s,()./%:+-]/.test(aiIngredients);
 
       if (aiLooksBad) throw new Error("AI returned low-quality extraction");
 

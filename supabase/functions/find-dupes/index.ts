@@ -1,5 +1,11 @@
-/// <reference lib="deno.ns" />
+// @ts-expect-error - Deno edge runtime import
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+
+declare const Deno: {
+  env: {
+    get: (key: string) => string | undefined;
+  };
+};
 
 /**
  * OPTIMIZED FIND-DUPES EDGE FUNCTION
@@ -188,6 +194,22 @@ const Utils = {
     return (value || "")
       .toLowerCase()
       .replace(/[^a-z0-9\s]/g, " ")
+      .replace(/\s+/g, " ")
+      .trim();
+  },
+
+  sanitizePromptText(value: string): string {
+    const normalized = (value || "").normalize("NFKD");
+    const filtered = Array.from(normalized)
+      .filter((char) => {
+        const code = char.charCodeAt(0);
+        if (code < 32 || code === 127) return false;
+        if (code >= 0xd800 && code <= 0xdfff) return false;
+        return true;
+      })
+      .join("");
+    return filtered
+      .replace(/[^a-zA-Z0-9\s.,'&%\-()/]/g, " ")
       .replace(/\s+/g, " ")
       .trim();
   },
@@ -765,7 +787,7 @@ class DupeProcessor {
             : null;
 
         // Build images array
-        let images: string[] = [];
+  const images: string[] = [];
 
         if (Array.isArray(obf?.images)) {
           for (const img of obf.images) {
@@ -937,10 +959,10 @@ class UIMapper {
 
     if (Array.isArray(dupe?.ingredientList)) {
       const ing = dupe.ingredientList.map((x: string) => x.toLowerCase());
-      if (ing.some((x) => x.includes("ceramide") || x.includes("cholesterol"))) {
+      if (ing.some((x: string) => x.includes("ceramide") || x.includes("cholesterol"))) {
         derived.push("Barrier support");
       }
-      if (ing.some((x) => x.includes("fragrance") || x.includes("parfum"))) {
+      if (ing.some((x: string) => x.includes("fragrance") || x.includes("parfum"))) {
         derived.push("Contains fragrance");
       }
     }
@@ -1036,57 +1058,79 @@ serve(async (req: Request): Promise<Response> => {
   try {
     const body = await req.json();
     
-    // Validate required fields
-    const productName = typeof body?.productName === "string" ? body.productName.trim() : "";
-    if (!productName) {
+    // Validate required fields (allow partial OCR output)
+    const rawProductName = typeof body?.productName === "string" ? body.productName.trim() : "";
+    const rawBrand = typeof body?.brand === "string" ? body.brand.trim() : "";
+    const rawCategory = typeof body?.category === "string" ? body.category.trim() : "";
+    const rawSkinType = typeof body?.skinType === "string" ? body.skinType.trim() : "";
+    const rawConcerns = typeof body?.concerns === "string" ? body.concerns.trim() : "";
+    const rawIngredients = Array.isArray(body?.ingredients) ? body.ingredients : [];
+
+    const cleanedProductName = Utils.sanitizePromptText(rawProductName);
+    const cleanedBrand = Utils.sanitizePromptText(rawBrand);
+    const cleanedCategory = Utils.sanitizePromptText(rawCategory);
+    const cleanedSkinType = Utils.sanitizePromptText(rawSkinType);
+    const cleanedConcerns = Utils.sanitizePromptText(rawConcerns);
+    const cleanedIngredients = rawIngredients
+      .map((ing: any) => Utils.sanitizePromptText(String(ing ?? "")))
+      .filter(Boolean);
+
+    const hasAnyInput = Boolean(
+      cleanedProductName || cleanedBrand || cleanedIngredients.length || cleanedCategory
+    );
+
+    if (!hasAnyInput) {
       return new Response(
-        JSON.stringify({ dupes: [], error: "productName is required" }),
+        JSON.stringify({ dupes: [], error: "productName or ingredients are required" }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    const brand = typeof body?.brand === "string" ? body.brand.trim() : "";
-    const category = typeof body?.category === "string" ? body.category.trim() : "";
-    const skinType = typeof body?.skinType === "string" ? body.skinType.trim() : "";
-    const concerns = typeof body?.concerns === "string" ? body.concerns.trim() : "";
-    const ingredients = Array.isArray(body?.ingredients) ? body.ingredients : [];
+    const productNameForAI =
+      cleanedProductName || cleanedBrand || cleanedIngredients[0] || "Unknown product";
+    const productNameForResponse = rawProductName || productNameForAI;
 
     // Create request fingerprint for deduplication
-    const requestFingerprint = Utils.createRequestFingerprint(body);
+    const requestFingerprint = Utils.createRequestFingerprint({
+      productName: productNameForAI,
+      brand: cleanedBrand,
+      category: cleanedCategory,
+      ingredients: cleanedIngredients,
+    });
     
     // Check if there's a pending request with the same fingerprint
     const pendingRequest = CacheManager.getPendingRequest(requestFingerprint);
     if (pendingRequest) {
-      console.log("Returning pending request for:", productName);
+      console.log("Returning pending request for:", productNameForResponse);
       return pendingRequest;
     }
 
     // Create cache key
     const aiCacheKey = JSON.stringify({
-      productName,
-      brand,
-      ingredients: ingredients.slice(0, CONFIG.MAX_PROMPT_INGREDIENTS),
-      category,
-      skinType,
-      concerns,
+      productName: productNameForAI,
+      brand: cleanedBrand,
+      ingredients: cleanedIngredients.slice(0, CONFIG.MAX_PROMPT_INGREDIENTS),
+      category: cleanedCategory,
+      skinType: cleanedSkinType,
+      concerns: cleanedConcerns,
     });
 
     // Check AI cache
     const cachedDupes = CacheManager.getAI(aiCacheKey);
     if (cachedDupes && cachedDupes.length > 0) {
-      console.log("Returning cached dupes for:", productName);
+      console.log("Returning cached dupes for:", productNameForResponse);
       
-      const sourceIngredients = Utils.normalizeIngredientList(ingredients);
+      const sourceIngredients = Utils.normalizeIngredientList(cleanedIngredients);
       const sourceScentTokens = ScentAnalyzer.extractTokens(
-        `${productName} ${ingredients.join(" ")}`
+        `${productNameForAI} ${cleanedIngredients.join(" ")}`
       );
 
       const processedDupes = await DupeProcessor.process({
         dupes: cachedDupes,
         sourceIngredients,
         sourceScentTokens,
-        productName,
-        brand,
+        productName: productNameForAI,
+        brand: cleanedBrand,
       });
 
       const uiDupes = UIMapper.mapToUI(processedDupes);
@@ -1116,9 +1160,9 @@ serve(async (req: Request): Promise<Response> => {
 
       const response = {
         sourceProduct: {
-          name: productName,
-          brand: brand || null,
-          category: category || null,
+          name: productNameForResponse,
+          brand: rawBrand || cleanedBrand || null,
+          category: rawCategory || cleanedCategory || null,
         },
         summary: {
           bestMatchId,
@@ -1137,29 +1181,29 @@ serve(async (req: Request): Promise<Response> => {
       try {
         // Get AI dupes
         const rawDupes = await AIProvider.getDupes({
-          productName,
-          brand,
-          ingredients,
-          category,
-          skinType,
-          concerns,
+          productName: productNameForAI,
+          brand: cleanedBrand,
+          ingredients: cleanedIngredients,
+          category: cleanedCategory,
+          skinType: cleanedSkinType,
+          concerns: cleanedConcerns,
         });
 
         // Cache the raw AI response
         CacheManager.setAI(aiCacheKey, rawDupes);
 
         // Process dupes
-        const sourceIngredients = Utils.normalizeIngredientList(ingredients);
+        const sourceIngredients = Utils.normalizeIngredientList(cleanedIngredients);
         const sourceScentTokens = ScentAnalyzer.extractTokens(
-          `${productName} ${ingredients.join(" ")}`
+          `${productNameForAI} ${cleanedIngredients.join(" ")}`
         );
 
         const processedDupes = await DupeProcessor.process({
           dupes: rawDupes,
           sourceIngredients,
           sourceScentTokens,
-          productName,
-          brand,
+          productName: productNameForAI,
+          brand: cleanedBrand,
         });
 
         const uiDupes = UIMapper.mapToUI(processedDupes);
@@ -1190,9 +1234,9 @@ serve(async (req: Request): Promise<Response> => {
 
         const response = {
           sourceProduct: {
-            name: productName,
-            brand: brand || null,
-            category: category || null,
+            name: productNameForResponse,
+            brand: rawBrand || cleanedBrand || null,
+            category: rawCategory || cleanedCategory || null,
           },
           summary: {
             bestMatchId,
