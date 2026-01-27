@@ -1,13 +1,13 @@
-import { useEffect, useMemo, useRef, useState } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
-import { supabase } from "@/integrations/supabase/client";
-import AppShell from "@/components/AppShell";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Progress } from "@/components/ui/progress";
+import { useEffect, useMemo, useRef, useState } from "react"
+import { useLocation, useNavigate } from "react-router-dom"
+import { supabase } from "@/integrations/supabase/client"
+import AppShell from "@/components/AppShell"
+import { Button } from "@/components/ui/button"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Badge } from "@/components/ui/badge"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Progress } from "@/components/ui/progress"
 import {
   ArrowLeft,
   Search,
@@ -17,58 +17,57 @@ import {
   Loader2,
   AlertTriangle,
   Clock,
-} from "lucide-react";
-import { PaywallModal } from "@/components/paywall/PaywallModal";
-import { DupeCard } from "@/components/DupeCard";
-import { toast } from "@/hooks/use-toast";
-import { invokeFunction } from "@/lib/functions-client";
+  Database,
+  Smartphone
+} from "lucide-react"
+import { PaywallModal } from "@/components/paywall/PaywallModal"
+import { DupeCard } from "@/components/DupeCard"
+import { toast } from "@/hooks/use-toast"
+import { invokeFunction } from "@/lib/functions-client"
 
-const CATEGORY_FILTERS = ["all", "face", "body", "hair", "scalp"];
-const norm = (v) => String(v || "").trim();
+const CATEGORY_FILTERS = ["all", "face", "body", "hair", "scalp"]
+const norm = (v) => String(v || "").trim()
 
-// ==============================
-// CACHE
-// ==============================
+const normalizeIngredient = (s) =>
+  String(s || "")
+    .toLowerCase()
+    .replace(/\s+/g, " ")
+    .replace(/[().]/g, "")
+    .trim()
 
-const getMarketDupeCacheKey = (userId, productId) => {
-  if (!userId || !productId) return null;
-  return `sl_market_dupes_${userId}_${productId}`;
-};
+const toIngredientSet = (ingredientsText) => {
+  return new Set(
+    String(ingredientsText || "")
+      .split(/[,;\n]+/)
+      .map((x) => normalizeIngredient(x))
+      .filter(Boolean)
+  )
+}
 
-const readMarketDupeCache = (userId, productId) => {
-  const key = getMarketDupeCacheKey(userId, productId);
-  if (!key) return null;
+const jaccardScore = (setA, setB) => {
+  if (!setA?.size || !setB?.size) return { score: 0, sharedCount: 0, sharedSample: [] }
 
-  const sources = [() => sessionStorage.getItem(key), () => localStorage.getItem(key)];
-  for (const source of sources) {
-    try {
-      const value = source();
-      if (!value) continue;
-      const parsed = JSON.parse(value);
-      if (Array.isArray(parsed) && parsed.length > 0) return parsed;
-    } catch {}
+  let shared = 0
+  const sharedSample = []
+
+  for (const v of setA) {
+    if (setB.has(v)) {
+      shared += 1
+      if (sharedSample.length < 10) sharedSample.push(v)
+    }
   }
-  return null;
-};
 
-const writeMarketDupeCache = (userId, productId, dupes) => {
-  const key = getMarketDupeCacheKey(userId, productId);
-  if (!key) return;
+  const union = setA.size + setB.size - shared
+  const score = union ? Math.round((shared / union) * 100) : 0
 
-  const payload = JSON.stringify(dupes);
-  try { sessionStorage.setItem(key, payload); } catch {}
-  try { localStorage.setItem(key, payload); } catch {}
-};
-
-// ==============================
-// NORMALIZE
-// ==============================
+  return { score, sharedCount: shared, sharedSample }
+}
 
 const normalizeDupe = (dupe) => {
-  if (!dupe) return null;
+  if (!dupe) return null
 
   return {
-    id: dupe.id,
+    id: dupe.id || null,
     name: dupe.name || "",
     brand: dupe.brand || null,
     imageUrl: dupe.imageUrl || null,
@@ -86,251 +85,385 @@ const normalizeDupe = (dupe) => {
     ingredientList: Array.isArray(dupe.ingredientList) ? dupe.ingredientList : [],
     internalLink: dupe.internalLink ?? null,
     productUrl: dupe.productUrl ?? null,
-  };
-};
+  }
+}
 
 const savedKeyForMarketDupe = ({ name, brand }, sourceProductId) => {
-  return `${norm(sourceProductId)}::${norm(name)}::${norm(brand)}`;
-};
+  return `${norm(sourceProductId)}::${norm(name)}::${norm(brand)}`
+}
 
 const savedKeyFor = ({ product_name, brand, source_product_id }) => {
-  return `${norm(source_product_id)}::${norm(product_name)}::${norm(brand)}`;
-};
+  return `${norm(source_product_id)}::${norm(product_name)}::${norm(brand)}`
+}
 
-// ==============================
-// COMPONENT
-// ==============================
+const getMarketDupeCacheKey = (userId, productId) => {
+  if (!userId || !productId) return null
+  return `sl_market_dupes_${userId}_${productId}`
+}
+
+const readMarketDupeLocalCache = (userId, productId) => {
+  const key = getMarketDupeCacheKey(userId, productId)
+  if (!key) return null
+
+  const sources = [() => sessionStorage.getItem(key), () => localStorage.getItem(key)]
+  for (const source of sources) {
+    try {
+      const value = source()
+      if (!value) continue
+      const parsed = JSON.parse(value)
+      if (Array.isArray(parsed) && parsed.length > 0) return parsed
+    } catch {}
+  }
+  return null
+}
+
+const writeMarketDupeLocalCache = (userId, productId, dupes) => {
+  const key = getMarketDupeCacheKey(userId, productId)
+  if (!key) return
+
+  const payload = JSON.stringify(dupes)
+  try { sessionStorage.setItem(key, payload) } catch {}
+  try { localStorage.setItem(key, payload) } catch {}
+}
+
+const readMarketDupeCloudCache = async (userId, productId) => {
+  if (!userId || !productId) return { dupes: null, updatedAt: null }
+
+  const { data, error } = await supabase
+    .from("market_dupe_cache")
+    .select("dupes, updated_at")
+    .eq("user_id", userId)
+    .eq("source_product_id", productId)
+    .maybeSingle()
+
+  if (error) return { dupes: null, updatedAt: null }
+
+  const raw = data?.dupes
+  const dupes = Array.isArray(raw) ? raw.map(normalizeDupe).filter(Boolean) : null
+  const updatedAt = data?.updated_at || null
+
+  if (!dupes?.length) return { dupes: null, updatedAt: updatedAt }
+  return { dupes, updatedAt }
+}
+
+const writeMarketDupeCloudCache = async (userId, productId, dupes) => {
+  if (!userId || !productId) return { ok: false }
+
+  const safeDupes = Array.isArray(dupes) ? dupes.slice(0, 60) : []
+  const payload = {
+    user_id: userId,
+    source_product_id: productId,
+    dupes: safeDupes,
+    dupes_count: safeDupes.length,
+    updated_at: new Date().toISOString()
+  }
+
+  const { error } = await supabase
+    .from("market_dupe_cache")
+    .upsert(payload, { onConflict: "user_id,source_product_id" })
+
+  if (error) return { ok: false }
+  return { ok: true }
+}
 
 export default function Compare() {
-  const navigate = useNavigate();
-  const location = useLocation();
+  const navigate = useNavigate()
+  const location = useLocation()
 
-  const [isInitializing, setIsInitializing] = useState(true);
+  const topRef = useRef(null)
 
-  const [userId, setUserId] = useState(null);
-  const [analyses, setAnalyses] = useState([]);
-  const [selectedProductId, setSelectedProductId] = useState(null);
+  const [isInitializing, setIsInitializing] = useState(true)
 
-  const [savedDupes, setSavedDupes] = useState(new Set());
-  const [skinProfile, setSkinProfile] = useState({ skinType: "normal", concerns: [] });
+  const [userId, setUserId] = useState(null)
+  const [analyses, setAnalyses] = useState([])
+  const [selectedProductId, setSelectedProductId] = useState(null)
 
-  const [showPaywall, setShowPaywall] = useState(false);
-  const [categoryFilter, setCategoryFilter] = useState("all");
-  const [activeTab, setActiveTab] = useState("market");
+  const [savedDupes, setSavedDupes] = useState(new Set())
+  const [skinProfile, setSkinProfile] = useState({ skinType: "normal", concerns: [] })
 
-  const [findingDupes, setFindingDupes] = useState(false);
-  const [dupeProgress, setDupeProgress] = useState(0);
-  const [dupeStage, setDupeStage] = useState("Ready");
-  const [dupeError, setDupeError] = useState(null);
+  const [showPaywall, setShowPaywall] = useState(false)
+  const [categoryFilter, setCategoryFilter] = useState("all")
+  const [activeTab, setActiveTab] = useState("market")
 
-  const [marketDupes, setMarketDupes] = useState([]);
-  const [hasCachedResults, setHasCachedResults] = useState(false);
+  const [findingDupes, setFindingDupes] = useState(false)
+  const [dupeProgress, setDupeProgress] = useState(0)
+  const [dupeStage, setDupeStage] = useState("Ready")
+  const [dupeError, setDupeError] = useState(null)
 
-  const ingredientsCacheRef = useRef({});
-  const inflightRef = useRef(new Map());
-  const latestRequestKeyRef = useRef(null);
+  const [marketDupes, setMarketDupes] = useState([])
+  const [hasCachedResults, setHasCachedResults] = useState(false)
+  const [cacheMeta, setCacheMeta] = useState({ source: null, updatedAt: null })
 
-  // Prevent auto-run loops per product
-  const autoRanRef = useRef(new Set());
+  const ingredientsCacheRef = useRef({})
+  const inflightRef = useRef(new Map())
+  const latestRequestKeyRef = useRef(null)
+
+  const autoRanRef = useRef(new Set())
+
+  const [myProductMatches, setMyProductMatches] = useState([])
+  const [mySearch, setMySearch] = useState("")
+  const [onlySameCategory, setOnlySameCategory] = useState(true)
+
+  const selectedIdRef = useRef(null)
+  useEffect(() => {
+    selectedIdRef.current = selectedProductId
+  }, [selectedProductId])
 
   const selectedProduct = useMemo(
     () => analyses.find((a) => a.id === selectedProductId) || null,
     [analyses, selectedProductId]
-  );
+  )
 
   const filteredMarketDupes = useMemo(() => {
-    if (categoryFilter === "all") return marketDupes;
-    return marketDupes.filter((d) => d.category === categoryFilter);
-  }, [marketDupes, categoryFilter]);
+    if (categoryFilter === "all") return marketDupes
+    return marketDupes.filter((d) => d.category === categoryFilter)
+  }, [marketDupes, categoryFilter])
 
   const getScoreColor = (score) => {
-    if (!score) return "text-muted-foreground";
-    if (score >= 70) return "text-emerald-500";
-    if (score >= 50) return "text-amber-500";
-    return "text-red-500";
-  };
+    if (!score) return "text-muted-foreground"
+    if (score >= 70) return "text-emerald-500"
+    if (score >= 50) return "text-amber-500"
+    return "text-red-500"
+  }
 
   const readUrlSelectedId = (list) => {
-    const params = new URLSearchParams(location.search);
-    const requestedId = params.get("productId");
-    if (requestedId && list.some((a) => a.id === requestedId)) return requestedId;
-    return list[0]?.id ?? null;
-  };
+    const params = new URLSearchParams(location.search)
+    const requestedId = params.get("productId")
+    if (requestedId && list.some((a) => a.id === requestedId)) return requestedId
+    return list[0]?.id ?? null
+  }
+
+  const syncUrlProductId = (id, { replace = true } = {}) => {
+    const params = new URLSearchParams(location.search)
+    params.set("productId", id)
+    navigate({ pathname: location.pathname, search: params.toString() }, { replace })
+  }
 
   const loadIngredientsForId = async (uid, id) => {
-    if (!uid || !id) return "";
+    if (!uid || !id) return ""
 
-    const cached = ingredientsCacheRef.current[id];
-    if (typeof cached === "string") return cached;
+    const cached = ingredientsCacheRef.current[id]
+    if (typeof cached === "string") return cached
 
     const { data, error } = await supabase
       .from("user_analyses")
       .select("ingredients_list")
       .eq("user_id", uid)
       .eq("id", id)
-      .maybeSingle();
+      .maybeSingle()
 
-    if (error) return "";
+    if (error) return ""
 
-    const text = data?.ingredients_list || "";
-    ingredientsCacheRef.current[id] = text;
-    return text;
-  };
+    const text = data?.ingredients_list || ""
+    ingredientsCacheRef.current[id] = text
+    return text
+  }
 
-  const loadCachedDupesForSelection = (uid, pid) => {
-    const cached = readMarketDupeCache(uid, pid);
+  const loadCachedDupesForSelection = async (uid, pid) => {
+    setDupeError(null)
+    setDupeProgress(0)
+    setDupeStage("Checking cache")
 
-    if (cached && cached.length > 0) {
-      setMarketDupes(cached);
-      setHasCachedResults(true);
-      setDupeStage("Showing cached results");
-      setDupeProgress(100);
-      setDupeError(null);
-      return true;
+    const local = readMarketDupeLocalCache(uid, pid)
+    if (local?.length) {
+      setMarketDupes(local)
+      setHasCachedResults(true)
+      setCacheMeta({ source: "local", updatedAt: null })
+      setDupeStage("Loaded cached results")
+      setDupeProgress(100)
+      return true
     }
 
-    setMarketDupes([]);
-    setHasCachedResults(false);
-    setDupeStage("No cached results");
-    setDupeProgress(0);
-    setDupeError(null);
-    return false;
-  };
+    setDupeStage("Checking cloud cache")
+    const cloud = await readMarketDupeCloudCache(uid, pid)
+    if (cloud?.dupes?.length) {
+      writeMarketDupeLocalCache(uid, pid, cloud.dupes)
+      setMarketDupes(cloud.dupes)
+      setHasCachedResults(true)
+      setCacheMeta({ source: "cloud", updatedAt: cloud.updatedAt })
+      setDupeStage("Loaded cached results")
+      setDupeProgress(100)
+      return true
+    }
 
-  const findMarketDupes = async ({ force = false } = {}) => {
-    if (!userId || !selectedProductId || !selectedProduct) return;
+    setMarketDupes([])
+    setHasCachedResults(false)
+    setCacheMeta({ source: null, updatedAt: null })
+    setDupeStage("No cached results")
+    setDupeProgress(0)
+    return false
+  }
 
-    setDupeError(null);
-    setFindingDupes(true);
-    setDupeProgress(10);
-    setDupeStage("Preparing search");
+  const findMarketDupes = async ({ force = false, productId } = {}) => {
+    const pid = productId || selectedIdRef.current
+    const product = analyses.find((a) => a.id === pid) || null
 
-    const inflightKey = `${userId}:${selectedProductId}`;
-    const requestId = `${inflightKey}:${Date.now()}`;
-    latestRequestKeyRef.current = requestId;
+    if (!userId || !pid || !product) return
+
+    setDupeError(null)
+    setFindingDupes(true)
+    setDupeProgress(10)
+    setDupeStage("Preparing search")
+
+    const inflightKey = `${userId}:${pid}`
+    const requestId = `${inflightKey}:${Date.now()}`
+    latestRequestKeyRef.current = requestId
 
     if (!force) {
-      const cached = readMarketDupeCache(userId, selectedProductId);
-      if (cached && cached.length > 0) {
-        setMarketDupes(cached);
-        setHasCachedResults(true);
-        setDupeStage("Loaded from cache");
-        setDupeProgress(100);
-        setFindingDupes(false);
-        return;
+      const local = readMarketDupeLocalCache(userId, pid)
+      if (local?.length) {
+        if (selectedIdRef.current !== pid) return
+        setMarketDupes(local)
+        setHasCachedResults(true)
+        setCacheMeta({ source: "local", updatedAt: null })
+        setDupeStage("Loaded from cache")
+        setDupeProgress(100)
+        setFindingDupes(false)
+        return
+      }
+
+      const cloud = await readMarketDupeCloudCache(userId, pid)
+      if (cloud?.dupes?.length) {
+        if (selectedIdRef.current !== pid) return
+        writeMarketDupeLocalCache(userId, pid, cloud.dupes)
+        setMarketDupes(cloud.dupes)
+        setHasCachedResults(true)
+        setCacheMeta({ source: "cloud", updatedAt: cloud.updatedAt })
+        setDupeStage("Loaded from cache")
+        setDupeProgress(100)
+        setFindingDupes(false)
+        return
       }
     }
 
-    const inflightExisting = inflightRef.current.get(inflightKey);
+    const inflightExisting = inflightRef.current.get(inflightKey)
     if (inflightExisting) {
       try {
-        const dupes = await inflightExisting;
-        if (latestRequestKeyRef.current !== requestId) return;
-        setMarketDupes(dupes);
-        setHasCachedResults(true);
-        setDupeStage("Results ready");
-        setDupeProgress(100);
+        const dupes = await inflightExisting
+        if (latestRequestKeyRef.current !== requestId) return
+        if (selectedIdRef.current !== pid) return
+        setMarketDupes(dupes)
+        setHasCachedResults(dupes?.length > 0)
+        setCacheMeta({ source: "fresh", updatedAt: new Date().toISOString() })
+        setDupeStage("Results ready")
+        setDupeProgress(100)
       } catch {
-        if (latestRequestKeyRef.current !== requestId) return;
-        setDupeError("Failed to find dupes");
-        setDupeStage("Error");
-        setDupeProgress(100);
+        if (latestRequestKeyRef.current !== requestId) return
+        if (selectedIdRef.current !== pid) return
+        setDupeError("Failed to find dupes")
+        setDupeStage("Error")
+        setDupeProgress(100)
       } finally {
-        if (latestRequestKeyRef.current === requestId) setFindingDupes(false);
+        if (latestRequestKeyRef.current === requestId) setFindingDupes(false)
       }
-      return;
+      return
     }
 
     const promise = (async () => {
-      setDupeStage("Loading ingredients");
-      setDupeProgress(30);
+      setDupeStage("Loading ingredients")
+      setDupeProgress(30)
 
-      const ingredientText = await loadIngredientsForId(userId, selectedProductId);
+      const ingredientText = await loadIngredientsForId(userId, pid)
       const ingredients = String(ingredientText || "")
         .split(/[,;\n]+/)
         .map((i) => i.trim())
-        .filter(Boolean);
+        .filter(Boolean)
 
-      setDupeStage("Searching for dupes");
-      setDupeProgress(60);
+      setDupeStage("Searching for dupes")
+      setDupeProgress(60)
 
       const data = await invokeFunction("find-dupes", {
-        productName: selectedProduct.product_name,
-        brand: selectedProduct.brand,
+        productName: product.product_name,
+        brand: product.brand,
         ingredients,
-        category: selectedProduct.category || "face",
+        category: product.category || "face",
         skinType: skinProfile.skinType,
         concerns: skinProfile.concerns,
-      });
+      })
 
-      if (data?.error) throw new Error(String(data.error));
+      if (data?.error) throw new Error(String(data.error))
 
-      const rawDupes = Array.isArray(data?.dupes) ? data.dupes : [];
-      const normalizedDupes = rawDupes.map(normalizeDupe).filter(Boolean);
+      const rawDupes = Array.isArray(data?.dupes) ? data.dupes : []
+      const normalizedDupes = rawDupes.map(normalizeDupe).filter(Boolean)
 
-      writeMarketDupeCache(userId, selectedProductId, normalizedDupes);
+      writeMarketDupeLocalCache(userId, pid, normalizedDupes)
+      await writeMarketDupeCloudCache(userId, pid, normalizedDupes)
 
-      return normalizedDupes;
-    })();
+      return normalizedDupes
+    })()
 
-    inflightRef.current.set(inflightKey, promise);
+    inflightRef.current.set(inflightKey, promise)
 
     try {
-      const dupes = await promise;
-      if (latestRequestKeyRef.current !== requestId) return;
+      const dupes = await promise
+      if (latestRequestKeyRef.current !== requestId) return
+      if (selectedIdRef.current !== pid) return
 
-      setMarketDupes(dupes);
-      setHasCachedResults(Array.isArray(dupes) && dupes.length > 0);
-      setDupeStage(dupes?.length ? "Results ready" : "No results found");
-      setDupeProgress(100);
+      setMarketDupes(dupes)
+      setHasCachedResults(Array.isArray(dupes) && dupes.length > 0)
+      setCacheMeta({ source: "fresh", updatedAt: new Date().toISOString() })
+      setDupeStage(dupes?.length ? "Results ready" : "No results found")
+      setDupeProgress(100)
 
       if (!dupes?.length) {
-        toast({ title: "No dupes found", description: "Try searching for a different product." });
+        toast({ title: "No dupes found", description: "Try a different product." })
       } else {
-        toast({ title: "Dupes found!", description: `Found ${dupes.length} similar products.` });
+        toast({ title: "Dupes found", description: `Found ${dupes.length} similar products.` })
       }
     } catch (error) {
-      const message = error instanceof Error ? error.message : "";
+      const message = error instanceof Error ? error.message : ""
       const friendlyMessage =
         message.includes("402") || message.includes("Payment Required")
           ? "Dupe search is temporarily unavailable. Try again later."
-          : "Failed to find dupes. Try again.";
+          : "Failed to find dupes. Try again."
 
-      if (latestRequestKeyRef.current !== requestId) return;
+      if (latestRequestKeyRef.current !== requestId) return
+      if (selectedIdRef.current !== pid) return
 
-      setDupeError(friendlyMessage);
-      setDupeStage("Error");
-      setDupeProgress(100);
+      setDupeError(friendlyMessage)
+      setDupeStage("Error")
+      setDupeProgress(100)
 
-      toast({ title: "Error finding dupes", description: friendlyMessage, variant: "destructive" });
+      toast({ title: "Error finding dupes", description: friendlyMessage, variant: "destructive" })
     } finally {
-      inflightRef.current.delete(inflightKey);
-      if (latestRequestKeyRef.current === requestId) setFindingDupes(false);
+      inflightRef.current.delete(inflightKey)
+      if (latestRequestKeyRef.current === requestId) setFindingDupes(false)
     }
-  };
+  }
 
-  const handleSelectProduct = (id) => {
-    setSelectedProductId(id);
-    if (!userId) return;
+  const selectProduct = async (id, opts = {}) => {
+    if (!id) return
 
-    const hadCache = loadCachedDupesForSelection(userId, id);
-    loadIngredientsForId(userId, id).catch(() => {});
+    selectedIdRef.current = id
+    setSelectedProductId(id)
 
-    // If no cache, auto-run once for this product selection
-    if (!hadCache && !autoRanRef.current.has(id)) {
-      autoRanRef.current.add(id);
-      // Force true ensures we do a real request
-      findMarketDupes({ force: true });
+    if (!opts.skipUrl) syncUrlProductId(id, { replace: true })
+
+    if (opts.goToMarket) setActiveTab("market")
+    if (opts.scrollTop) topRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })
+
+    if (!userId) return
+
+    await loadCachedDupesForSelection(userId, id)
+    loadIngredientsForId(userId, id).catch(() => {})
+
+    const localOrCloudExists =
+      readMarketDupeLocalCache(userId, id)?.length ||
+      (await readMarketDupeCloudCache(userId, id))?.dupes?.length
+
+    if (!localOrCloudExists && !autoRanRef.current.has(id)) {
+      autoRanRef.current.add(id)
+      findMarketDupes({ force: true, productId: id })
     }
-  };
+  }
 
   const toggleSaveDupe = async (dupe) => {
-    if (!userId || !selectedProductId) return;
+    if (!userId || !selectedProductId) return
 
-    const safeName = norm(dupe?.name);
-    const safeBrand = norm(dupe?.brand);
-    const savedKey = savedKeyForMarketDupe({ name: safeName, brand: safeBrand }, selectedProductId);
-    const isSaved = savedDupes.has(savedKey);
+    const safeName = norm(dupe?.name)
+    const safeBrand = norm(dupe?.brand)
+    const savedKey = savedKeyForMarketDupe({ name: safeName, brand: safeBrand }, selectedProductId)
+    const isSaved = savedDupes.has(savedKey)
 
     if (isSaved) {
       const { error } = await supabase
@@ -339,17 +472,17 @@ export default function Compare() {
         .eq("user_id", userId)
         .eq("source_product_id", selectedProductId)
         .eq("product_name", safeName)
-        .eq("brand", safeBrand);
+        .eq("brand", safeBrand)
 
       if (!error) {
         setSavedDupes((prev) => {
-          const next = new Set(prev);
-          next.delete(savedKey);
-          return next;
-        });
-        toast({ title: "Removed from favorites" });
+          const next = new Set(prev)
+          next.delete(savedKey)
+          return next
+        })
+        toast({ title: "Removed from favorites" })
       }
-      return;
+      return
     }
 
     const { error } = await supabase.from("saved_dupes").insert({
@@ -360,92 +493,177 @@ export default function Compare() {
       image_url: dupe?.imageUrl || null,
       price_estimate: dupe?.price ?? null,
       saved_at: new Date().toISOString(),
-    });
+    })
 
     if (!error) {
-      setSavedDupes((prev) => new Set(prev).add(savedKey));
-      toast({ title: "Saved to favorites ❤️" });
+      setSavedDupes((prev) => new Set(prev).add(savedKey))
+      toast({ title: "Saved to favorites" })
     }
-  };
-
-  // ==============================
-  // INIT
-  // ==============================
+  }
 
   useEffect(() => {
-    let cancelled = false;
+    let cancelled = false
 
-    (async () => {
+    ;(async () => {
       try {
-        const { data: auth } = await supabase.auth.getUser();
+        const { data: auth } = await supabase.auth.getUser()
         if (!auth?.user) {
-          navigate("/auth");
-          return;
+          navigate("/auth")
+          return
         }
-        if (cancelled) return;
+        if (cancelled) return
 
-        const uid = auth.user.id;
-        setUserId(uid);
+        const uid = auth.user.id
+        setUserId(uid)
 
         const { data: analysesData } = await supabase
           .from("user_analyses")
-          .select("id, product_name, brand, epiq_score, product_price, category")
+          .select("id, product_name, brand, epiq_score, product_price, category, analyzed_at")
           .eq("user_id", uid)
           .order("analyzed_at", { ascending: false })
-          .limit(50);
+          .limit(50)
 
-        if (cancelled) return;
+        if (cancelled) return
 
-        const list = Array.isArray(analysesData) ? analysesData : [];
-        const unique = Array.from(new Map(list.map((a) => [a.id, a])).values());
-        setAnalyses(unique);
+        const list = Array.isArray(analysesData) ? analysesData : []
+        const unique = Array.from(new Map(list.map((a) => [a.id, a])).values())
+        setAnalyses(unique)
 
-        const initialId = readUrlSelectedId(unique);
-        setSelectedProductId(initialId);
+        const initialId = readUrlSelectedId(unique)
+        selectedIdRef.current = initialId
+        setSelectedProductId(initialId)
 
-        if (initialId) {
-          // Load cache for initial selection
-          const hadCache = loadCachedDupesForSelection(uid, initialId);
-          loadIngredientsForId(uid, initialId).catch(() => {});
+        setIsInitializing(false)
 
-          // Auto-run once if no cache
-          if (!hadCache && !autoRanRef.current.has(initialId)) {
-            autoRanRef.current.add(initialId);
-            findMarketDupes({ force: true });
-          }
-        }
-
-        setIsInitializing(false);
-
-        // Background loads
         Promise.all([
           supabase.from("saved_dupes").select("id, product_name, brand, source_product_id").eq("user_id", uid),
           supabase.from("profiles").select("skin_type, skin_concerns").eq("id", uid).single(),
         ]).then(([savedRes, profileRes]) => {
-          if (cancelled) return;
+          if (cancelled) return
 
           if (!savedRes.error && Array.isArray(savedRes.data)) {
-            setSavedDupes(new Set(savedRes.data.map(savedKeyFor)));
+            setSavedDupes(new Set(savedRes.data.map(savedKeyFor)))
           }
 
           if (!profileRes.error && profileRes.data) {
-            const concerns = profileRes.data.skin_concerns;
+            const concerns = profileRes.data.skin_concerns
             setSkinProfile({
               skinType: profileRes.data.skin_type || "normal",
               concerns: Array.isArray(concerns) ? concerns.map((c) => String(c)) : [],
-            });
+            })
           }
-        });
+        })
+
+        if (initialId) {
+          await loadCachedDupesForSelection(uid, initialId)
+          loadIngredientsForId(uid, initialId).catch(() => {})
+
+          const local = readMarketDupeLocalCache(uid, initialId)
+          const cloud = await readMarketDupeCloudCache(uid, initialId)
+
+          if (!local?.length && !cloud?.dupes?.length && !autoRanRef.current.has(initialId)) {
+            autoRanRef.current.add(initialId)
+            findMarketDupes({ force: true, productId: initialId })
+          }
+        }
       } catch (e) {
-        console.error("Init error:", e);
-        if (!cancelled) setIsInitializing(false);
+        if (!cancelled) setIsInitializing(false)
       }
-    })();
+    })()
 
     return () => {
-      cancelled = true;
-    };
-  }, [navigate, location.search]);
+      cancelled = true
+    }
+  }, [navigate])
+
+  useEffect(() => {
+    if (!analyses.length) return
+
+    const params = new URLSearchParams(location.search)
+    const pid = params.get("productId")
+
+    if (!pid) return
+    if (pid === selectedProductId) return
+    if (!analyses.some((a) => a.id === pid)) return
+
+    selectProduct(pid, { skipUrl: true })
+  }, [location.search, analyses, selectedProductId])
+
+  useEffect(() => {
+    let cancelled = false
+
+    const run = async () => {
+      if (!userId || !selectedProductId || analyses.length < 2) {
+        setMyProductMatches([])
+        return
+      }
+
+      const ids = analyses.map((a) => a.id).filter(Boolean)
+
+      const { data, error } = await supabase
+        .from("user_analyses")
+        .select("id, ingredients_list")
+        .eq("user_id", userId)
+        .in("id", ids)
+
+      if (cancelled) return
+      if (error) {
+        setMyProductMatches([])
+        return
+      }
+
+      const map = {}
+      for (const row of data || []) map[row.id] = toIngredientSet(row.ingredients_list)
+
+      const baseSet = map[selectedProductId]
+      if (!baseSet?.size) {
+        setMyProductMatches([])
+        return
+      }
+
+      const baseCategory = analyses.find((a) => a.id === selectedProductId)?.category || null
+
+      const matches = analyses
+        .filter((a) => a.id !== selectedProductId)
+        .filter((a) => {
+          if (!onlySameCategory) return true
+          if (!baseCategory) return true
+          return a.category === baseCategory
+        })
+        .map((a) => {
+          const otherSet = map[a.id]
+          const { score, sharedCount, sharedSample } = jaccardScore(baseSet, otherSet)
+
+          return {
+            id: a.id,
+            product_name: a.product_name,
+            brand: a.brand,
+            category: a.category,
+            epiq_score: a.epiq_score,
+            product_price: a.product_price,
+            similarity: score,
+            sharedCount,
+            sharedSample,
+          }
+        })
+        .filter((m) => m.similarity > 0)
+        .sort((a, b) => b.similarity - a.similarity)
+        .slice(0, 30)
+
+      const q = mySearch.trim().toLowerCase()
+      const filtered = q
+        ? matches.filter((m) => `${m.product_name} ${m.brand || ""}`.toLowerCase().includes(q))
+        : matches
+
+      setMyProductMatches(filtered)
+    }
+
+    run()
+
+    return () => {
+      cancelled = true
+    }
+  }, [userId, selectedProductId, analyses, mySearch, onlySameCategory])
 
   if (isInitializing) {
     return (
@@ -456,16 +674,54 @@ export default function Compare() {
           </div>
         </div>
       </AppShell>
-    );
+    )
   }
 
-  // ==============================
-  // RENDER
-  // ==============================
+  const CacheIndicator = () => {
+    if (!hasCachedResults) {
+      return (
+        <div className="flex items-center gap-2 text-sm">
+          <AlertTriangle className="w-4 h-4 text-amber-500" />
+          <span className="text-muted-foreground">{dupeStage}</span>
+        </div>
+      )
+    }
+
+    const isCloud = cacheMeta.source === "cloud"
+    const isLocal = cacheMeta.source === "local"
+    const isFresh = cacheMeta.source === "fresh"
+
+    return (
+      <div className="flex items-center gap-2 text-sm">
+        <Clock className="w-4 h-4 text-emerald-500" />
+        <span className="text-emerald-600 dark:text-emerald-400">
+          Cached results
+        </span>
+
+        {isLocal ? (
+          <span className="inline-flex items-center gap-1 text-muted-foreground">
+            <Smartphone className="w-4 h-4" />
+            This device
+          </span>
+        ) : null}
+
+        {isCloud ? (
+          <span className="inline-flex items-center gap-1 text-muted-foreground">
+            <Database className="w-4 h-4" />
+            Synced
+          </span>
+        ) : null}
+
+        {isFresh ? (
+          <span className="text-muted-foreground">Updated</span>
+        ) : null}
+      </div>
+    )
+  }
 
   return (
     <AppShell showNavigation showBottomNav contentClassName="px-[5px] lg:px-4 py-6">
-      <main className="container mx-auto pb-24 lg:pb-8">
+      <main className="container mx-auto pb-24 lg:pb-8" ref={topRef}>
         <Button variant="ghost" onClick={() => navigate(-1)} className="mb-4 -ml-2">
           <ArrowLeft className="w-4 h-4 mr-2" />
           Back
@@ -484,7 +740,7 @@ export default function Compare() {
             <CardContent className="py-12 text-center">
               <FlaskConical className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
               <h3 className="font-semibold text-lg mb-2">Analyze a Product First</h3>
-              <p className="text-muted-foreground mb-4">We need at least one analyzed product to find dupes for</p>
+              <p className="text-muted-foreground mb-4">You need at least one analyzed product.</p>
               <Button onClick={() => navigate("/upload")}>Analyze a Product</Button>
             </CardContent>
           </Card>
@@ -492,11 +748,11 @@ export default function Compare() {
           <div className="flex flex-col gap-6 w-full">
             <Card>
               <CardHeader className="pb-3">
-                <CardTitle className="text-base font-medium">Select a product to find dupes for</CardTitle>
+                <CardTitle className="text-base font-medium">Base product</CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="flex flex-col sm:flex-row gap-4">
-                  <Select value={selectedProductId || ""} onValueChange={handleSelectProduct}>
+                  <Select value={selectedProductId || ""} onValueChange={(id) => selectProduct(id)}>
                     <SelectTrigger className="w-full sm:flex-1">
                       <SelectValue placeholder="Choose a product" />
                     </SelectTrigger>
@@ -504,26 +760,25 @@ export default function Compare() {
                       {analyses.map((a) => (
                         <SelectItem key={a.id} value={a.id}>
                           {a.product_name}
-                          {a.epiq_score && (
+                          {a.epiq_score ? (
                             <Badge variant="secondary" className="ml-2 text-xs">
                               {a.epiq_score}
                             </Badge>
-                          )}
+                          ) : null}
                         </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
 
-                  {/* ONE BUTTON ONLY */}
                   <Button
-                    onClick={() => findMarketDupes({ force: true })}
+                    onClick={() => findMarketDupes({ force: true, productId: selectedIdRef.current })}
                     disabled={findingDupes || !selectedProduct}
                     className="gap-2 whitespace-nowrap"
                   >
                     {findingDupes ? (
                       <>
                         <Loader2 className="w-4 h-4 animate-spin" />
-                        Refreshing...
+                        Refreshing
                       </>
                     ) : (
                       <>
@@ -534,7 +789,7 @@ export default function Compare() {
                   </Button>
                 </div>
 
-                {selectedProduct && (
+                {selectedProduct ? (
                   <div className="p-3 bg-muted/50 rounded-lg flex items-center justify-between">
                     <div className="min-w-0">
                       <p className="font-medium truncate">{selectedProduct.product_name}</p>
@@ -544,28 +799,16 @@ export default function Compare() {
                       <p className={`font-bold text-lg ${getScoreColor(selectedProduct.epiq_score)}`}>
                         {selectedProduct.epiq_score || "—"}
                       </p>
-                      {selectedProduct.product_price && (
+                      {selectedProduct.product_price ? (
                         <p className="text-sm text-muted-foreground">${selectedProduct.product_price}</p>
-                      )}
+                      ) : null}
                     </div>
                   </div>
-                )}
+                ) : null}
 
-                <div className="flex items-center gap-2 text-sm">
-                  {hasCachedResults ? (
-                    <>
-                      <Clock className="w-4 h-4 text-emerald-500" />
-                      <span className="text-emerald-600 dark:text-emerald-400">Showing cached results</span>
-                    </>
-                  ) : (
-                    <>
-                      <AlertTriangle className="w-4 h-4 text-amber-500" />
-                      <span className="text-muted-foreground">{dupeStage}</span>
-                    </>
-                  )}
-                </div>
+                <CacheIndicator />
 
-                {findingDupes && (
+                {findingDupes ? (
                   <div className="space-y-2">
                     <div className="flex items-center justify-between text-sm text-muted-foreground">
                       <span>{dupeStage}</span>
@@ -573,7 +816,7 @@ export default function Compare() {
                     </div>
                     <Progress value={dupeProgress} className="h-2" />
                   </div>
-                )}
+                ) : null}
               </CardContent>
             </Card>
 
@@ -585,7 +828,7 @@ export default function Compare() {
                 </TabsTrigger>
                 <TabsTrigger value="myproducts" className="gap-2">
                   <Package className="w-4 h-4" />
-                  My Products
+                  My Products Match
                 </TabsTrigger>
               </TabsList>
 
@@ -609,7 +852,11 @@ export default function Compare() {
                     <CardContent className="py-12 text-center space-y-2">
                       <AlertTriangle className="w-10 h-10 mx-auto text-muted-foreground/60" />
                       <p className="text-sm text-muted-foreground">{dupeError}</p>
-                      <Button onClick={() => findMarketDupes({ force: true })} disabled={findingDupes} className="mt-4">
+                      <Button
+                        onClick={() => findMarketDupes({ force: true, productId: selectedIdRef.current })}
+                        disabled={findingDupes}
+                        className="mt-4"
+                      >
                         Try Again
                       </Button>
                     </CardContent>
@@ -617,26 +864,21 @@ export default function Compare() {
                 ) : filteredMarketDupes.length > 0 ? (
                   <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
                     {filteredMarketDupes.map((dupe, idx) => {
-                      const key = savedKeyForMarketDupe(dupe, selectedProductId);
+                      const key = savedKeyForMarketDupe(dupe, selectedProductId)
 
-                      // FIX: always unique key
                       const reactKey = dupe?.id
                         ? `${selectedProductId}:${dupe.id}`
-                        : `${selectedProductId}:${norm(dupe.brand)}:${norm(dupe.name)}:${idx}`;
+                        : `${selectedProductId}:${norm(dupe.brand)}:${norm(dupe.name)}:${idx}`
 
                       return (
-                        <div
-                          key={reactKey}
-                          className="animate-fade-in"
-                          style={{ animationDelay: `${idx * 30}ms` }}
-                        >
+                        <div key={reactKey} className="animate-fade-in" style={{ animationDelay: `${idx * 30}ms` }}>
                           <DupeCard
                             dupe={dupe}
                             isSaved={savedDupes.has(key)}
                             onToggleSave={() => toggleSaveDupe(dupe)}
                           />
                         </div>
-                      );
+                      )
                     })}
                   </div>
                 ) : (
@@ -645,7 +887,7 @@ export default function Compare() {
                       <Sparkles className="w-12 h-12 mx-auto text-muted-foreground/50 mb-4" />
                       <h3 className="text-lg font-medium mb-2">No dupes yet</h3>
                       <p className="text-muted-foreground text-sm max-w-md mx-auto mb-4">
-                        We will auto-run dupes when this product has no cached results.
+                        Pick a base product, then refresh dupes.
                       </p>
                     </CardContent>
                   </Card>
@@ -654,11 +896,141 @@ export default function Compare() {
 
               <TabsContent value="myproducts" className="space-y-6">
                 <Card className="border-dashed">
-                  <CardContent className="py-12 text-center">
-                    <Package className="w-12 h-12 mx-auto text-muted-foreground/50 mb-4" />
-                    <p className="text-muted-foreground">Analyze at least 2 products to compare your collection.</p>
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-base font-medium">How to use this tab</CardTitle>
+                  </CardHeader>
+                  <CardContent className="text-sm text-muted-foreground space-y-2">
+                    <div>1. Pick your base product at the top of this page.</div>
+                    <div>2. This list ranks your scanned products by ingredient overlap with the base product.</div>
+                    <div>3. Tap Use as base, then go to Market Dupes.</div>
+                    <div className="flex gap-2 flex-wrap pt-2">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => topRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })}
+                      >
+                        Change base product
+                      </Button>
+                      <Button
+                        size="sm"
+                        onClick={() => {
+                          setActiveTab("market")
+                          topRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })
+                        }}
+                      >
+                        Go to market dupes
+                      </Button>
+                    </div>
                   </CardContent>
                 </Card>
+
+                {analyses.length < 2 ? (
+                  <Card className="border-dashed">
+                    <CardContent className="py-12 text-center">
+                      <Package className="w-12 h-12 mx-auto text-muted-foreground/50 mb-4" />
+                      <p className="text-muted-foreground">Analyze at least 2 products.</p>
+                    </CardContent>
+                  </Card>
+                ) : !selectedProduct ? (
+                  <Card className="border-dashed">
+                    <CardContent className="py-12 text-center">
+                      <AlertTriangle className="w-12 h-12 mx-auto text-muted-foreground/50 mb-4" />
+                      <p className="text-muted-foreground">Pick a base product first.</p>
+                    </CardContent>
+                  </Card>
+                ) : (
+                  <div className="space-y-4">
+                    <Card>
+                      <CardHeader className="pb-2">
+                        <CardTitle className="text-base font-medium">Filters</CardTitle>
+                      </CardHeader>
+                      <CardContent className="flex flex-col md:flex-row gap-3 md:items-center md:justify-between">
+                        <div className="flex gap-2 flex-wrap">
+                          <Button size="sm" variant="outline" onClick={() => setOnlySameCategory((v) => !v)}>
+                            {onlySameCategory ? "Same category only" : "All categories"}
+                          </Button>
+                        </div>
+
+                        <div className="flex gap-2 w-full md:w-auto">
+                          <input
+                            value={mySearch}
+                            onChange={(e) => setMySearch(e.target.value)}
+                            placeholder="Search by name or brand"
+                            className="w-full md:w-[280px] h-10 rounded-md border bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-ring"
+                          />
+                          <Button variant="outline" onClick={() => setMySearch("")} className="whitespace-nowrap">
+                            Clear
+                          </Button>
+                        </div>
+                      </CardContent>
+                    </Card>
+
+                    {myProductMatches.length > 0 ? (
+                      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                        {myProductMatches.map((m, idx) => {
+                          const k = `${selectedProductId}:${m.id}:${idx}`
+
+                          return (
+                            <Card key={k} className="overflow-hidden">
+                              <CardHeader className="pb-2">
+                                <CardTitle className="text-sm font-medium truncate">{m.product_name}</CardTitle>
+                                <p className="text-xs text-muted-foreground truncate">{m.brand || "Unknown brand"}</p>
+                              </CardHeader>
+
+                              <CardContent className="space-y-3">
+                                <div className="flex items-center justify-between">
+                                  <Badge variant="secondary" className="text-xs">Match {m.similarity}%</Badge>
+                                  <span className="text-xs text-muted-foreground">Shared {m.sharedCount}</span>
+                                </div>
+
+                                <Progress value={m.similarity} className="h-2" />
+
+                                {m.sharedSample?.length ? (
+                                  <div className="flex flex-wrap gap-2">
+                                    {m.sharedSample.slice(0, 6).map((x, i) => (
+                                      <Badge key={`${k}:ing:${i}`} variant="outline" className="text-[10px]">
+                                        {x}
+                                      </Badge>
+                                    ))}
+                                  </div>
+                                ) : null}
+
+                                <div className="flex gap-2 flex-wrap">
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() => selectProduct(m.id, { goToMarket: false, scrollTop: true })}
+                                  >
+                                    Use as base
+                                  </Button>
+
+                                  <Button
+                                    size="sm"
+                                    onClick={async () => {
+                                      await selectProduct(m.id, { goToMarket: true, scrollTop: true })
+                                      await findMarketDupes({ force: false, productId: m.id })
+                                    }}
+                                  >
+                                    Use and find dupes
+                                  </Button>
+                                </div>
+                              </CardContent>
+                            </Card>
+                          )
+                        })}
+                      </div>
+                    ) : (
+                      <Card className="border-dashed">
+                        <CardContent className="py-12 text-center">
+                          <Package className="w-12 h-12 mx-auto text-muted-foreground/50 mb-4" />
+                          <p className="text-muted-foreground">
+                            No matches yet. Analyze more products with full ingredient lists.
+                          </p>
+                        </CardContent>
+                      </Card>
+                    )}
+                  </div>
+                )}
               </TabsContent>
             </Tabs>
           </div>
@@ -672,5 +1044,5 @@ export default function Compare() {
         featureDescription="Unlock unlimited dupe discovery to find the best value products"
       />
     </AppShell>
-  );
+  )
 }
