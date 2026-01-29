@@ -3,10 +3,10 @@ import BrandName from './BrandName';
 
 const Footer = () => {
   const links = [
-    { label: 'About Us', href: '#' },
+    { label: 'About Us', href: '/about' },
     { label: 'How It Works', href: '#how-it-works' },
-    { label: 'FAQ', href: '#' },
-    { label: 'Contact', href: '#' },
+    { label: 'FAQ', href: '/faq' },
+    { label: 'Connect', href: '/connect' },
   ];
 
   const socialLinks = [

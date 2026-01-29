@@ -82,7 +82,7 @@ const FooterLinks = () => (
         { label: "About Us", href: "/about" },
         { label: "How It Works", href: "/how-it-works" },
         { label: "FAQ", href: "/faq" },
-        { label: "Contact", href: "/contact" },
+        { label: "Connect", href: "/connect" },
       ].map((link) => (
         <li key={link.label}>
           <a href={link.href} className="text-primary-foreground/80 hover:text-primary-foreground transition-colors">

@@ -21,6 +21,10 @@ import Quiz from "./pages/Quiz";
 import InstagramLanding from "./pages/InstagramLanding";
 import Analytics from "./pages/Analytics";
 import BetaFeedback from "./pages/BetaFeedback";
+import About from "./pages/About";
+import Faq from "./pages/Faq";
+import HowItWorks from "./pages/HowItWorks";
+import Connect from "./pages/Connect";
 import Compare from "./pages/Compare";
 import Favorites from "./pages/Favorites";
 import Pricing from "./pages/Pricing";
@@ -92,6 +96,11 @@ const App = () => (
           <Route path="/favorites" element={<AppProtectedRoute><Favorites /></AppProtectedRoute>} />
           <Route path="/settings" element={<AppProtectedRoute><Settings /></AppProtectedRoute>} />
           <Route path="/pricing" element={<Pricing />} />
+          <Route path="/about" element={<About />} />
+          <Route path="/faq" element={<Faq />} />
+          <Route path="/how-it-works" element={<HowItWorks />} />
+          <Route path="/connect" element={<Connect />} />
+          <Route path="/contact" element={<Connect />} />
           <Route path="/dashboard/reviewer" element={<AppProtectedRoute><ProtectedRoute><StudentReviewer /></ProtectedRoute></AppProtectedRoute>} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />

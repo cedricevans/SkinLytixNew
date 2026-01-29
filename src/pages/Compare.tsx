@@ -204,7 +204,8 @@ export default function Compare() {
 
   const [showPaywall, setShowPaywall] = useState(false);
 
-  const [activeTab, setActiveTab] = useState("market");
+  // default to the user's scanned matches tab
+  const [activeTab, setActiveTab] = useState("myproducts");
   const [categoryFilter, setCategoryFilter] = useState("all");
 
   const [findingDupes, setFindingDupes] = useState(false);
@@ -320,7 +321,7 @@ export default function Compare() {
     return { hit: false, source: null };
   };
 
-  const findMarketDupes = async ({ force = false, productId } = {}) => {
+  const findMarketDupes = async ({ force = false, productId }: { force?: boolean; productId?: string } = {}) => {
     const pid = productId || selectedIdRef.current;
     const product = analyses.find((a) => a.id === pid) || null;
 
@@ -459,7 +460,10 @@ export default function Compare() {
     }
   };
 
-  const selectProduct = async (id, opts = {}) => {
+  const selectProduct = async (
+    id,
+    opts: { skipUrl?: boolean; goToMarket?: boolean; scrollTop?: boolean; autoFindDupes?: boolean } = {}
+  ) => {
     if (!id) return;
 
     selectedIdRef.current = id;
@@ -863,14 +867,14 @@ export default function Compare() {
             </Card>
 
             <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6 w-full">
-              <TabsList className="grid w-full max-w-md grid-cols-2">
-                <TabsTrigger value="market" className="gap-2">
-                  <Sparkles className="w-4 h-4" />
-                  Market Dupes
-                </TabsTrigger>
-                <TabsTrigger value="myproducts" className="gap-2">
+              <TabsList className="h-10 items-center justify-center rounded-md bg-muted p-1 text-muted-foreground grid w-full max-w-md grid-cols-2 gap-1 box-border overflow-hidden">
+                <TabsTrigger value="myproducts" className="gap-2 inline-flex items-center justify-center whitespace-nowrap rounded-sm px-3 py-1.5 text-sm font-medium">
                   <Package className="w-4 h-4" />
-                  My Scanned Matches
+                  Scanned Matches
+                </TabsTrigger>
+                <TabsTrigger value="previous" className="gap-2 inline-flex items-center justify-center whitespace-nowrap rounded-sm px-3 py-1.5 text-sm font-medium">
+                  <Database className="w-4 h-4" />
+                  Previous Scans
                 </TabsTrigger>
               </TabsList>
 
@@ -972,7 +976,7 @@ export default function Compare() {
                     </div>
                     <div>Ingredient match shows overlap with your base product.</div>
                     <div>Tap Set as base to compare everything to that product.</div>
-                    <div>Tap Set base and search dupes to jump to Market Dupes.</div>
+                    <div>Tap Set base and search dupes to search for dupes in the market.</div>
 
                     <div className="flex gap-2 flex-wrap pt-2">
                       <Button
@@ -982,15 +986,7 @@ export default function Compare() {
                       >
                         Change base product
                       </Button>
-                      <Button
-                        size="sm"
-                        onClick={() => {
-                          setActiveTab("market");
-                          topRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
-                        }}
-                      >
-                        Go to Market Dupes
-                      </Button>
+                      {/* Market dupes are accessible via the Set base and search dupes action. */}
                     </div>
                   </CardContent>
                 </Card>
@@ -1108,6 +1104,69 @@ export default function Compare() {
                         </CardContent>
                       </Card>
                     )}
+                  </div>
+                )}
+              </TabsContent>
+
+              <TabsContent value="previous" className="space-y-6">
+                <Card className="border-dashed">
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-base font-medium">Your previous scans</CardTitle>
+                  </CardHeader>
+                  <CardContent className="text-sm text-muted-foreground space-y-2">
+                    <div>View your recent scanned products and set any as the base product for comparison.</div>
+                  </CardContent>
+                </Card>
+
+                {analyses.length === 0 ? (
+                  <Card className="border-dashed">
+                    <CardContent className="py-12 text-center">
+                      <Package className="w-12 h-12 mx-auto text-muted-foreground/50 mb-4" />
+                      <p className="text-muted-foreground">No previous scans yet.</p>
+                    </CardContent>
+                  </Card>
+                ) : (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+                    {analyses.map((a) => (
+                      <Card key={a.id} className="overflow-hidden">
+                        <CardHeader className="pb-2">
+                          <CardTitle className="text-sm font-medium truncate">{a.product_name}</CardTitle>
+                          <p className="text-xs text-muted-foreground truncate">{a.brand || 'Unknown brand'}</p>
+                        </CardHeader>
+
+                        <CardContent className="space-y-3">
+                          <div className="flex items-center justify-between">
+                            <div className="text-sm">EpiQ: {a.epiq_score ?? '—'}</div>
+                            <div className="text-sm text-muted-foreground">{a.category || '—'}</div>
+                          </div>
+
+                          <div className="flex gap-2">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={async () => {
+                                await selectProduct(a.id, { goToMarket: false, scrollTop: true });
+                                toast({ title: 'Base product updated', description: 'Now review your matches.' });
+                              }}
+                            >
+                              Set as base
+                            </Button>
+                            <Button
+                              size="sm"
+                              onClick={async () => {
+                                await selectProduct(a.id, {
+                                  goToMarket: true,
+                                  scrollTop: true,
+                                  autoFindDupes: true,
+                                });
+                              }}
+                            >
+                              Set base and search dupes
+                            </Button>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    ))}
                   </div>
                 )}
               </TabsContent>
