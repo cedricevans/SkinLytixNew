@@ -305,19 +305,21 @@ const Pricing = () => {
         </div>
       </section>
 
-      {/* Academic Partnership Banner */}
+      {/* Academic Validation Banner */}
       <section className="px-4 pb-16">
         <div className="max-w-4xl mx-auto">
           <Card className="bg-gradient-to-br from-primary/10 via-accent/5 to-transparent border-primary/20">
             <CardContent className="py-8 text-center">
               <div className="flex items-center justify-center gap-2 mb-4">
                 <Star className="h-5 w-5 text-primary" />
-                <span className="font-heading font-bold text-lg">Human + AI Validation</span>
+                <span className="font-heading font-bold text-lg">Academic Validation</span>
                 <Star className="h-5 w-5 text-primary" />
               </div>
+              <p className="text-xs uppercase tracking-wide text-muted-foreground mb-3">
+                4 Partners
+              </p>
               <p className="text-muted-foreground max-w-2xl mx-auto">
-                Every EpiQ Score is calibrated by Cosmetic Science students from our founding academic partner, 
-                <span className="font-semibold text-foreground"> Spelman College</span>. 
+                Every EpiQ Score is calibrated by Cosmetic Science students from our founding academic partner.
                 Real expertise backing every recommendation.
               </p>
             </CardContent>
