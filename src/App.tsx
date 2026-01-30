@@ -5,6 +5,8 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, useLocation } from "react-router-dom";
 import { useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import invokeFunction from "@/lib/functions-client";
+import { toast } from "sonner";
 import Index from "./pages/Index";
 import Home from "./pages/Home";
 import Upload from "./pages/Upload";
@@ -66,6 +68,48 @@ const SessionRefreshGate = () => {
   return null;
 };
 
+const SubscriptionSyncGate = () => {
+  const location = useLocation();
+
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const subscriptionStatus = params.get("subscription");
+    if (!subscriptionStatus) return;
+
+    const syncSubscription = async () => {
+      try {
+        await invokeFunction("check-subscription");
+        if (typeof window !== "undefined") {
+          window.dispatchEvent(new Event("subscription:refresh"));
+        }
+        if (subscriptionStatus === "success") {
+          toast.success("Subscription updated", {
+            description: "Your plan is now active.",
+          });
+        } else if (subscriptionStatus === "canceled") {
+          toast("Checkout canceled", {
+            description: "No changes were made to your plan.",
+          });
+        }
+      } catch (error) {
+        console.error("Error syncing subscription after checkout:", error);
+        toast.error("Unable to sync subscription", {
+          description: "Please use the Sync button in Settings.",
+        });
+      } finally {
+        params.delete("subscription");
+        const nextSearch = params.toString();
+        const nextUrl = `${location.pathname}${nextSearch ? `?${nextSearch}` : ""}${location.hash}`;
+        window.history.replaceState({}, "", nextUrl);
+      }
+    };
+
+    syncSubscription();
+  }, [location.hash, location.pathname, location.search]);
+
+  return null;
+};
+
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
@@ -75,6 +119,7 @@ const App = () => (
       <BrowserRouter>
         <ScrollToTop />
         <SessionRefreshGate />
+        <SubscriptionSyncGate />
         <Routes>
           <Route path="/" element={<Index />} />
           <Route path="/home" element={<AppProtectedRoute><Home /></AppProtectedRoute>} />

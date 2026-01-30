@@ -14,7 +14,6 @@ import { Droplets, Wind, Flame, Shield, Sparkles, Home, ArrowLeft, User, Trendin
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { useTracking, trackEvent } from "@/hooks/useTracking";
 import { DemoModeToggle } from "@/components/DemoModeToggle";
-import { useSubscription } from "@/hooks/useSubscription";
 import { TrialBanner } from "@/components/subscription";
 import AppShell from "@/components/AppShell";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";

@@ -114,6 +114,15 @@ export function useSubscription() {
     return () => clearTimeout(syncTimer);
   }, [loadSubscriptionStatus]);
 
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const handleRefresh = () => {
+      loadSubscriptionStatus();
+    };
+    window.addEventListener("subscription:refresh", handleRefresh);
+    return () => window.removeEventListener("subscription:refresh", handleRefresh);
+  }, [loadSubscriptionStatus]);
+
   // Get effective tier (considers admin bypass and demo mode)
   const getEffectiveTier = (): SubscriptionTier => {
     // Admin in demo mode: use demo tier

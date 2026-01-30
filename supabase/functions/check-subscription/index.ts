@@ -75,19 +75,26 @@ serve(async (req) => {
 
     const subscriptions = await stripe.subscriptions.list({
       customer: customerId,
-      status: "active",
-      limit: 1,
+      status: "all",
+      limit: 5,
     });
     
-    const hasActiveSub = subscriptions.data.length > 0;
+    const activeSubscription = subscriptions.data.find((subscription) =>
+      subscription.status === "active" || subscription.status === "trialing"
+    );
+    const hasActiveSub = !!activeSubscription;
     let tier = "free";
     let subscriptionEnd = null;
     let subscriptionId = null;
+    let trialEndsAt = null;
 
     if (hasActiveSub) {
-      const subscription = subscriptions.data[0];
+      const subscription = activeSubscription!;
       subscriptionEnd = new Date(subscription.current_period_end * 1000).toISOString();
       subscriptionId = subscription.id;
+      if (subscription.status === "trialing" && subscription.trial_end) {
+        trialEndsAt = new Date(subscription.trial_end * 1000).toISOString();
+      }
       
       const productId = subscription.items.data[0].price.product as string;
       tier = PRODUCT_TO_TIER[productId] || "premium";
@@ -95,6 +102,7 @@ serve(async (req) => {
       logStep("Active subscription found", { 
         subscriptionId: subscription.id, 
         productId,
+        status: subscription.status,
         tier,
         endDate: subscriptionEnd 
       });
@@ -104,7 +112,8 @@ serve(async (req) => {
         .from("profiles")
         .update({ 
           subscription_tier: tier,
-          stripe_subscription_id: subscriptionId 
+          stripe_subscription_id: subscriptionId,
+          trial_ends_at: trialEndsAt
         })
         .eq("id", user.id);
     } else {
@@ -114,7 +123,8 @@ serve(async (req) => {
         .from("profiles")
         .update({ 
           subscription_tier: "free",
-          stripe_subscription_id: null 
+          stripe_subscription_id: null,
+          trial_ends_at: null
         })
         .eq("id", user.id);
     }
