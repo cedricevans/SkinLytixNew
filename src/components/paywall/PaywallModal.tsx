@@ -87,7 +87,11 @@ export function PaywallModal({
       try {
         const data: any = await (await import('@/lib/functions-client')).invokeFunction('create-checkout', { plan: selectedPlan, billingCycle });
         if (data?.url) {
-          window.open(data.url, '_blank');
+          const popup = window.open(data.url, '_blank');
+          if (!popup) {
+            window.location.assign(data.url);
+            return;
+          }
           onOpenChange(false);
           toast.success('Checkout opened in new tab');
         }
