@@ -516,14 +516,14 @@ export default function Routine() {
         {/* Routine Summary */}
         {routineProducts.length > 0 && (
           <Card className="p-6 mb-6">
-            <div className="flex items-center justify-between flex-wrap gap-4">
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
               <div>
                 <h3 className="text-lg font-semibold mb-1">Routine Summary</h3>
                 <p className="text-sm text-muted-foreground">
                   {routineProducts.length} products • Total Cost: ${totalCost.toFixed(2)}
                 </p>
               </div>
-              <div className="flex gap-2 flex-wrap">
+              <div className="flex w-full flex-col gap-3 sm:w-auto sm:flex-col sm:items-end sm:gap-3">
                 {/* Usage counter for premium users */}
                 {effectiveTier === 'premium' && (
                   <UsageCounter 
@@ -531,40 +531,47 @@ export default function Routine() {
                     limit={premiumLimits.routineOptimizations}
                     label="Optimizations"
                     feature="Routine Optimization"
+                    className="w-full sm:w-[320px] md:w-[360px]"
                   />
                 )}
-                <div className="flex items-center">
-                  <Button
-                    onClick={handleOptimizeRoutine}
-                    disabled={optimizing}
-                    className="bg-primary"
-                  >
-                    {effectiveTier === 'free' && <Lock className="w-4 h-4 mr-2" />}
-                    <Sparkles className="w-4 h-4 mr-2" />
-                    {optimizing ? "Optimizing..." : "Optimize Routine"}
-                  </Button>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Info className="w-4 h-4 ml-2 text-muted-foreground cursor-help" />
-                    </TooltipTrigger>
-                    <TooltipContent className="max-w-xs">
-                      <p>Our AI analyzes your routine for ingredient conflicts, redundancies, and cost-saving opportunities. {effectiveTier === 'free' ? 'Upgrade to Premium for full access.' : 'Optimize after adding 2+ products for best results.'}</p>
-                    </TooltipContent>
-                  </Tooltip>
-                </div>
-                <div className="flex items-center">
-                  <Button variant="outline" onClick={handleCostAnalysis}>
-                    <DollarSign className="w-4 h-4 mr-2" />
-                    Cost Analysis
-                  </Button>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Info className="w-4 h-4 ml-2 text-muted-foreground cursor-help" />
-                    </TooltipTrigger>
-                    <TooltipContent className="max-w-xs">
-                      <p>View detailed breakdown of your routine costs and discover budget-friendly alternatives that maintain the same key ingredients.</p>
-                    </TooltipContent>
-                  </Tooltip>
+                <div className="grid w-full grid-cols-2 gap-2 sm:flex sm:w-auto sm:gap-2">
+                  <div className="flex items-center w-full">
+                    <Button
+                      onClick={handleOptimizeRoutine}
+                      disabled={optimizing}
+                      className="bg-primary w-full sm:w-auto text-xs sm:text-sm"
+                    >
+                      {effectiveTier === 'free' && <Lock className="w-4 h-4 mr-2" />}
+                      <Sparkles className="w-4 h-4 mr-2" />
+                      {optimizing ? "Optimizing..." : "Optimize Routine"}
+                    </Button>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Info className="w-4 h-4 ml-2 text-muted-foreground cursor-help" />
+                      </TooltipTrigger>
+                      <TooltipContent className="max-w-xs">
+                        <p>Our AI analyzes your routine for ingredient conflicts, redundancies, and cost-saving opportunities. {effectiveTier === 'free' ? 'Upgrade to Premium for full access.' : 'Optimize after adding 2+ products for best results.'}</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </div>
+                  <div className="flex items-center w-full">
+                    <Button
+                      variant="outline"
+                      onClick={handleCostAnalysis}
+                      className="w-full sm:w-auto text-xs sm:text-sm"
+                    >
+                      <DollarSign className="w-4 h-4 mr-2" />
+                      Cost Analysis
+                    </Button>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Info className="w-4 h-4 ml-2 text-muted-foreground cursor-help" />
+                      </TooltipTrigger>
+                      <TooltipContent className="max-w-xs">
+                        <p>View detailed breakdown of your routine costs and discover budget-friendly alternatives that maintain the same key ingredients.</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </div>
                 </div>
               </div>
             </div>
@@ -666,7 +673,7 @@ export default function Routine() {
               </Button>
               <Button
                 onClick={() => setShowManualEntryDialog(true)}
-                variant="default"
+                variant="cta"
                 className="w-full sm:w-auto"
               >
                 <Plus className="w-4 h-4 mr-2" />
