@@ -3,6 +3,7 @@ import { cn } from "@/lib/utils";
 import Navigation from "@/components/Navigation";
 import Footer from "@/components/Footer";
 import { ResponsiveBottomNav, ResponsiveBottomNavProps } from "@/components/ResponsiveBottomNav";
+import BrandName from "@/components/landing/BrandName";
 
 type AppShellProps = {
   children: ReactNode;
@@ -35,7 +36,7 @@ const AppShell = ({
         <header className="w-full bg-primary shadow-soft">
           <div className="max-w-6xl mx-auto px-[10px] md:px-6 py-3 md:py-4 flex justify-between items-center">
             <h2 className="text-xl md:text-2xl font-heading font-bold text-primary-foreground">
-              SkinLytix
+              <BrandName />
             </h2>
             <Navigation variant="app" onAskGpt={onAskGpt} />
           </div>

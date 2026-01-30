@@ -13,13 +13,13 @@ interface BrandNameProps {
  * <BrandName />
  * 
  * @example
- * // With suffix (e.g., "SkinLytix (TM) Analyzer")
+ * // With suffix (e.g., "SkinLytix TM Analyzer")
  * <BrandName> Analyzer</BrandName>
  */
 const BrandName = ({ children }: BrandNameProps) => {
   return (
     <>
-      SkinLytix<sup className="text-[0.6em]">(TM)</sup>{children}
+      SkinLytix<sup className="text-[0.6em]">TM</sup>{children}
     </>
   );
 };
