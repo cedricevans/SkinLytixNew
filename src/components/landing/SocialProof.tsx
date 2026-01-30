@@ -22,7 +22,7 @@ const SocialProof = () => {
       size: 'text-2xl md:text-3xl',
     },
     {
-      number: '1 Partner',
+      number: '4 Partners',
       label: 'Academic Validation',
       detail: 'Human + AI verified accuracy',
       color: 'text-primary',
