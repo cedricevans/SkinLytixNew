@@ -453,15 +453,20 @@ export default function Compare() {
     const inflightExisting = inflightRef.current.get(inflightKey);
     if (inflightExisting) {
       try {
-        const dupes = await inflightExisting;
+        const result = await inflightExisting;
         if (latestRequestKeyRef.current !== requestId) return;
         if (selectedIdRef.current !== pid) return;
+
+        if (result?.needsRetry) return result;
+
+        const dupes = Array.isArray(result?.dupes) ? result.dupes : [];
 
         setMarketDupes(dupes);
         setHasCachedResults(dupes?.length > 0);
         setCacheMeta({ source: "fresh", updatedAt: new Date().toISOString() });
         setDupeStage("Results ready");
         setDupeProgress(100);
+        return result?.ok ? result : { ok: true, needsRetry: false, dupesCount: dupes.length };
       } catch {
         if (latestRequestKeyRef.current !== requestId) return;
         if (selectedIdRef.current !== pid) return;
@@ -469,6 +474,7 @@ export default function Compare() {
         setDupeError("Failed to find dupes");
         setDupeStage("Error");
         setDupeProgress(100);
+        return { ok: false, needsRetry: false, reason: "error" };
       } finally {
         if (latestRequestKeyRef.current === requestId) setFindingDupes(false);
       }
@@ -484,6 +490,14 @@ export default function Compare() {
         .split(/[,;\n]+/)
         .map((i) => i.trim())
         .filter(Boolean);
+
+      // Gate. No ingredients yet means scan still processing.
+      if (ingredients.length < 5 && !product?.product_name) {
+        setDupeStage("Scan still processing. Waiting for ingredients");
+        setDupeProgress(35);
+        setFindingDupes(false);
+        return { ok: false, needsRetry: true, reason: "ingredients_not_ready" };
+      }
 
       setDupeStage("Searching OBF dupes");
       setDupeProgress(60);
@@ -507,15 +521,19 @@ export default function Compare() {
       writeMarketDupeLocalCache(userId, pid, normalizedDupes);
       await writeMarketDupeCloudCache(userId, pid, normalizedDupes);
 
-      return normalizedDupes;
+      return { ok: true, needsRetry: false, dupesCount: normalizedDupes.length, dupes: normalizedDupes };
     })();
 
     inflightRef.current.set(inflightKey, promise);
 
     try {
-      const dupes = await promise;
+      const result = await promise;
       if (latestRequestKeyRef.current !== requestId) return;
       if (selectedIdRef.current !== pid) return;
+
+      if (result?.needsRetry) return result;
+
+      const dupes = Array.isArray(result?.dupes) ? result.dupes : [];
 
       setMarketDupes(dupes);
       setHasCachedResults(Array.isArray(dupes) && dupes.length > 0);
@@ -528,6 +546,7 @@ export default function Compare() {
       } else {
         toast({ title: "Dupes found", description: `Found ${dupes.length} similar products.` });
       }
+      return result ?? { ok: true, needsRetry: false, dupesCount: dupes.length };
     } catch (error) {
       const message = error instanceof Error ? error.message : "";
       const friendlyMessage =
@@ -543,6 +562,7 @@ export default function Compare() {
       setDupeProgress(100);
 
       toast({ title: "Error finding dupes", description: friendlyMessage, variant: "destructive" });
+      return { ok: false, needsRetry: false, reason: "error" };
     } finally {
       inflightRef.current.delete(inflightKey);
       if (latestRequestKeyRef.current === requestId) setFindingDupes(false);
@@ -573,8 +593,19 @@ export default function Compare() {
       const hasAny = Boolean(local?.length) || Boolean(cloud?.dupes?.length);
 
       if (!hasAny && !autoRanRef.current.has(id)) {
+        const res = await findMarketDupes({ force: true, productId: id });
+
+        // Ingredients not ready. Do not lock out future auto runs.
+        if (res?.needsRetry) {
+          setTimeout(() => {
+            // Try once more after DB finishes saving ingredients_list
+            findMarketDupes({ force: true, productId: id });
+          }, 1200);
+          return;
+        }
+
+        // Mark as auto ran only after a real attempt
         autoRanRef.current.add(id);
-        await findMarketDupes({ force: true, productId: id });
       }
     }
   };
@@ -707,8 +738,19 @@ export default function Compare() {
           const hasAny = Boolean(local?.length) || Boolean(cloud?.dupes?.length);
 
           if (!hasAny && !autoRanRef.current.has(initialId)) {
+            const res = await findMarketDupes({ force: true, productId: initialId });
+
+            // Ingredients not ready. Do not lock out future auto runs.
+            if (res?.needsRetry) {
+              setTimeout(() => {
+                // Try once more after DB finishes saving ingredients_list
+                findMarketDupes({ force: true, productId: initialId });
+              }, 1200);
+              return;
+            }
+
+            // Mark as auto ran only after a real attempt
             autoRanRef.current.add(initialId);
-            await findMarketDupes({ force: true, productId: initialId });
           }
         }
       } catch {
@@ -757,8 +799,19 @@ export default function Compare() {
     // pid already selected, but we still need to load dupes for it
     loadCachedDupesForSelection(userId, pid).then(async (res) => {
       if (!res?.hit && !autoRanRef.current.has(pid)) {
+        const result = await findMarketDupes({ force: true, productId: pid });
+
+        // Ingredients not ready. Do not lock out future auto runs.
+        if (result?.needsRetry) {
+          setTimeout(() => {
+            // Try once more after DB finishes saving ingredients_list
+            findMarketDupes({ force: true, productId: pid });
+          }, 1200);
+          return;
+        }
+
+        // Mark as auto ran only after a real attempt
         autoRanRef.current.add(pid);
-        await findMarketDupes({ force: true, productId: pid });
       }
     });
   }, [userId, selectedProductId]);

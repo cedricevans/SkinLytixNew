@@ -34,8 +34,16 @@ const emptyResult = () => ({
   notes: null,
 });
 
-const normalizeText = (v: unknown) =>
-  typeof v === "string" ? v.replace(/\s+/g, " ").trim() : "";
+const normalizeText = (v: unknown) => {
+  if (typeof v !== "string") return "";
+  return v.normalize("NFKC").replace(/\s+/g, " ").trim();
+};
+
+const normalizeLabelText = (v: unknown) => {
+  if (typeof v !== "string") return "";
+  // keep line breaks, collapse repeated spaces only
+  return v.normalize("NFKC").replace(/[ \t]+/g, " ").trim();
+};
 
 const safeReadText = async (r: Response) => {
   try {
@@ -78,6 +86,15 @@ const dedupeStrings = (values: string[]) => {
   return result;
 };
 
+const stripIngredientSymbols = (s: string) => {
+  return s
+    .normalize("NFKC")
+    .replace(/[♥❤•®™]/g, "")
+    .replace(/\*/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+};
+
 const sanitizeBrand = (value: unknown) => {
   const text = normalizeText(value);
   if (!text) return "";
@@ -99,10 +116,14 @@ const sanitizeBrand = (value: unknown) => {
 };
 
 const normalizeIngredients = (value: unknown) => {
+  const cleanToken = (item: string) =>
+    stripIngredientSymbols(item)
+      .replace(/^[,;:.\s]+|[,;:.\s]+$/g, "")
+      .trim();
+
   if (Array.isArray(value)) {
     const cleaned = value
-      .map((item) => normalizeText(item))
-      .map((item) => item.replace(/^[,;:.\\s]+|[,;:.\\s]+$/g, ""))
+      .map((item) => cleanToken(String(item || "")))
       .filter(Boolean)
       .filter((item) => item.toLowerCase() !== "ingredients");
     return dedupeStrings(cleaned);
@@ -110,9 +131,8 @@ const normalizeIngredients = (value: unknown) => {
 
   if (typeof value === "string") {
     const parts = value
-      .split(/[,;\\n]+/)
-      .map((item) => normalizeText(item))
-      .map((item) => item.replace(/^[,;:.\\s]+|[,;:.\\s]+$/g, ""))
+      .split(/[,;\n]+/)
+      .map((item) => cleanToken(item))
       .filter(Boolean)
       .filter((item) => item.toLowerCase() !== "ingredients");
     return dedupeStrings(parts);
@@ -200,7 +220,7 @@ const parseAndValidate = (content: string) => {
   const variant = variantRaw ? variantRaw.slice(0, 60) : null;
   const sizeRaw = normalizeText(extracted?.size);
   const size = sizeRaw || null;
-  const ingredients = normalizeIngredients(extracted?.ingredients);
+  const ingredients = normalizeIngredients(extracted?.ingredients ?? []);
   const keyFlags = normalizeStringArray(extracted?.key_flags);
   const skinConcerns = normalizeStringArray(extracted?.skin_concerns);
   const skinTypes = normalizeSkinTypes(extracted?.skin_types);
@@ -450,7 +470,7 @@ serve(async (req) => {
   try {
     const body = await req.json().catch(() => ({}));
     const image = body?.image;
-    const labelText = normalizeText(body?.labelText) || null;
+    const labelText = normalizeLabelText(body?.labelText) || null;
 
     const imageError = validateImageInput(image);
     if (imageError) {
