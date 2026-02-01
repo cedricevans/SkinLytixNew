@@ -966,15 +966,30 @@ const Analysis = () => {
           </div>
 
           <Tabs defaultValue="safe" className="w-full">
-            <TabsList className="w-full flex flex-wrap">
-              <TabsTrigger value="safe" className="flex-1 text-sm">
-                Safe ({analysis.recommendations_json.safe_ingredients?.length || 0})
+            <TabsList className="w-full grid grid-cols-3 gap-2">
+              <TabsTrigger value="safe" className="text-[11px] sm:text-sm whitespace-nowrap leading-none px-2">
+                <span className="sm:hidden">
+                  Safe ({analysis.recommendations_json.safe_ingredients?.length || 0})
+                </span>
+                <span className="hidden sm:inline">
+                  Safe ({analysis.recommendations_json.safe_ingredients?.length || 0})
+                </span>
               </TabsTrigger>
-              <TabsTrigger value="concerns" className="flex-1 text-sm">
-                Concerns ({analysis.recommendations_json.problematic_ingredients?.length || 0})
+              <TabsTrigger value="concerns" className="text-[11px] sm:text-sm whitespace-nowrap leading-none px-2">
+                <span className="sm:hidden">
+                  Concerns ({analysis.recommendations_json.problematic_ingredients?.length || 0})
+                </span>
+                <span className="hidden sm:inline">
+                  Concerns ({analysis.recommendations_json.problematic_ingredients?.length || 0})
+                </span>
               </TabsTrigger>
-              <TabsTrigger value="needs" className="flex-1 text-sm">
-                Needs More Data ({analysis.recommendations_json.concern_ingredients?.length || 0})
+              <TabsTrigger value="needs" className="text-[11px] sm:text-sm whitespace-nowrap leading-none px-2">
+                <span className="sm:hidden">
+                  Needs Data ({analysis.recommendations_json.concern_ingredients?.length || 0})
+                </span>
+                <span className="hidden sm:inline">
+                  Needs More Data ({analysis.recommendations_json.concern_ingredients?.length || 0})
+                </span>
               </TabsTrigger>
             </TabsList>
 
