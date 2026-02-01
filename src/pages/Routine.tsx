@@ -539,11 +539,21 @@ export default function Routine() {
                     <Button
                       onClick={handleOptimizeRoutine}
                       disabled={optimizing}
-                      className="bg-primary w-full sm:w-auto text-xs sm:text-sm"
+                      className="bg-primary w-full sm:w-auto text-xs sm:text-sm gap-1 sm:gap-2"
                     >
                       {effectiveTier === 'free' && <Lock className="w-4 h-4 mr-2" />}
                       <Sparkles className="w-4 h-4 mr-2" />
-                      {optimizing ? "Optimizing..." : "Optimize Routine"}
+                      {optimizing ? (
+                        <>
+                          <span className="sm:hidden">Optimizing</span>
+                          <span className="hidden sm:inline">Optimizing...</span>
+                        </>
+                      ) : (
+                        <>
+                          <span className="sm:hidden">Optimize</span>
+                          <span className="hidden sm:inline">Optimize Routine</span>
+                        </>
+                      )}
                     </Button>
                     <Tooltip>
                       <TooltipTrigger asChild>
