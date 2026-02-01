@@ -53,10 +53,10 @@ export const AIExplanationAccordion = ({ aiExplanation }: AIExplanationAccordion
           aria-expanded={isExpanded}
         >
           <div className="flex items-start justify-between gap-4">
-            <div className="flex items-center gap-2 flex-1 text-left">
+            <div className="flex items-center gap-2 flex-1 min-w-0 text-left">
               <Sparkles className="w-5 h-5 text-purple-600 dark:text-purple-400 flex-shrink-0" />
-              <div className="flex-1">
-                <h2 className="text-lg font-semibold flex items-center gap-2">
+              <div className="flex-1 min-w-0">
+                <h2 className="text-lg font-semibold flex items-center gap-2 break-words">
                   🤖✨ AI Explanation
                   {!hasAccess && (
                     <span className="inline-flex items-center gap-1 text-xs font-normal text-muted-foreground bg-primary/10 px-2 py-0.5 rounded-full">
@@ -66,7 +66,7 @@ export const AIExplanationAccordion = ({ aiExplanation }: AIExplanationAccordion
                   )}
                 </h2>
                 {aiExplanation.summary_one_liner && (
-                  <p className="text-sm text-muted-foreground mt-1 font-normal">
+                  <p className="text-sm text-muted-foreground mt-1 font-normal break-words whitespace-normal">
                     {aiExplanation.summary_one_liner}
                   </p>
                 )}
