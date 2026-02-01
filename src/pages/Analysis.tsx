@@ -1159,7 +1159,7 @@ const Analysis = () => {
                           <details key={`${name}-${index}`} id={getIngredientId(name)} className="rounded-lg border border-border/60 bg-background/50 px-3 py-2">
                             <summary className="cursor-pointer list-none flex flex-wrap items-center justify-between gap-2">
                               <div className="flex items-center gap-2">
-                                <Badge variant="outline" className="border-amber-300 text-amber-700">Needs Data</Badge>
+                                <Badge variant="outline" className="border-amber-300 text-amber-700 whitespace-nowrap">Needs Data</Badge>
                                 <span className="font-medium">{name}</span>
                               </div>
                               {role && <span className="text-xs text-muted-foreground">Role: {role}</span>}
