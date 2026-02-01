@@ -1164,4 +1164,4 @@ export default function Compare() {
       />
     </AppShell>
   );
-}
+} 

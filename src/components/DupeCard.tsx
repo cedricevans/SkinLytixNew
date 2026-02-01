@@ -348,7 +348,7 @@ export const DupeCard = ({
             {expanded ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
           </button>
         </div>
-
+ 
         <p className="text-[10px] text-muted-foreground">{String(categoryText)}</p>
 
         <div>
