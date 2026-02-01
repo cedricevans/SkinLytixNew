@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Check, Crown, Sparkles, Zap, Shield, Star } from 'lucide-react';
+import { Check, Crown, Sparkles, Shield, Star } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -15,15 +15,6 @@ import {
 } from '@/components/ui/accordion';
 import Navigation from '@/components/Navigation';
 import BrandName from '@/components/landing/BrandName';
-
-const FREE_FEATURES = [
-  'Unlimited product analyses',
-  'Basic EpiQ Score',
-  'Ingredient safety flags',
-  '1 routine (up to 5 products)',
-  '3 SkinLytixGPT chats/month',
-  'Compare 2 products',
-];
 
 const PREMIUM_FEATURES = [
   'Everything in Free',
@@ -184,43 +175,9 @@ const Pricing = () => {
 
       {/* Pricing Cards */}
       <section className="px-4 pb-20">
-        <div className="max-w-6xl mx-auto grid md:grid-cols-3 gap-6 lg:gap-8">
-          {/* Free Tier */}
-          <Card className="border-2 border-border relative overflow-hidden order-3">
-            <CardHeader className="pb-4">
-              <div className="flex items-center gap-2 mb-2">
-                <Zap className="h-5 w-5 text-muted-foreground" />
-                <CardTitle className="text-xl">Free</CardTitle>
-              </div>
-              <div className="flex items-baseline gap-1">
-                <span className="text-4xl font-bold">$0</span>
-                <span className="text-muted-foreground">/forever</span>
-              </div>
-              <p className="text-sm text-muted-foreground mt-2">
-                Perfect for getting started
-              </p>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <Button 
-                variant="outline" 
-                className="w-full whitespace-normal"
-                onClick={() => navigate('/auth')}
-              >
-                Get Started Free
-              </Button>
-              <ul className="space-y-3">
-                {FREE_FEATURES.map((feature, i) => (
-                  <li key={i} className="flex items-start gap-2 text-sm">
-                    <Check className="h-4 w-4 text-success-foreground mt-0.5 flex-shrink-0" />
-                    <span>{feature}</span>
-                  </li>
-                ))}
-              </ul>
-            </CardContent>
-          </Card>
-
+        <div className="max-w-6xl mx-auto grid md:grid-cols-2 gap-6 lg:gap-8">
           {/* Premium Tier */}
-          <Card className="border-2 border-primary relative overflow-hidden shadow-lg scale-105 order-2">
+          <Card className="border-2 border-primary relative overflow-hidden shadow-lg scale-105">
             <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-primary to-accent" />
             <CardHeader className="pb-4">
               <div className="flex items-center gap-2 mb-2">
@@ -260,7 +217,7 @@ const Pricing = () => {
           </Card>
 
           {/* Pro Tier */}
-          <Card className="border-2 border-amber-500/50 relative overflow-hidden order-1">
+          <Card className="border-2 border-amber-500/50 relative overflow-hidden">
             <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-amber-500 to-orange-500" />
             <Badge className="absolute top-4 right-4 bg-amber-500">
               Most Popular

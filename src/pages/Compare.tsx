@@ -298,6 +298,7 @@ export default function Compare() {
   const ingredientsCacheRef = useRef({});
   const inflightRef = useRef(new Map());
   const latestRequestKeyRef = useRef(null);
+  const pendingSelectRef = useRef(null);
 
   const autoRanRef = useRef(new Set());
 
@@ -728,11 +729,39 @@ export default function Compare() {
     const pid = params.get("productId");
 
     if (!pid) return;
-    if (pid === selectedProductId) return;
     if (!analyses.some((a) => a.id === pid)) return;
 
+    // user not ready yet, queue it
+    if (!userId) {
+      pendingSelectRef.current = pid;
+      return;
+    }
+
+    if (pid === selectedProductId) return;
+
     selectProduct(pid, { skipUrl: true });
-  }, [location.search, analyses, selectedProductId]);
+  }, [location.search, analyses, selectedProductId, userId]);
+
+  useEffect(() => {
+    if (!userId) return;
+    const pid = pendingSelectRef.current;
+    if (!pid) return;
+
+    pendingSelectRef.current = null;
+
+    if (pid !== selectedProductId) {
+      selectProduct(pid, { skipUrl: true });
+      return;
+    }
+
+    // pid already selected, but we still need to load dupes for it
+    loadCachedDupesForSelection(userId, pid).then(async (res) => {
+      if (!res?.hit && !autoRanRef.current.has(pid)) {
+        autoRanRef.current.add(pid);
+        await findMarketDupes({ force: true, productId: pid });
+      }
+    });
+  }, [userId, selectedProductId]);
 
   // ---------- My Products Match computation ----------
   useEffect(() => {
