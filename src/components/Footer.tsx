@@ -59,7 +59,7 @@ const Footer = () => {
         {/* Bottom Bar */}
         <div className="pt-8 border-t border-primary-foreground/20 flex flex-col md:flex-row justify-between items-center gap-4">
           <p className="text-sm font-body text-primary-foreground/60">
-            © 2025 SkinLytix. Built with open science & real user data.
+            © 2026 SkinLytix. Built with open science & real user data.
           </p>
           {showFeedback && (
             <Button variant="cta" size="sm" onClick={() => navigate("/feedback")}>

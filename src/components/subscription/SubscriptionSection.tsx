@@ -70,7 +70,6 @@ export function SubscriptionSection({ className }: SubscriptionSectionProps) {
       toast.success('Subscription status updated');
     } catch (error) {
       console.error('Error syncing subscription:', error);
-      toast.error('Failed to sync subscription');
     } finally {
       setIsSyncing(false);
     }
@@ -86,11 +85,6 @@ export function SubscriptionSection({ className }: SubscriptionSectionProps) {
       window.open(data.url, '_blank');
     } catch (error: any) {
       console.error('Error opening billing portal:', error);
-      if (error.message?.includes('No Stripe customer found')) {
-        toast.error('No billing account found. Please subscribe first.');
-      } else {
-        toast.error(error.message || 'Failed to open billing portal');
-      }
     } finally {
       setIsManagingBilling(false);
     }
