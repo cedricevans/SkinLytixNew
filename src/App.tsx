@@ -22,7 +22,7 @@ import RoutineOptimization from "./pages/RoutineOptimization";
 import Quiz from "./pages/Quiz";
 import InstagramLanding from "./pages/InstagramLanding";
 import Analytics from "./pages/Analytics";
-import BetaFeedback from "./pages/BetaFeedback";
+import Feedback from "./pages/Feedback";
 import About from "./pages/About";
 import Faq from "./pages/Faq";
 import HowItWorks from "./pages/HowItWorks";
@@ -136,7 +136,7 @@ const App = () => (
           <Route path="/routine" element={<AppProtectedRoute><Routine /></AppProtectedRoute>} />
           <Route path="/routine/optimization/:id" element={<AppProtectedRoute><RoutineOptimization /></AppProtectedRoute>} />
           <Route path="/analytics" element={<AppProtectedRoute><ProtectedRoute><Analytics /></ProtectedRoute></AppProtectedRoute>} />
-          <Route path="/beta-feedback" element={<AppProtectedRoute><BetaFeedback /></AppProtectedRoute>} />
+          <Route path="/feedback" element={<AppProtectedRoute><Feedback /></AppProtectedRoute>} />
           <Route path="/compare" element={<AppProtectedRoute><Compare /></AppProtectedRoute>} />
           <Route path="/favorites" element={<AppProtectedRoute><Favorites /></AppProtectedRoute>} />
           <Route path="/settings" element={<AppProtectedRoute><Settings /></AppProtectedRoute>} />

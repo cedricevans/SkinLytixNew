@@ -326,7 +326,7 @@ const Settings = () => {
             <div className="flex items-center justify-between">
               <div>
                 <p className="font-medium text-foreground">Product updates</p>
-                <p className="text-sm text-muted-foreground">New features and beta updates.</p>
+                <p className="text-sm text-muted-foreground">New features and product updates.</p>
               </div>
               <Switch
                 checked={productUpdates}

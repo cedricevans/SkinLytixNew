@@ -62,7 +62,7 @@ const Footer = () => {
             © 2025 SkinLytix. Built with open science & real user data.
           </p>
           {showFeedback && (
-            <Button variant="cta" size="sm" onClick={() => navigate("/beta-feedback")}>
+            <Button variant="cta" size="sm" onClick={() => navigate("/feedback")}>
               Feedback
             </Button>
           )}

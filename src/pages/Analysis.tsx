@@ -16,7 +16,6 @@ import { ProfessionalReferralBanner } from "@/components/ProfessionalReferralBan
 // IngredientRiskHeatmap will be lazy-loaded below to reduce initial bundle
 import { ScoreBreakdownAccordion } from "@/components/ScoreBreakdownAccordion";
 import { AIExplanationLoader } from "@/components/AIExplanationLoader";
-import { DemoModeToggle } from "@/components/DemoModeToggle";
 import { ExportAnalysisButton } from "@/components/ExportAnalysisButton";
 import { ExpertReviewBadge } from "@/components/ExpertReviewBadge";
 import ChatPromoCard from "@/components/ChatPromoCard";
@@ -1257,8 +1256,6 @@ const Analysis = () => {
           />
         </Suspense>
 
-        {/* Demo Mode Toggle - Admin Only */}
-        <DemoModeToggle />
       </div>
     </AppShell>
     </TooltipProvider>

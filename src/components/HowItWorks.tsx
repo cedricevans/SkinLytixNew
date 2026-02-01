@@ -86,12 +86,12 @@ const HowItWorks = () => {
           </div>
         </div>
 
-        {/* Beta Notice */}
+        {/* Timing Notice */}
         <div className="mt-10 md:mt-16 max-w-3xl mx-auto">
           <div className="bg-warning/20 border border-warning/30 rounded-xl p-4 md:p-6 text-center">
             <p className="text-sm md:text-base font-subheading text-warning-foreground">
-              <span className="font-bold">Beta Transparency:</span> First-time product entry takes 20-40 seconds. 
-              Once in our database, analysis drops to 5-7 seconds. You're not just using SkinLytix—you're building it with us.
+              <span className="font-bold">Timing Note:</span> First-time product entry takes 20-40 seconds. 
+              Once in our database, analysis drops to 5-7 seconds. Thanks for helping improve accuracy over time.
             </p>
           </div>
         </div>

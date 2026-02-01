@@ -21,16 +21,15 @@ serve(async (req: Request) => {
 
   try {
     // Declare variables for AI response and fallback tracking at the top of the try block
-    let aiData;
     let optimizationData;
     let fallbackLevel = 0;
-    let aiResponse;
     const { routineId } = await req.json();
     console.log('Optimizing routine:', routineId);
 
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-    const lovableApiKey = Deno.env.get('LOVABLE_API_KEY')!;
+    const geminiApiKey = Deno.env.get('GEMINI_API_KEY');
+    const lovableApiKey = Deno.env.get('LOVABLE_API_KEY');
     
     const supabase = createClient(supabaseUrl, supabaseKey);
 
@@ -302,111 +301,95 @@ Format your response as a structured JSON:
   "summary": ""
 }`;
 
-  aiResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${lovableApiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: 'google/gemini-2.5-flash',
-        messages: [
-          { role: 'system', content: 'You are a skincare formulation expert specializing in ingredient analysis and routine optimization.' },
-          { role: 'user', content: aiPrompt }
-        ],
-        response_format: { type: "json_object" }
-      }),
-    });
+    const parseJsonContent = (raw?: string) => {
+      if (!raw) return null;
+      try {
+        return JSON.parse(raw);
+      } catch {
+        return null;
+      }
+    };
 
-    if (!aiResponse.ok) {
-      // Fallback to Gemini 2.5 Flash Lite direct call
-    fallbackLevel = 1;
-      const geminiApiKey = Deno.env.get('GEMINI_API_KEY');
-      if (!geminiApiKey) throw new Error('GEMINI_API_KEY not set');
-      console.warn('Lovable API failed, falling back to Gemini direct:', aiResponse.status);
-    aiResponse = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key=' + geminiApiKey, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          contents: [
-            { role: 'user', parts: [{ text: aiPrompt }] }
-          ],
-          generationConfig: {
-            response_mime_type: 'application/json',
-            temperature: 0.7,
-            maxOutputTokens: 2048
-          }
-        }),
-      });
-      if (!aiResponse.ok) {
-        // Third-level fallback: Gemma model with user comfort message
-    fallbackLevel = 2;
-        console.warn('Gemini Flash Lite failed, falling back to Gemma. Status:', aiResponse.status);
-    aiResponse = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemma-3-4b:generateContent?key=' + geminiApiKey, {
+    const callGemini = async () => {
+      if (!geminiApiKey) return null;
+      const response = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key=${geminiApiKey}`,
+        {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
+          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            contents: [
-              { role: 'user', parts: [{ text: aiPrompt }] }
-            ],
+            contents: [{ role: 'user', parts: [{ text: aiPrompt }] }],
             generationConfig: {
               response_mime_type: 'application/json',
               temperature: 0.7,
               maxOutputTokens: 2048
             }
           }),
-        });
-        if (!aiResponse.ok) {
-          // All models failed: likely out of credits/quota everywhere
-          const errorText = await aiResponse.text();
-          console.error('Gemma fallback failed: ', aiResponse.status, errorText);
-          return new Response(
-            JSON.stringify({
-              error: 'All AI models are currently unavailable due to quota or credit exhaustion. Please try again later or contact support if this persists.'
-            }),
-            { status: 503, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-          );
         }
-        aiData = await aiResponse.json();
-  const content = aiData.candidates?.[0]?.content?.parts?.[0]?.text || aiData.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
-        try {
-          optimizationData = JSON.parse(content);
-        } catch (e) {
-          // If Gemma output is not valid JSON, return a helpful message
-          optimizationData = {
-            summary: "This routine includes active ingredients that need extra review. We’re running a deeper analysis to make sure everything works well together. Some results may need additional verification.",
-            fallback: true
-          };
-        }
-      } else {
-        aiData = await aiResponse.json();
-  const content = aiData.candidates?.[0]?.content?.parts?.[0]?.text || aiData.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
-        try {
-          optimizationData = JSON.parse(content);
-        } catch (e) {
-          optimizationData = {
-            summary: "This routine includes active ingredients that need extra review. We’re running a deeper analysis to make sure everything works well together. Some results may need additional verification.",
-            fallback: true
-          };
-        }
+      );
+
+      if (!response.ok) {
+        const errText = await response.text().catch(() => '');
+        console.warn('Gemini API failed:', response.status, errText);
+        return null;
       }
-    } else {
-      aiData = await aiResponse.json();
-      optimizationData = JSON.parse(aiData.choices[0].message.content);
+
+      const data = await response.json();
+      const content = data?.candidates?.[0]?.content?.parts?.[0]?.text
+        || data?.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data
+        || "";
+      return parseJsonContent(content);
+    };
+
+    const callLovable = async () => {
+      if (!lovableApiKey) return null;
+      const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${lovableApiKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: 'google/gemini-2.5-flash',
+          messages: [
+            { role: 'system', content: 'You are a skincare formulation expert specializing in ingredient analysis and routine optimization.' },
+            { role: 'user', content: aiPrompt }
+          ],
+          response_format: { type: "json_object" }
+        }),
+      });
+
+      if (!response.ok) {
+        const errText = await response.text().catch(() => '');
+        console.warn('Lovable API failed:', response.status, errText);
+        return null;
+      }
+
+      const data = await response.json();
+      const content = data?.choices?.[0]?.message?.content ?? "";
+      return parseJsonContent(content);
+    };
+
+    optimizationData = await callGemini();
+    if (!optimizationData) {
+      fallbackLevel = 1;
+      optimizationData = await callLovable();
+    }
+
+    if (!optimizationData) {
+      return new Response(
+        JSON.stringify({
+          error: 'All AI models are currently unavailable. Please try again later or contact support if this persists.'
+        }),
+        { status: 503, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
     }
 
     // Track which fallback was used
-    // fallbackLevel: 0 = Lovable, 1 = Gemini, 2 = Gemma
+    // fallbackLevel: 0 = Gemini, 1 = Lovable
     optimizationData.fallbackLevel = fallbackLevel;
     if (fallbackLevel > 0) {
-      // Proactively log/flag fallback usage for quota monitoring
-  const fallbackName = fallbackLevel === 1 ? 'Gemini' : 'Gemma';
-      console.warn(`AI fallback triggered: ${fallbackName} used for routineId ${routineId}`);
-      // Optionally: send alert/notification here (e.g., webhook, email, etc.)
+      console.warn(`AI fallback triggered: Lovable used for routineId ${routineId}`);
     }
 
     // Calculate total cost and add metadata

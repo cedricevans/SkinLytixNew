@@ -161,10 +161,15 @@ setInterval(() => CacheManager.cleanup(), 5 * 60 * 1000);
 const CONFIG = {
   OPENROUTER_MODEL: "qwen/qwen3-coder:free",
   MAX_DUPES_TO_RETURN: 5,
-  MAX_DUPES_TO_ENRICH: 3, // Only enrich top 3 with OBF to reduce API calls
+  MAX_DUPES_TO_ENRICH: 3,
   MAX_PROMPT_INGREDIENTS: 40,
-  AI_TIMEOUT: 15000, // 15 seconds
-  OBF_TIMEOUT: 5000, // 5 seconds per OBF call
+  AI_TIMEOUT: 15000,
+
+  OBF_TIMEOUT_FULL: 5000,
+  OBF_TIMEOUT_IMAGE: 2000,
+
+  OBF_PAGE_SIZE_FULL: 3,
+  OBF_PAGE_SIZE_IMAGE: 3,
 };
 
 // ============================================================================
@@ -274,12 +279,17 @@ const Utils = {
   },
 
   createRequestFingerprint(body: any): string {
+    const normIngs = Utils.normalizeIngredientList(Array.isArray(body?.ingredients) ? body.ingredients : []);
+    const ingHash = Utils.stableHash(normIngs.sort().join("|"));
+
     return Utils.stableHash(
       JSON.stringify({
+        sourceProductId: body?.sourceProductId || "",
+        scanKey: body?.scanKey || "",
         productName: body?.productName || "",
         brand: body?.brand || "",
         category: body?.category || "",
-        ingredients: (body?.ingredients || []).slice(0, 20), // Limit to first 20 for fingerprint
+        ingredientsHash: ingHash,
       })
     );
   },
@@ -375,14 +385,17 @@ class AIProvider {
     }
   }
 
-  static async getDupes(params: {
+  static async getDupes(
+    params: {
     productName: string;
     brand: string;
     ingredients: string[];
     category: string;
     skinType: string;
     concerns: string;
-  }): Promise<any[]> {
+    },
+    options: { preferredProvider?: "gemini" | "lovable" | "openrouter" } = {}
+  ): Promise<any[]> {
     const { productName, brand, ingredients, category, skinType, concerns } = params;
 
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
@@ -404,7 +417,7 @@ Return ONLY a JSON array of 12 products.
 
 Each product object MUST include:
 - "name": string
-- "brand": string | null
+- "brand": string
 - "category": string | null
 - "priceEstimate": string | null
 - "highlights": string[] (2-4 short bullets)
@@ -415,7 +428,7 @@ Each product object MUST include:
 - "sharedIngredients": string[] | null
 
 Rules:
-- Do NOT invent brand. Use null if unsure.
+- Brand is REQUIRED. If you are not sure of brand, do not include that product.
 - Do NOT return fake products. Only real products.
 - Keep strings short.
 `.trim();
@@ -435,8 +448,40 @@ Rules:
     const errorLog: string[] = [];
     let aiContent: string | null = null;
 
-    // Try Lovable
-    if (LOVABLE_API_KEY && !aiContent) {
+    const preferred = options.preferredProvider;
+    const tryGemini = async () => {
+      if (!GEMINI_API_KEY || aiContent) return;
+      try {
+        const prompt = `${systemPrompt}\n\n${userPrompt}`;
+        const response = await this.callWithTimeout(
+          fetch(
+            `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key=${GEMINI_API_KEY}`,
+            {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                contents: [{ role: "user", parts: [{ text: prompt }] }],
+                generationConfig: { temperature: 0.7 },
+              }),
+            }
+          ),
+          CONFIG.AI_TIMEOUT
+        );
+
+        if (response.ok) {
+          const data = await response.json();
+          aiContent = data?.candidates?.[0]?.content?.parts?.[0]?.text ?? null;
+        } else {
+          const err = await this.safeReadText(response);
+          errorLog.push(`Gemini ${response.status}: ${err}`);
+        }
+      } catch (e) {
+        errorLog.push(`Gemini error: ${(e as Error)?.message || String(e)}`);
+      }
+    };
+
+    const tryLovable = async () => {
+      if (!LOVABLE_API_KEY || aiContent) return;
       try {
         const response = await this.callWithTimeout(
           fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
@@ -467,41 +512,10 @@ Rules:
       } catch (e) {
         errorLog.push(`Lovable error: ${(e as Error)?.message || String(e)}`);
       }
-    }
+    };
 
-    // Try Gemini
-    if (GEMINI_API_KEY && !aiContent) {
-      try {
-        const prompt = `${systemPrompt}\n\n${userPrompt}`;
-        const response = await this.callWithTimeout(
-          fetch(
-            `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key=${GEMINI_API_KEY}`,
-            {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                contents: [{ role: "user", parts: [{ text: prompt }] }],
-                generationConfig: { temperature: 0.7 },
-              }),
-            }
-          ),
-          CONFIG.AI_TIMEOUT
-        );
-
-        if (response.ok) {
-          const data = await response.json();
-          aiContent = data?.candidates?.[0]?.content?.parts?.[0]?.text ?? null;
-        } else {
-          const err = await this.safeReadText(response);
-          errorLog.push(`Gemini ${response.status}: ${err}`);
-        }
-      } catch (e) {
-        errorLog.push(`Gemini error: ${(e as Error)?.message || String(e)}`);
-      }
-    }
-
-    // Try OpenRouter
-    if (OPENROUTER_API_KEY && !aiContent) {
+    const tryOpenRouter = async () => {
+      if (!OPENROUTER_API_KEY || aiContent) return;
       try {
         const response = await this.callWithTimeout(
           fetch("https://openrouter.ai/api/v1/chat/completions", {
@@ -512,7 +526,8 @@ Rules:
             },
             body: JSON.stringify({
               model: CONFIG.OPENROUTER_MODEL,
-              response_format: { type: "json_object" },
+              // Let the model return a JSON array as requested by the prompt.
+              // response_format removed on purpose.
               messages: [
                 { role: "system", content: systemPrompt },
                 { role: "user", content: userPrompt },
@@ -533,6 +548,20 @@ Rules:
       } catch (e) {
         errorLog.push(`OpenRouter error: ${(e as Error)?.message || String(e)}`);
       }
+    };
+
+    if (preferred === "lovable") {
+      await tryLovable();
+      await tryGemini();
+      await tryOpenRouter();
+    } else if (preferred === "openrouter") {
+      await tryOpenRouter();
+      await tryGemini();
+      await tryLovable();
+    } else {
+      await tryGemini();
+      await tryLovable();
+      await tryOpenRouter();
     }
 
     const dupes = this.parseAIArray(aiContent);
@@ -575,19 +604,34 @@ class OpenBeautyFacts {
 
   private static buildSearchTerms(name: string, brandName?: string): string[] {
     const normalized = Utils.normalizeText(name);
+    const core = this.coreName(name);
+
     const tokens = normalized.split(" ").filter((t) => t.length > 2);
-    const topTokens = tokens.slice(0, 3).join(" ");
     const firstTwo = tokens.slice(0, 2).join(" ");
+    const topTokens = tokens.slice(0, 3).join(" ");
+
     const terms = new Set<string>();
 
     if (brandName) {
       const b = Utils.normalizeText(brandName);
+
+      // Always lead with brand + full name.
       terms.add(`${b} ${normalized}`.trim());
+
+      // Add a core variant so "daily hydration lotion" maps to "hydration lotion".
+      if (core && core !== normalized) terms.add(`${b} ${core}`.trim());
+
+      // Add lighter variants.
       if (topTokens) terms.add(`${b} ${topTokens}`.trim());
       if (firstTwo) terms.add(`${b} ${firstTwo}`.trim());
+
+      // No generic non brand terms when brand exists.
+      return Array.from(terms).filter((t) => t.length > 2);
     }
 
+    // No brand. Fall back to generic terms.
     terms.add(normalized);
+    if (core && core !== normalized) terms.add(core);
     if (topTokens) terms.add(topTokens);
     if (firstTwo) terms.add(firstTwo);
 
@@ -595,7 +639,9 @@ class OpenBeautyFacts {
   }
 
   private static brandTokens(value: string): string[] {
-    return Utils.normalizeText(value).split(" ").filter((t) => t.length > 1);
+    return Utils.normalizeText(value)
+      .split(" ")
+      .filter((t) => t.length > 1);
   }
 
   private static hasAllBrandTokens(candidate: string, expected: string): boolean {
@@ -605,102 +651,264 @@ class OpenBeautyFacts {
     return expectedTokens.every((t) => candidateTokens.has(t));
   }
 
-  private static isBrandMatch(
+  private static readonly STOP_WORDS = new Set([
+    "daily","everyday","day","night","intense","extra","ultimate","advanced",
+    "hydration","hydrating","moisture","moisturizing","moisturiser","moisturizer",
+    "lotion","cream","butter","gel","serum","mist","wash","cleanser",
+    "body","face","hand","feet","foot","skin",
+    "with","and","for","to","of","the","a","an",
+    "spf","uv","broad","spectrum",
+  ]);
+
+  private static coreName(value: string): string {
+    const tokens = Utils.normalizeText(value)
+      .split(" ")
+      .filter((t) => t.length > 2);
+
+    const kept = tokens.filter((t) => !this.STOP_WORDS.has(t));
+    const out = kept.length ? kept : tokens;
+
+    return out.slice(0, 4).join(" ").trim();
+  }
+
+  private static isBrandMatchStrict(
     obfBrand: string | null | undefined,
     obfName: string | null | undefined,
-    dupeBrand: string | null | undefined
+    expectedBrand: string
   ): boolean {
-    if (!obfBrand || !dupeBrand) return false;
-    if (this.hasAllBrandTokens(obfBrand, dupeBrand)) return true;
-    if (obfName && this.hasAllBrandTokens(obfName, dupeBrand)) return true;
+    if (!expectedBrand) return false;
+    if (!obfBrand && !obfName) return false;
+
+    if (obfBrand && this.hasAllBrandTokens(obfBrand, expectedBrand)) return true;
+    if (obfName && this.hasAllBrandTokens(obfName, expectedBrand)) return true;
+
     return false;
   }
 
-  static async lookup(name: string, dupeBrand: string | undefined): Promise<ObfEnriched | null> {
-    const cacheKey = `${name}:${dupeBrand || ""}`;
-    
-    // Check cache
+  private static getCandidateImages(product: any): string[] {
+    const out: string[] = [];
+
+    const front = typeof product?.image_front_url === "string" ? product.image_front_url : "";
+    const main = typeof product?.image_url === "string" ? product.image_url : "";
+    const other = typeof product?.image_small_url === "string" ? product.image_small_url : "";
+
+    for (const u of [front, main, other]) {
+      if (u && !Utils.isPlaceholderImage(u) && !out.includes(u)) out.push(u);
+    }
+
+    return out;
+  }
+
+  private static scoreCandidate(params: {
+    expectedName: string;
+    expectedBrand: string;
+    product: any;
+  }): number {
+    const { expectedName, expectedBrand, product } = params;
+
+    const obfBrand = typeof product?.brands === "string" ? product.brands : "";
+    const obfName = typeof product?.product_name === "string" ? product.product_name : "";
+
+    const images = this.getCandidateImages(product);
+    const hasFront =
+      typeof product?.image_front_url === "string" &&
+      product.image_front_url &&
+      !Utils.isPlaceholderImage(product.image_front_url);
+
+    const nameScore = Utils.computeTokenSimilarity(expectedName, obfName);
+    const brandScore = Utils.computeTokenSimilarity(expectedBrand, obfBrand);
+
+    let score = 0;
+
+    score += nameScore * 2.0;
+    score += brandScore * 1.5;
+
+    if (images.length) score += 1.0;
+    if (hasFront) score += 0.5;
+
+    if (typeof product?.ingredients_text === "string" && product.ingredients_text.trim().length > 10) score += 0.2;
+    if (Array.isArray(product?.ingredients) && product.ingredients.length > 3) score += 0.2;
+
+    return score;
+  }
+
+  private static async fetchCandidates(params: {
+    term: string;
+    timeoutMs: number;
+    pageSize: number;
+  }): Promise<any[]> {
+    const { term, timeoutMs, pageSize } = params;
+
+    const encoded = encodeURIComponent(term);
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+
+    try {
+      const response = await fetch(
+        `https://world.openbeautyfacts.org/cgi/search.pl?search_terms=${encoded}&search_simple=1&action=process&json=1&page_size=${pageSize}`,
+        {
+          headers: { "User-Agent": "SkinLytix/1.0" },
+          signal: controller.signal,
+        }
+      );
+
+      if (!response.ok) return [];
+
+      const data = await response.json();
+      const products = data?.products;
+      if (!Array.isArray(products) || products.length === 0) return [];
+
+      return products;
+    } catch {
+      return [];
+    } finally {
+      clearTimeout(timeoutId);
+    }
+  }
+
+  private static pickBestMatch(params: {
+    products: any[];
+    expectedName: string;
+    expectedBrand: string;
+    requireImage: boolean;
+    strictBrand: boolean;
+  }): any | null {
+    const { products, expectedName, expectedBrand, requireImage, strictBrand } = params;
+
+    let best: any | null = null;
+    let bestScore = -1;
+
+    for (const p of products) {
+      const obfBrand = typeof p?.brands === "string" ? p.brands : null;
+      const obfName = typeof p?.product_name === "string" ? p.product_name : null;
+
+      if (expectedBrand && strictBrand) {
+        if (!this.isBrandMatchStrict(obfBrand, obfName, expectedBrand)) continue;
+      }
+
+      const images = this.getCandidateImages(p);
+      if (requireImage && images.length === 0) continue;
+
+      const s = this.scoreCandidate({ expectedName, expectedBrand, product: p });
+      if (s > bestScore) {
+        bestScore = s;
+        best = p;
+      }
+    }
+
+    return best;
+  }
+
+  static async lookupFull(name: string, expectedBrand: string): Promise<ObfEnriched | null> {
+    const cacheKey = `full:${name}:${expectedBrand}`;
+
     const cached = CacheManager.getOBF(cacheKey);
     if (cached !== undefined) return cached;
 
-    const searchTerms = this.buildSearchTerms(name, dupeBrand);
+    if (!expectedBrand) {
+      CacheManager.setOBF(cacheKey, null);
+      return null;
+    }
 
-    // Only try the first 2 search terms to reduce API calls
-    for (const term of searchTerms.slice(0, 2)) {
-      try {
-        const encoded = encodeURIComponent(term);
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), CONFIG.OBF_TIMEOUT);
+    const searchTerms = this.buildSearchTerms(name, expectedBrand);
 
-        const response = await fetch(
-          `https://world.openbeautyfacts.org/cgi/search.pl?search_terms=${encoded}&search_simple=1&action=process&json=1&page_size=3`,
-          {
-            headers: { "User-Agent": "SkinLytix/1.0" },
-            signal: controller.signal,
-          }
-        );
+    for (const term of searchTerms.slice(0, 4)) {
+      const products = await this.fetchCandidates({
+        term,
+        timeoutMs: CONFIG.OBF_TIMEOUT_FULL,
+        pageSize: CONFIG.OBF_PAGE_SIZE_FULL,
+      });
 
-        clearTimeout(timeoutId);
+      if (!products.length) continue;
 
-        if (!response.ok) continue;
+      const best = this.pickBestMatch({
+        products,
+        expectedName: name,
+        expectedBrand,
+        requireImage: true,
+        strictBrand: true,
+      });
 
-        const data = await response.json();
-        const products = data?.products;
-        if (!Array.isArray(products) || products.length === 0) continue;
+      if (!best) continue;
 
-        // Only check first product to speed up
-        const product = products[0];
-        const obfBrand = product.brands || null;
-        const obfName = product.product_name || null;
+      const images = this.getCandidateImages(best);
+      const imageUrl = images[0] ?? null;
 
-        if (dupeBrand && obfBrand && !this.isBrandMatch(obfBrand, obfName, dupeBrand)) continue;
+      const result: ObfEnriched = {
+        imageUrl,
+        productUrl: typeof best?.url === "string" ? best.url : null,
+        ingredients: this.extractIngredients(best),
+        brand: typeof best?.brands === "string" ? best.brands : null,
+        productName: typeof best?.product_name === "string" ? best.product_name : null,
+        images: images.length ? images : undefined,
+        price: best?.price ?? null,
+        description: best?.description ?? null,
+        generic_name: best?.generic_name ?? null,
+        categories: best?.categories ?? null,
+        barcode: best?.code ?? null,
+        packaging: best?.packaging ?? null,
+        storeLocation:
+          (typeof best?.purchase_places === "string" && best.purchase_places.trim()
+            ? best.purchase_places.trim()
+            : typeof best?.stores === "string" && best.stores.trim()
+              ? best.stores.trim()
+              : null),
+      };
 
-        const imageUrl = product.image_front_url || product.image_url || null;
-        const productUrl = product.url || null;
-        const obfIngredients = this.extractIngredients(product);
+      CacheManager.setOBF(cacheKey, result);
+      return result;
+    }
 
-        const images: string[] = [];
-        if (typeof product.image_front_url === "string") images.push(product.image_front_url);
-        if (typeof product.image_url === "string" && !images.includes(product.image_url)) {
-          images.push(product.image_url);
-        }
+    CacheManager.setOBF(cacheKey, null);
+    return null;
+  }
 
-        const price = product.price ?? null;
-        const description = product.description ?? null;
-        const generic_name = product.generic_name ?? null;
-        const categories = product.categories ?? null;
-        const barcode = product.code ?? null;
-        const packaging = product.packaging ?? null;
+  static async lookupImageOnly(name: string, expectedBrand: string): Promise<ObfEnriched | null> {
+    const cacheKey = `img:${name}:${expectedBrand}`;
 
-        let storeLocation: string | null = null;
-        if (typeof product.purchase_places === "string" && product.purchase_places.trim()) {
-          storeLocation = product.purchase_places.trim();
-        } else if (typeof product.stores === "string" && product.stores.trim()) {
-          storeLocation = product.stores.trim();
-        }
+    const cached = CacheManager.getOBF(cacheKey);
+    if (cached !== undefined) return cached;
 
-        const result: ObfEnriched = {
-          imageUrl,
-          productUrl,
-          ingredients: obfIngredients,
-          brand: obfBrand,
-          productName: obfName,
-          images: images.length ? images : undefined,
-          price,
-          description,
-          generic_name,
-          categories,
-          barcode,
-          packaging,
-          storeLocation,
-        };
+    if (!expectedBrand) {
+      CacheManager.setOBF(cacheKey, null);
+      return null;
+    }
 
-        CacheManager.setOBF(cacheKey, result);
-        return result;
-      } catch (e) {
-        console.warn("OBF lookup error:", e);
-        continue;
-      }
+    const searchTerms = this.buildSearchTerms(name, expectedBrand);
+
+    for (const term of searchTerms.slice(0, 4)) {
+      const products = await this.fetchCandidates({
+        term,
+        timeoutMs: CONFIG.OBF_TIMEOUT_IMAGE,
+        pageSize: CONFIG.OBF_PAGE_SIZE_IMAGE,
+      });
+
+      if (!products.length) continue;
+
+      const best = this.pickBestMatch({
+        products,
+        expectedName: name,
+        expectedBrand,
+        requireImage: true,
+        strictBrand: false,
+      });
+
+      if (!best) continue;
+
+      const images = this.getCandidateImages(best);
+      const imageUrl = images[0] ?? null;
+
+      const result: ObfEnriched = {
+        imageUrl,
+        productUrl: typeof best?.url === "string" ? best.url : null,
+        ingredients: null,
+        brand: typeof best?.brands === "string" ? best.brands : null,
+        productName: typeof best?.product_name === "string" ? best.product_name : null,
+        images: images.length ? images : undefined,
+      };
+
+      CacheManager.setOBF(cacheKey, result);
+      return result;
     }
 
     CacheManager.setOBF(cacheKey, null);
@@ -764,9 +972,11 @@ class DupeProcessor {
         if (!name || typeof name !== "string") return null;
 
         // Only enrich top-scoring dupes
+        const expectedBrand = typeof dupeBrand === "string" ? dupeBrand.trim() : "";
+
         const obf = topIndexes.has(index)
-          ? await OpenBeautyFacts.lookup(name, dupeBrand)
-          : null;
+          ? await OpenBeautyFacts.lookupFull(name, expectedBrand)
+          : await OpenBeautyFacts.lookupImageOnly(name, expectedBrand);
 
         // Determine ingredients priority
         let targetIngredients: string[] | null = null;
@@ -799,9 +1009,6 @@ class DupeProcessor {
 
         if (obf?.imageUrl && !Utils.isPlaceholderImage(obf.imageUrl) && !images.includes(obf.imageUrl)) {
           images.push(obf.imageUrl);
-        }
-        if (dupe?.imageUrl && !Utils.isPlaceholderImage(dupe.imageUrl) && !images.includes(dupe.imageUrl)) {
-          images.push(dupe.imageUrl);
         }
 
         // Extract other fields
@@ -1063,8 +1270,14 @@ serve(async (req: Request): Promise<Response> => {
     const rawBrand = typeof body?.brand === "string" ? body.brand.trim() : "";
     const rawCategory = typeof body?.category === "string" ? body.category.trim() : "";
     const rawSkinType = typeof body?.skinType === "string" ? body.skinType.trim() : "";
-    const rawConcerns = typeof body?.concerns === "string" ? body.concerns.trim() : "";
+    const rawConcerns = Array.isArray(body?.concerns)
+      ? body.concerns.map((x: any) => String(x ?? "").trim()).filter(Boolean).join(", ")
+      : typeof body?.concerns === "string"
+        ? body.concerns.trim()
+        : "";
     const rawIngredients = Array.isArray(body?.ingredients) ? body.ingredients : [];
+    const sourceProductId = typeof body?.sourceProductId === "string" ? body.sourceProductId.trim() : "";
+    const scanKey = typeof body?.scanKey === "string" ? body.scanKey.trim() : "";
 
     const cleanedProductName = Utils.sanitizePromptText(rawProductName);
     const cleanedBrand = Utils.sanitizePromptText(rawBrand);
@@ -1092,6 +1305,8 @@ serve(async (req: Request): Promise<Response> => {
 
     // Create request fingerprint for deduplication
     const requestFingerprint = Utils.createRequestFingerprint({
+      sourceProductId,
+      scanKey,
       productName: productNameForAI,
       brand: cleanedBrand,
       category: cleanedCategory,
@@ -1106,13 +1321,18 @@ serve(async (req: Request): Promise<Response> => {
     }
 
     // Create cache key
+    const normIngs = Utils.normalizeIngredientList(cleanedIngredients);
+    const ingredientsHash = Utils.stableHash(normIngs.sort().join("|"));
+
     const aiCacheKey = JSON.stringify({
+      sourceProductId,
+      scanKey,
       productName: productNameForAI,
       brand: cleanedBrand,
-      ingredients: cleanedIngredients.slice(0, CONFIG.MAX_PROMPT_INGREDIENTS),
       category: cleanedCategory,
       skinType: cleanedSkinType,
       concerns: cleanedConcerns,
+      ingredientsHash,
     });
 
     // Check AI cache
@@ -1133,7 +1353,43 @@ serve(async (req: Request): Promise<Response> => {
         brand: cleanedBrand,
       });
 
-      const uiDupes = UIMapper.mapToUI(processedDupes);
+      let uiDupes = UIMapper.mapToUI(processedDupes);
+      const hasAnyImages = uiDupes.some(
+        (dupe) => (Array.isArray(dupe.images) && dupe.images.length > 0) || dupe.imageUrl
+      );
+
+      if (!hasAnyImages && Deno.env.get("LOVABLE_API_KEY")) {
+        console.warn("Cached dupes missing images. Retrying with Lovable.");
+        const retryDupes = await AIProvider.getDupes(
+          {
+            productName: productNameForAI,
+            brand: cleanedBrand,
+            ingredients: cleanedIngredients,
+            category: cleanedCategory,
+            skinType: cleanedSkinType,
+            concerns: cleanedConcerns,
+          },
+          { preferredProvider: "lovable" }
+        );
+
+        if (retryDupes?.length) {
+          const retryProcessed = await DupeProcessor.process({
+            dupes: retryDupes,
+            sourceIngredients,
+            sourceScentTokens,
+            productName: productNameForAI,
+            brand: cleanedBrand,
+          });
+          const retryUiDupes = UIMapper.mapToUI(retryProcessed);
+          const retryHasImages = retryUiDupes.some(
+            (dupe) => (Array.isArray(dupe.images) && dupe.images.length > 0) || dupe.imageUrl
+          );
+          if (retryHasImages) {
+            uiDupes = retryUiDupes;
+            CacheManager.setAI(aiCacheKey, retryDupes);
+          }
+        }
+      }
 
       let bestMatchId: string | null = null;
       let bestValueId: string | null = null;
@@ -1206,7 +1462,43 @@ serve(async (req: Request): Promise<Response> => {
           brand: cleanedBrand,
         });
 
-        const uiDupes = UIMapper.mapToUI(processedDupes);
+        let uiDupes = UIMapper.mapToUI(processedDupes);
+        const hasAnyImages = uiDupes.some(
+          (dupe) => (Array.isArray(dupe.images) && dupe.images.length > 0) || dupe.imageUrl
+        );
+
+        if (!hasAnyImages && Deno.env.get("LOVABLE_API_KEY")) {
+          console.warn("No dupe images found from primary provider. Retrying with Lovable.");
+          const retryDupes = await AIProvider.getDupes(
+            {
+              productName: productNameForAI,
+              brand: cleanedBrand,
+              ingredients: cleanedIngredients,
+              category: cleanedCategory,
+              skinType: cleanedSkinType,
+              concerns: cleanedConcerns,
+            },
+            { preferredProvider: "lovable" }
+          );
+
+          if (retryDupes?.length) {
+            const retryProcessed = await DupeProcessor.process({
+              dupes: retryDupes,
+              sourceIngredients,
+              sourceScentTokens,
+              productName: productNameForAI,
+              brand: cleanedBrand,
+            });
+            const retryUiDupes = UIMapper.mapToUI(retryProcessed);
+            const retryHasImages = retryUiDupes.some(
+              (dupe) => (Array.isArray(dupe.images) && dupe.images.length > 0) || dupe.imageUrl
+            );
+            if (retryHasImages) {
+              uiDupes = retryUiDupes;
+              CacheManager.setAI(aiCacheKey, retryDupes);
+            }
+          }
+        }
 
         // Calculate summary
         let bestMatchId: string | null = null;

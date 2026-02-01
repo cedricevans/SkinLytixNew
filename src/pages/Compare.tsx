@@ -25,11 +25,13 @@ import { PaywallModal } from "@/components/paywall/PaywallModal";
 import { DupeCard } from "@/components/DupeCard";
 import { toast } from "@/hooks/use-toast";
 import { invokeFunction } from "@/lib/functions-client";
+import noImageFound from "@/assets/no_image_found.png";
 
 const CATEGORY_FILTERS = ["all", "face", "body", "hair", "scalp"];
 const norm = (v) => String(v || "").trim();
 
 const CACHE_TTL_MS = 1000 * 60 * 60 * 24 * 7; // 7 days
+const ANALYSES_CACHE_TTL_MS = 1000 * 60 * 60 * 24 * 2; // 2 days
 
 // ---------- ingredient similarity (My Products Match) ----------
 const normalizeIngredient = (s) =>
@@ -68,17 +70,47 @@ const jaccardScore = (setA, setB) => {
 };
 
 // ---------- normalize dupe payload ----------
+const toUrl = (v) => {
+  if (!v) return null;
+  if (typeof v === "string") return v.trim() || null;
+  if (typeof v === "object") {
+    const u = v.url || v.imageUrl || v.image_url || v.src || v.href;
+    return typeof u === "string" ? (u.trim() || null) : null;
+  }
+  return null;
+};
+
+const uniq = (arr) => Array.from(new Set((arr || []).filter(Boolean)));
+
 const normalizeDupe = (dupe) => {
   if (!dupe) return null;
 
+  const rawImages = Array.isArray(dupe.images) ? dupe.images : [];
+  const rawObfImages = Array.isArray(dupe?.obf?.images) ? dupe.obf.images : [];
+  const rawObfImageUrls = Array.isArray(dupe?.obf?.imageUrls) ? dupe.obf.imageUrls : [];
+
+  const imageUrls = uniq([
+    toUrl(dupe.imageUrl),
+    toUrl(dupe.image_url),
+    ...(Array.isArray(dupe.imageUrls) ? dupe.imageUrls.map(toUrl) : []),
+    ...rawImages.map(toUrl),
+
+    toUrl(dupe?.obf?.imageUrl),
+    ...rawObfImageUrls.map(toUrl),
+    ...rawObfImages.map(toUrl),
+  ]).filter(Boolean);
+
   return {
     id: dupe.id || null,
-    name: dupe.name || "",
-    brand: dupe.brand || null,
-    imageUrl: dupe.imageUrl || null,
-    images: Array.isArray(dupe.images) ? dupe.images : [],
+    name: dupe.name || dupe.productName || dupe.product_name || "",
+    brand: dupe.brand || dupe.brandName || dupe.brand_name || null,
+
+    imageUrl: imageUrls[0] || null,
+    imageUrls,
+    images: imageUrls,
+
     price: dupe.priceEstimate || dupe.price || null,
-    matchPercent: dupe.matchPercent ?? null,
+    matchPercent: dupe.matchPercent ?? dupe.match_percent ?? null,
     description: dupe.description ?? null,
     category: dupe.category ?? null,
     whereToBuy: dupe.whereToBuy ?? null,
@@ -89,7 +121,7 @@ const normalizeDupe = (dupe) => {
     ingredientsCount: dupe.ingredientsCount ?? 0,
     ingredientList: Array.isArray(dupe.ingredientList) ? dupe.ingredientList : [],
     internalLink: dupe.internalLink ?? null,
-    productUrl: dupe.productUrl ?? null,
+    productUrl: dupe.productUrl ?? dupe.url ?? null,
 
     matchedCount: dupe.matchedCount ?? dupe.matchMeta?.matchedCount ?? null,
     sourceCount: dupe.sourceCount ?? dupe.matchMeta?.sourceCount ?? null,
@@ -104,7 +136,7 @@ const savedKeyFor = ({ product_name, brand, source_product_id }) => {
   return `${norm(source_product_id)}::${norm(product_name)}::${norm(brand)}`;
 };
 
-// ---------- local cache ----------
+// ---------- local cache (market dupes) ----------
 const getMarketDupeCacheKey = (userId, productId) => {
   if (!userId || !productId) return null;
   return `sl_market_dupes_${userId}_${productId}`;
@@ -139,7 +171,53 @@ const writeMarketDupeLocalCache = (userId, productId, dupes) => {
   } catch {}
 };
 
-// ---------- Supabase cache ----------
+// ---------- local cache (analyses list for Previous Scans) ----------
+const getAnalysesCacheKey = (userId) => {
+  if (!userId) return null;
+  return `sl_user_analyses_${userId}`;
+};
+
+const readAnalysesLocalCache = (userId) => {
+  const key = getAnalysesCacheKey(userId);
+  if (!key) return null;
+
+  const sources = [() => sessionStorage.getItem(key), () => localStorage.getItem(key)];
+  for (const source of sources) {
+    try {
+      const raw = source();
+      if (!raw) continue;
+      const parsed = JSON.parse(raw);
+      const updatedAt = parsed?.updatedAt || null;
+      const items = Array.isArray(parsed?.items) ? parsed.items : null;
+
+      if (!items?.length) continue;
+
+      const t = updatedAt ? new Date(updatedAt).getTime() : 0;
+      if (!t || !Number.isFinite(t)) return { items, updatedAt: null, fresh: false };
+
+      const fresh = Date.now() - t < ANALYSES_CACHE_TTL_MS;
+      return { items, updatedAt, fresh };
+    } catch {}
+  }
+
+  return null;
+};
+
+const writeAnalysesLocalCache = (userId, items) => {
+  const key = getAnalysesCacheKey(userId);
+  if (!key) return;
+
+  const payload = JSON.stringify({ updatedAt: new Date().toISOString(), items: Array.isArray(items) ? items : [] });
+
+  try {
+    sessionStorage.setItem(key, payload);
+  } catch {}
+  try {
+    localStorage.setItem(key, payload);
+  } catch {}
+};
+
+// ---------- Supabase cache (market dupes) ----------
 const readMarketDupeCloudCache = async (userId, productId) => {
   if (!userId || !productId) return { dupes: null, updatedAt: null };
 
@@ -204,8 +282,8 @@ export default function Compare() {
 
   const [showPaywall, setShowPaywall] = useState(false);
 
-  // default to the user's scanned matches tab
-  const [activeTab, setActiveTab] = useState("myproducts");
+  // default to the OBF dupes tab so users actually see market dupes first
+  const [activeTab, setActiveTab] = useState("market");
   const [categoryFilter, setCategoryFilter] = useState("all");
 
   const [findingDupes, setFindingDupes] = useState(false);
@@ -241,6 +319,12 @@ export default function Compare() {
     if (categoryFilter === "all") return marketDupes;
     return marketDupes.filter((d) => d.category === categoryFilter);
   }, [marketDupes, categoryFilter]);
+
+  const filteredAnalyses = useMemo(() => {
+    if (categoryFilter === "all") return analyses;
+    const cat = categoryFilter.toLowerCase();
+    return analyses.filter((a) => String(a?.category || "").toLowerCase().includes(cat));
+  }, [analyses, categoryFilter]);
 
   const getScoreColor = (score) => {
     if (!score) return "text-muted-foreground";
@@ -321,7 +405,8 @@ export default function Compare() {
     return { hit: false, source: null };
   };
 
-  const findMarketDupes = async ({ force = false, productId }: { force?: boolean; productId?: string } = {}) => {
+  // OBF dupes fetch
+  const findMarketDupes = async ({ force = false, productId } = {}) => {
     const pid = productId || selectedIdRef.current;
     const product = analyses.find((a) => a.id === pid) || null;
 
@@ -330,12 +415,13 @@ export default function Compare() {
     setDupeError(null);
     setFindingDupes(true);
     setDupeProgress(10);
-    setDupeStage("Preparing search");
+    setDupeStage(force ? "Refreshing from OBF" : "Preparing search");
 
     const inflightKey = `${userId}:${pid}`;
     const requestId = `${inflightKey}:${Date.now()}`;
     latestRequestKeyRef.current = requestId;
 
+    // If not forced, allow cache hits (fast)
     if (!force) {
       const local = readMarketDupeLocalCache(userId, pid);
       if (local?.length) {
@@ -398,10 +484,12 @@ export default function Compare() {
         .map((i) => i.trim())
         .filter(Boolean);
 
-      setDupeStage("Searching for dupes");
+      setDupeStage("Searching OBF dupes");
       setDupeProgress(60);
 
       const data = await invokeFunction("find-dupes", {
+        sourceProductId: pid,
+        scanKey: `${userId}:${pid}`,
         productName: product.product_name,
         brand: product.brand,
         ingredients,
@@ -460,10 +548,7 @@ export default function Compare() {
     }
   };
 
-  const selectProduct = async (
-    id,
-    opts: { skipUrl?: boolean; goToMarket?: boolean; scrollTop?: boolean; autoFindDupes?: boolean } = {}
-  ) => {
+  const selectProduct = async (id, opts = {}) => {
     if (!id) return;
 
     selectedIdRef.current = id;
@@ -553,9 +638,28 @@ export default function Compare() {
         const uid = auth.user.id;
         setUserId(uid);
 
+        // 1) Load Previous Scans from local cache first
+        const cached = readAnalysesLocalCache(uid);
+        if (cached?.items?.length) {
+          const uniqueCached = Array.from(new Map(cached.items.map((a) => [a.id, a])).values());
+          setAnalyses(uniqueCached);
+
+          const initialIdFromCache = readUrlSelectedId(uniqueCached);
+          selectedIdRef.current = initialIdFromCache;
+          setSelectedProductId(initialIdFromCache);
+
+          setIsInitializing(false);
+
+          if (initialIdFromCache) {
+            loadCachedDupesForSelection(uid, initialIdFromCache).catch(() => {});
+            loadIngredientsForId(uid, initialIdFromCache).catch(() => {});
+          }
+        }
+
+        // 2) Always refresh from Supabase after (source of truth)
         const { data: analysesData } = await supabase
           .from("user_analyses")
-          .select("id, product_name, brand, epiq_score, product_price, category, analyzed_at")
+          .select("id, product_name, brand, epiq_score, product_price, category, analyzed_at, image_url")
           .eq("user_id", uid)
           .order("analyzed_at", { ascending: false })
           .limit(50);
@@ -564,7 +668,9 @@ export default function Compare() {
 
         const list = Array.isArray(analysesData) ? analysesData : [];
         const unique = Array.from(new Map(list.map((a) => [a.id, a])).values());
+
         setAnalyses(unique);
+        writeAnalysesLocalCache(uid, unique);
 
         const initialId = readUrlSelectedId(unique);
         selectedIdRef.current = initialId;
@@ -681,6 +787,7 @@ export default function Compare() {
             category: a.category,
             epiq_score: a.epiq_score,
             product_price: a.product_price,
+            image_url: a.image_url,
             similarity: score,
             sharedCount,
             sharedSample,
@@ -770,7 +877,7 @@ export default function Compare() {
             <Search className="w-6 h-6 text-primary" />
             Dupe Discovery
           </h1>
-          <p className="text-muted-foreground mt-1">Find lookalike products by ingredient overlap.</p>
+          <p className="text-muted-foreground mt-1">Find market dupes from OBF, then compare against your base scan.</p>
         </div>
 
         {analyses.length < 1 ? (
@@ -816,6 +923,7 @@ export default function Compare() {
                   <Button
                     onClick={async () => {
                       await findMarketDupes({ force: true, productId: selectedIdRef.current });
+                      setActiveTab("market");
                       topRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
                     }}
                     disabled={findingDupes || !selectedProduct}
@@ -829,7 +937,7 @@ export default function Compare() {
                     ) : (
                       <>
                         <Sparkles className="w-4 h-4" />
-                        Refresh results
+                        Refresh from OBF
                       </>
                     )}
                   </Button>
@@ -867,18 +975,19 @@ export default function Compare() {
             </Card>
 
             <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6 w-full">
-              <TabsList className="h-10 items-center justify-center rounded-md bg-muted p-1 text-muted-foreground grid w-full max-w-md grid-cols-2 gap-1 box-border overflow-hidden">
-                <TabsTrigger value="myproducts" className="gap-2 inline-flex items-center justify-center whitespace-nowrap rounded-sm px-3 py-1.5 text-sm font-medium">
-                  <Package className="w-4 h-4" />
-                  Scanned Matches
+              <TabsList className="h-10 items-center justify-center rounded-md bg-muted p-1 text-muted-foreground grid w-full max-w-lg grid-cols-2 gap-1 box-border overflow-hidden">
+                <TabsTrigger value="market" className="gap-2 inline-flex items-center justify-center whitespace-nowrap rounded-sm px-3 py-1.5 text-sm font-medium">
+                  <Sparkles className="w-4 h-4" />
+                  Scanned matches
                 </TabsTrigger>
+
                 <TabsTrigger value="previous" className="gap-2 inline-flex items-center justify-center whitespace-nowrap rounded-sm px-3 py-1.5 text-sm font-medium">
                   <Database className="w-4 h-4" />
-                  Previous Scans
+                  Previous scans
                 </TabsTrigger>
               </TabsList>
 
-              {activeTab === "market" ? (
+              {activeTab === "market" || activeTab === "previous" ? (
                 <div className="flex gap-2 flex-wrap">
                   {CATEGORY_FILTERS.map((cat) => (
                     <Button
@@ -916,11 +1025,11 @@ export default function Compare() {
                     <Card className="border-dashed">
                       <CardContent className="py-3 text-sm text-muted-foreground space-y-1">
                         <div>
-                          Showing market alternatives compared to:{" "}
+                          Showing OBF market dupes compared to:{" "}
                           <span className="text-foreground font-medium">{baseName}</span>
                         </div>
-                        <div>Ingredient match shows overlap with your base product.</div>
-                        <div>Open a card and review the ingredients before you buy.</div>
+                        <div>Match percent is ingredient overlap compared to your base scan.</div>
+                        <div>Open a card and verify ingredients before you buy.</div>
                       </CardContent>
                     </Card>
 
@@ -948,9 +1057,9 @@ export default function Compare() {
                   <Card className="border-dashed">
                     <CardContent className="py-12 text-center">
                       <Sparkles className="w-12 h-12 mx-auto text-muted-foreground/50 mb-4" />
-                      <h3 className="text-lg font-medium mb-2">No results yet</h3>
+                      <h3 className="text-lg font-medium mb-2">No market results yet</h3>
                       <p className="text-muted-foreground text-sm max-w-md mx-auto mb-4">
-                        Pick a base product, then tap Refresh results.
+                        Pick a base product, then tap Refresh from OBF.
                       </p>
                       <Button
                         onClick={async () => {
@@ -958,153 +1067,10 @@ export default function Compare() {
                         }}
                         disabled={findingDupes || !selectedProduct}
                       >
-                        Search dupes
+                        Search OBF dupes
                       </Button>
                     </CardContent>
                   </Card>
-                )}
-              </TabsContent>
-
-              <TabsContent value="myproducts" className="space-y-6">
-                <Card className="border-dashed">
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-base font-medium">What this tab shows</CardTitle>
-                  </CardHeader>
-                  <CardContent className="text-sm text-muted-foreground space-y-2">
-                    <div>
-                      Based on your base product, these are your scanned products with the most similar ingredient lists.
-                    </div>
-                    <div>Ingredient match shows overlap with your base product.</div>
-                    <div>Tap Set as base to compare everything to that product.</div>
-                    <div>Tap Set base and search dupes to search for dupes in the market.</div>
-
-                    <div className="flex gap-2 flex-wrap pt-2">
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => topRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })}
-                      >
-                        Change base product
-                      </Button>
-                      {/* Market dupes are accessible via the Set base and search dupes action. */}
-                    </div>
-                  </CardContent>
-                </Card>
-
-                {analyses.length < 2 ? (
-                  <Card className="border-dashed">
-                    <CardContent className="py-12 text-center">
-                      <Package className="w-12 h-12 mx-auto text-muted-foreground/50 mb-4" />
-                      <p className="text-muted-foreground">Analyze at least 2 products.</p>
-                    </CardContent>
-                  </Card>
-                ) : !selectedProduct ? (
-                  <Card className="border-dashed">
-                    <CardContent className="py-12 text-center">
-                      <AlertTriangle className="w-12 h-12 mx-auto text-muted-foreground/50 mb-4" />
-                      <p className="text-muted-foreground">Pick a base product first.</p>
-                    </CardContent>
-                  </Card>
-                ) : (
-                  <div className="space-y-4">
-                    <Card>
-                      <CardHeader className="pb-2">
-                        <CardTitle className="text-base font-medium">Filters</CardTitle>
-                      </CardHeader>
-                      <CardContent className="flex flex-col md:flex-row gap-3 md:items-center md:justify-between">
-                        <div className="flex gap-2 flex-wrap">
-                          <Button size="sm" variant="outline" onClick={() => setOnlySameCategory((v) => !v)}>
-                            {onlySameCategory ? "Same category" : "All categories"}
-                          </Button>
-                        </div>
-
-                        <div className="flex gap-2 w-full md:w-auto">
-                          <input
-                            value={mySearch}
-                            onChange={(e) => setMySearch(e.target.value)}
-                            placeholder="Search your scans"
-                            className="w-full md:w-[280px] h-10 rounded-md border bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-ring"
-                          />
-                          <Button variant="outline" onClick={() => setMySearch("")} className="whitespace-nowrap">
-                            Clear
-                          </Button>
-                        </div>
-                      </CardContent>
-                    </Card>
-
-                    {myProductMatches.length > 0 ? (
-                      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-                        {myProductMatches.map((m, idx) => {
-                          const k = `${selectedProductId}:${m.id}:${idx}`;
-
-                          return (
-                            <Card key={k} className="overflow-hidden">
-                              <CardHeader className="pb-2">
-                                <CardTitle className="text-sm font-medium truncate">{m.product_name}</CardTitle>
-                                <p className="text-xs text-muted-foreground truncate">{m.brand || "Unknown brand"}</p>
-                              </CardHeader>
-
-                              <CardContent className="space-y-3">
-                                <div className="flex items-center justify-between">
-                                  <Badge variant="secondary" className="text-xs">
-                                    Ingredient match {m.similarity}%
-                                  </Badge>
-                                  <span className="text-xs text-muted-foreground">Shared {m.sharedCount}</span>
-                                </div>
-
-                                <Progress value={m.similarity} className="h-2" />
-
-                                {m.sharedSample?.length ? (
-                                  <div className="flex flex-wrap gap-2">
-                                    {m.sharedSample.slice(0, 6).map((x, i) => (
-                                      <Badge key={`${k}:ing:${i}`} variant="outline" className="text-[10px]">
-                                        {x}
-                                      </Badge>
-                                    ))}
-                                  </div>
-                                ) : null}
-
-                                <div className="flex gap-2 flex-wrap">
-                                  <Button
-                                    size="sm"
-                                    variant="outline"
-                                    onClick={async () => {
-                                      await selectProduct(m.id, { goToMarket: false, scrollTop: true });
-                                      toast({ title: "Base product updated", description: "Now review your matches." });
-                                    }}
-                                  >
-                                    Set as base
-                                  </Button>
-
-                                  <Button
-                                    size="sm"
-                                    onClick={async () => {
-                                      await selectProduct(m.id, {
-                                        goToMarket: true,
-                                        scrollTop: true,
-                                        autoFindDupes: true,
-                                      });
-                                    }}
-                                  >
-                                    Set base and search dupes
-                                  </Button>
-                                </div>
-                              </CardContent>
-                            </Card>
-                          );
-                        })}
-                      </div>
-                    ) : (
-                      <Card className="border-dashed">
-                        <CardContent className="py-12 text-center">
-                          <Package className="w-12 h-12 mx-auto text-muted-foreground/50 mb-4" />
-                          <p className="text-muted-foreground">
-                            No matches yet. Scan more products with full ingredient lists.
-                          </p>
-                        </CardContent>
-                      </Card>
-                    )}
-                  </div>
                 )}
               </TabsContent>
 
@@ -1114,30 +1080,45 @@ export default function Compare() {
                     <CardTitle className="text-base font-medium">Your previous scans</CardTitle>
                   </CardHeader>
                   <CardContent className="text-sm text-muted-foreground space-y-2">
-                    <div>View your recent scanned products and set any as the base product for comparison.</div>
+                    <div>These are your base products you have scanned before.</div>
+                    <div>We load from local cache first, then refresh from the database.</div>
                   </CardContent>
                 </Card>
 
-                {analyses.length === 0 ? (
+                {filteredAnalyses.length === 0 ? (
                   <Card className="border-dashed">
                     <CardContent className="py-12 text-center">
                       <Package className="w-12 h-12 mx-auto text-muted-foreground/50 mb-4" />
-                      <p className="text-muted-foreground">No previous scans yet.</p>
+                      <p className="text-muted-foreground">
+                        {analyses.length === 0 ? "No previous scans yet." : "No scans match this category."}
+                      </p>
                     </CardContent>
                   </Card>
                 ) : (
                   <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-                    {analyses.map((a) => (
+                    {filteredAnalyses.map((a) => (
                       <Card key={a.id} className="overflow-hidden">
                         <CardHeader className="pb-2">
                           <CardTitle className="text-sm font-medium truncate">{a.product_name}</CardTitle>
-                          <p className="text-xs text-muted-foreground truncate">{a.brand || 'Unknown brand'}</p>
+                          <p className="text-xs text-muted-foreground truncate">{a.brand || "Unknown brand"}</p>
                         </CardHeader>
 
                         <CardContent className="space-y-3">
+                          <div className="aspect-square rounded-lg overflow-hidden bg-muted/40">
+                            <img
+                              src={a.image_url || noImageFound}
+                              alt={`${a.product_name} image`}
+                              className={`w-full h-full ${a.image_url ? "object-cover" : "object-contain p-4"}`}
+                              onError={(event) => {
+                                event.currentTarget.src = noImageFound;
+                                event.currentTarget.className = "w-full h-full object-contain p-4";
+                              }}
+                            />
+                          </div>
+
                           <div className="flex items-center justify-between">
-                            <div className="text-sm">EpiQ: {a.epiq_score ?? '—'}</div>
-                            <div className="text-sm text-muted-foreground">{a.category || '—'}</div>
+                            <div className="text-sm">EpiQ: {a.epiq_score ?? "—"}</div>
+                            <div className="text-sm text-muted-foreground">{a.category || "—"}</div>
                           </div>
 
                           <div className="flex gap-2">
@@ -1146,7 +1127,7 @@ export default function Compare() {
                               variant="outline"
                               onClick={async () => {
                                 await selectProduct(a.id, { goToMarket: false, scrollTop: true });
-                                toast({ title: 'Base product updated', description: 'Now review your matches.' });
+                                toast({ title: "Base product updated", description: "Now review your matches." });
                               }}
                             >
                               Set as base

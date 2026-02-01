@@ -11,13 +11,13 @@ const Waitlist = () => {
           {/* Header */}
           <div className="text-center mb-8">
             <div className="inline-flex items-center gap-2 bg-accent/20 text-accent-foreground px-4 py-1.5 rounded-full text-sm font-semibold mb-4">
-              Free Beta - Sign Up Today
+              Sign Up Today
             </div>
             <h2 className="font-heading text-2xl md:text-3xl mb-3 text-primary-foreground">
               Ready to Stop Wasting Money on Skincare?
             </h2>
             <p className="text-primary-foreground/80 text-base max-w-xl mx-auto">
-              Join beauty enthusiasts who analyze before they buy. Start analyzing your products for free - no waiting, no credit card required.
+              Join beauty enthusiasts who analyze before they buy. Start analyzing your products today - no waiting, no credit card required.
             </p>
           </div>
 
@@ -28,10 +28,10 @@ const Waitlist = () => {
               onClick={() => navigate('/auth')}
               className="bg-cta text-cta-foreground px-8 py-3 rounded-full font-semibold transition-all duration-300 hover:opacity-90 hover:shadow-hover text-sm whitespace-nowrap"
             >
-              Get Started Free
+              Get Started
             </button>
             <p className="text-xs text-primary-foreground/60 mt-4">
-              No credit card required - Instant access - Free during beta
+              No credit card required - Instant access
             </p>
             <p className="text-xs text-primary-foreground/60 mt-2">
               Start analyzing with <BrandName /> today.

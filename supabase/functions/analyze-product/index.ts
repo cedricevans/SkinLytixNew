@@ -214,7 +214,8 @@ async function generateIngredientExplanation(
   ingredientName: string,
   category: 'safe' | 'beneficial' | 'problematic' | 'unverified',
   pubchemData: any,
-  lovableApiKey: string
+  geminiApiKey: string | null,
+  lovableApiKey: string | null
 ): Promise<string> {
   try {
     const systemPrompt = `You are an ingredient expert. Explain this skincare ingredient in 4-6 friendly sentences for consumers.
@@ -226,27 +227,56 @@ Keep it conversational, specific, and non-technical. No medical claims. Avoid re
       : 'Limited scientific data available';
     const userMessage = `Explain ${ingredientName} (category: ${category}) for a consumer. ${context}. If the ingredient is a clay, mineral, preservative, or colorant, mention its formulation role (e.g., stability, suspension, texture, oil absorption) in plain language.`;
 
-    const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${lovableApiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: 'google/gemini-2.5-flash',
-        messages: [
-          { role: 'system', content: systemPrompt },
-          { role: 'user', content: userMessage }
-        ],
-        max_tokens: 320,
-        temperature: 0.7,
-      }),
-    });
+    if (geminiApiKey) {
+      const geminiResponse = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key=${geminiApiKey}`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contents: [
+              {
+                role: 'user',
+                parts: [{ text: `${systemPrompt}\n\n${userMessage}` }],
+              },
+            ],
+            generationConfig: { temperature: 0.7, maxOutputTokens: 320 },
+          }),
+        }
+      );
 
-    if (!response.ok) return 'No detailed information available.';
-    
-    const data = await response.json();
-    return data.choices[0].message.content.trim();
+      if (geminiResponse.ok) {
+        const data = await geminiResponse.json();
+        const text = data?.candidates?.[0]?.content?.parts?.[0]?.text ?? '';
+        if (text.trim()) return text.trim();
+      }
+    }
+
+    if (lovableApiKey) {
+      const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${lovableApiKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: 'google/gemini-2.5-flash',
+          messages: [
+            { role: 'system', content: systemPrompt },
+            { role: 'user', content: userMessage }
+          ],
+          max_tokens: 320,
+          temperature: 0.7,
+        }),
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        return data.choices[0].message.content.trim();
+      }
+    }
+
+    return 'No detailed information available.';
   } catch (error) {
     console.error(`Error generating explanation for ${ingredientName}:`, error);
     return 'No detailed information available.';
@@ -263,7 +293,8 @@ async function generateGptExplanation(
     scoreLabel: string;
     recommendations: any;
   },
-  lovableApiKey: string
+  geminiApiKey: string | null,
+  lovableApiKey: string | null
 ): Promise<SkinLytixGptResponse | null> {
   try {
     console.log('Generating GPT explanation for:', analysisData.productName);
@@ -299,39 +330,76 @@ async function generateGptExplanation(
 Analysis Data:
 ${JSON.stringify(formattedAnalysis, null, 2)}`;
 
-    const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${lovableApiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: 'google/gemini-2.5-flash',
-        messages: [
-          { role: 'system', content: SKINLYTIX_SYSTEM_PROMPT },
-          { role: 'user', content: userMessage }
-        ],
-        response_format: { type: "json_object" },
-        temperature: 0.7,
-      }),
-    });
+    let gptContent = "";
 
-    if (!response.ok) {
-      if (response.status === 429) {
-        console.warn('Lovable AI rate limit exceeded - skipping GPT explanation');
-        return null;
+    if (geminiApiKey) {
+      const geminiResponse = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key=${geminiApiKey}`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            system_instruction: {
+              parts: [{ text: SKINLYTIX_SYSTEM_PROMPT }]
+            },
+            contents: [
+              {
+                role: 'user',
+                parts: [{ text: userMessage }]
+              }
+            ],
+            generationConfig: {
+              temperature: 0.7,
+              response_mime_type: 'application/json'
+            }
+          }),
+        }
+      );
+
+      if (geminiResponse.ok) {
+        const data = await geminiResponse.json();
+        gptContent = data?.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
       }
-      if (response.status === 402) {
-        console.warn('Lovable AI credits depleted - skipping GPT explanation');
-        return null;
-      }
-      const errorText = await response.text();
-      console.error('Gemini API error:', response.status, errorText);
-      return null;
     }
 
-    const data = await response.json();
-    const gptContent = data.choices[0].message.content;
+    if (!gptContent && lovableApiKey) {
+      const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${lovableApiKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: 'google/gemini-2.5-flash',
+          messages: [
+            { role: 'system', content: SKINLYTIX_SYSTEM_PROMPT },
+            { role: 'user', content: userMessage }
+          ],
+          response_format: { type: "json_object" },
+          temperature: 0.7,
+        }),
+      });
+
+      if (!response.ok) {
+        if (response.status === 429) {
+          console.warn('Lovable AI rate limit exceeded - skipping GPT explanation');
+          return null;
+        }
+        if (response.status === 402) {
+          console.warn('Lovable AI credits depleted - skipping GPT explanation');
+          return null;
+        }
+        const errorText = await response.text();
+        console.error('Lovable API error:', response.status, errorText);
+        return null;
+      }
+
+      const data = await response.json();
+      gptContent = data.choices[0].message.content;
+    }
+
+    if (!gptContent) return null;
+
     const gptResponse = JSON.parse(gptContent) as SkinLytixGptResponse;
     
     if (!gptResponse.answer_markdown || !gptResponse.summary_one_liner) {
@@ -1519,11 +1587,12 @@ serve(async (req) => {
     );
 
     // Enrich ingredients with AI explanations and PubChem data
+    const geminiApiKey = Deno.env.get('GEMINI_API_KEY');
     const lovableApiKey = Deno.env.get('LOVABLE_API_KEY');
     const maxAiSafeExplanations = 20;
     const maxAiConcernExplanations = 12;
     const shouldUseAiIngredientExplanations =
-      Boolean(lovableApiKey) &&
+      Boolean(geminiApiKey || lovableApiKey) &&
       !skip_ingredient_ai_explanations &&
       !isQuickScan;
     console.log('Starting ingredient enrichment...');
@@ -1657,6 +1726,7 @@ serve(async (req) => {
             ingredientName,
             'safe',
             pubchemData,
+            geminiApiKey,
             lovableApiKey
           );
         }
@@ -1687,6 +1757,7 @@ serve(async (req) => {
             ingredientName,
             'unverified',
             pubchemData,
+            geminiApiKey,
             lovableApiKey
           );
         }
@@ -1781,7 +1852,7 @@ serve(async (req) => {
     // Generate AI explanation using Gemini 2.5 Flash (graceful degradation)
     let aiExplanation: SkinLytixGptResponse | null = null;
 
-    if (lovableApiKey && !skip_ai_explanation && !isQuickScan) {
+    if ((geminiApiKey || lovableApiKey) && !skip_ai_explanation && !isQuickScan) {
       const scoreLabel = epiqScore >= 85 ? 'Low Risk - Excellent' :
                          epiqScore >= 70 ? 'Low Risk - Good' :
                          epiqScore >= 50 ? 'Moderate Risk' :
@@ -1795,9 +1866,9 @@ serve(async (req) => {
         epiqScore,
         scoreLabel,
         recommendations
-      }, lovableApiKey);
+      }, geminiApiKey, lovableApiKey);
     } else {
-      console.warn('LOVABLE_API_KEY not configured - skipping GPT explanation');
+      console.warn('AI keys not configured - skipping GPT explanation');
     }
 
     // Parse AI insights and enrich ingredients with them

@@ -50,7 +50,7 @@ export const PostAnalysisFeedbackCard = () => {
     localStorage.setItem('post_analysis_feedback_dismissed', dismissUntil.toString());
     setIsVisible(false);
     trackEvent({
-      eventName: 'beta_feedback_dismissed',
+      eventName: 'feedback_dismissed',
       eventCategory: 'feedback',
       eventProperties: { location: 'post_analysis_card' }
     });
@@ -58,11 +58,11 @@ export const PostAnalysisFeedbackCard = () => {
 
   const handleShareFeedback = () => {
     trackEvent({
-      eventName: 'beta_feedback_page_viewed',
+      eventName: 'feedback_page_viewed',
       eventCategory: 'feedback',
       eventProperties: { source: 'analysis' }
     });
-    navigate('/beta-feedback');
+    navigate('/feedback');
   };
 
   if (!isVisible) return null;

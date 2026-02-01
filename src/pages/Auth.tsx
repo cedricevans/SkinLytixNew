@@ -7,8 +7,6 @@ import { Card } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { Alert, AlertDescription } from "@/components/ui/alert";
-import { AlertCircle } from "lucide-react";
 import Navigation from "@/components/Navigation";
 import BrandName from "@/components/landing/BrandName";
 
@@ -128,13 +126,6 @@ const Auth = () => {
             Your personal skincare intelligence engine
           </p>
         </div>
-
-        <Alert className="mb-6 border-border bg-muted/40">
-          <AlertCircle className="h-4 w-4 text-muted-foreground" />
-          <AlertDescription className="text-sm">
-            <strong>Beta Notice:</strong> If you forget your password, use the password reset flow to regain access.
-          </AlertDescription>
-        </Alert>
 
         <Tabs defaultValue={defaultTab} className="w-full">
           <TabsList className="grid w-full grid-cols-2">

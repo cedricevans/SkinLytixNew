@@ -12,10 +12,10 @@ import { ArrowLeft, ArrowRight, CheckCircle2, Loader2 } from "lucide-react";
 import { useTracking, trackEvent } from "@/hooks/useTracking";
 import AppShell from "@/components/AppShell";
 
-const BetaFeedback = () => {
+const Feedback = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
-  useTracking('beta-feedback');
+  useTracking('feedback');
   
   const [currentStep, setCurrentStep] = useState(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -109,7 +109,7 @@ const BetaFeedback = () => {
     if (validateStep1()) {
       setCurrentStep(2);
       trackEvent({
-        eventName: 'beta_feedback_step_completed',
+        eventName: 'feedback_step_completed',
         eventCategory: 'feedback',
         eventProperties: { step: 1 }
       });
@@ -143,7 +143,7 @@ const BetaFeedback = () => {
       if (error) throw error;
 
       trackEvent({
-        eventName: 'beta_feedback_submitted',
+        eventName: 'feedback_submitted',
         eventCategory: 'feedback',
         eventProperties: {
           hasEmail: !!userEmail,
@@ -205,7 +205,7 @@ const BetaFeedback = () => {
           <div className="flex items-center justify-between mb-2">
             <h1 className="text-3xl font-bold">Help Us Build SkinLytix With You</h1>
             <span className="text-sm bg-primary/10 text-primary px-3 py-1 rounded-full">
-              Beta Feedback – v1
+              Feedback – v1
             </span>
           </div>
           <p className="text-muted-foreground">
@@ -392,7 +392,7 @@ const BetaFeedback = () => {
 
             <div className="space-y-3">
               <Label className="text-base font-semibold">
-                Once the beta ends, would you be willing to pay for SkinLytix? *
+                Would you be willing to pay for SkinLytix? *
               </Label>
               <RadioGroup value={pmfWillingToPay} onValueChange={setPmfWillingToPay}>
                 {["Yes", "Maybe", "No"].map((option) => (
@@ -483,4 +483,4 @@ const BetaFeedback = () => {
   );
 };
 
-export default BetaFeedback;
+export default Feedback;

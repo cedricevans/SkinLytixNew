@@ -13,7 +13,6 @@ import { Input } from "@/components/ui/input";
 import { Droplets, Wind, Flame, Shield, Sparkles, Home, ArrowLeft, User, TrendingUp, Calendar, DollarSign, Edit2, ChevronDown, ScanLine, Plus, History, Search, Info, MessageSquare, Crown, Trash2 } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { useTracking, trackEvent } from "@/hooks/useTracking";
-import { DemoModeToggle } from "@/components/DemoModeToggle";
 import { TrialBanner } from "@/components/subscription";
 import AppShell from "@/components/AppShell";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
@@ -730,7 +729,7 @@ const Profile = () => {
 
               <button
                 type="button"
-                onClick={() => navigate("/beta-feedback")}
+                onClick={() => navigate("/feedback")}
                 className="text-left w-full"
               >
                 <Card className="p-6 bg-gradient-to-br from-primary/5 to-accent/5 border-primary/20 transition hover:border-primary/40 hover:bg-primary/10 cursor-pointer">
@@ -949,7 +948,7 @@ const Profile = () => {
                   <p className="text-sm text-muted-foreground mb-3">
                     Your voice helps shape SkinLytix. Tell us what's working, what's not, and what you wish existed.
                   </p>
-                  <Button onClick={() => navigate('/beta-feedback')}>
+                  <Button onClick={() => navigate('/feedback')}>
                     Give Feedback
                   </Button>
                 </div>
@@ -1332,8 +1331,6 @@ const Profile = () => {
         </AlertDialog>
       </div>
 
-      {/* Demo Mode Toggle - Admin Only */}
-      <DemoModeToggle />
     </AppShell>
   );
 };

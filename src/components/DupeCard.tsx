@@ -1,5 +1,5 @@
 // DupeCard.jsx
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { Heart, ChevronDown, ChevronUp, ShieldAlert, Info } from "lucide-react";
@@ -14,12 +14,75 @@ const toTitle = (v) =>
     .replace(/\s+/g, " ")
     .trim();
 
-const pickFirstImage = (dupe) => {
-  if (dupe?.imageUrl) return dupe.imageUrl;
-  if (Array.isArray(dupe?.images) && dupe.images[0]) return dupe.images[0];
-  if (dupe?.obf?.imageUrl) return dupe.obf.imageUrl;
-  if (Array.isArray(dupe?.obf?.images) && dupe.obf.images[0]) return dupe.obf.images[0];
+const toUrl = (v) => {
+  if (!v) return null;
+  if (typeof v === "string") return v.trim() || null;
+  if (typeof v === "object") {
+    const u = v.url || v.imageUrl || v.image_url || v.src || v.href;
+    return typeof u === "string" ? (u.trim() || null) : null;
+  }
   return null;
+};
+
+const scoreRetailer = (url) => {
+  const u = String(url || "").toLowerCase();
+  if (u.includes("sephora")) return 90;
+  if (u.includes("ulta")) return 85;
+  if (u.includes("target")) return 80;
+  if (u.includes("walmart")) return 78;
+  if (u.includes("amazon")) return 70;
+  return 50;
+};
+
+const slugify = (s) =>
+  String(s || "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+
+const scoreBrandNameInUrl = (url, brand, name) => {
+  const u = String(url || "").toLowerCase();
+  const b = slugify(brand);
+  const n = slugify(name);
+
+  let score = 0;
+
+  if (b) {
+    const btoks = b.split(" ").filter(Boolean).slice(0, 2);
+    if (btoks.some((t) => u.includes(t))) score += 20;
+  }
+
+  if (n) {
+    const ntoks = n.split(" ").filter(Boolean).slice(0, 3);
+    const hit = ntoks.filter((t) => u.includes(t)).length;
+    score += Math.min(15, hit * 5);
+  }
+
+  return score;
+};
+
+const buildImageCandidates = (dupe) => {
+  const brand = deriveBrand(dupe);
+  const name = deriveName(dupe);
+
+  const candidates = uniq([
+    toUrl(dupe?.imageUrl),
+    toUrl(dupe?.image_url),
+    ...(Array.isArray(dupe?.imageUrls) ? dupe.imageUrls.map(toUrl) : []),
+    ...(Array.isArray(dupe?.images) ? dupe.images.map(toUrl) : []),
+
+    toUrl(dupe?.obf?.imageUrl),
+    ...(Array.isArray(dupe?.obf?.imageUrls) ? dupe.obf.imageUrls.map(toUrl) : []),
+    ...(Array.isArray(dupe?.obf?.images) ? dupe.obf.images.map(toUrl) : []),
+  ]).filter(Boolean);
+
+  return candidates
+    .map((u) => ({
+      u,
+      s: scoreRetailer(u) + scoreBrandNameInUrl(u, brand, name),
+    }))
+    .sort((a, b) => b.s - a.s)
+    .map((x) => x.u);
 };
 
 const detectFlagsFromIngredients = (ingredients) => {
@@ -128,14 +191,22 @@ export const DupeCard = ({
   badges = {},
 }) => {
   const [expanded, setExpanded] = useState(defaultExpanded);
-  const [imageError, setImageError] = useState(false);
   const [imageLoaded, setImageLoaded] = useState(false);
-
-  const displayImageRaw = pickFirstImage(dupe);
-  const displayImage = !imageError && displayImageRaw ? displayImageRaw : noImageFound;
+  const [imgIdx, setImgIdx] = useState(0);
 
   const brand = deriveBrand(dupe);
   const name = deriveName(dupe);
+
+  const imageCandidates = useMemo(() => buildImageCandidates(dupe), [dupe]);
+
+  useEffect(() => {
+    setImgIdx(0);
+    setImageLoaded(false);
+  }, [dupe]);
+
+  const displayImageRaw = imageCandidates[imgIdx] || null;
+  const displayImage = displayImageRaw || noImageFound;
+  const showSkeleton = !imageLoaded && Boolean(displayImageRaw);
 
   const priceText = dupe?.priceEstimate || dupe?.price || "Price unavailable";
   const categoryText = dupe?.category || dupe?.obf?.categories || "Moisturizer";
@@ -171,20 +242,35 @@ export const DupeCard = ({
     const matchedCount = dupe?.matchedCount ?? dupe?.matchMeta?.matchedCount ?? null;
     const sourceCount = dupe?.sourceCount ?? dupe?.matchMeta?.sourceCount ?? null;
 
-    return [
-      { label: "Description", value: dupe?.description || dupe?.obf?.generic_name || "Not provided" },
-      { label: "Store", value: dupe?.storeLocation || dupe?.obf?.storeLocation || "Not provided" },
-      { label: "Where to buy", value: dupe?.whereToBuy || dupe?.obf?.whereToBuy || "Not provided" },
+    const rows = [
+      { label: "Description", value: dupe?.description || dupe?.obf?.generic_name || null },
+      { label: "Store", value: dupe?.storeLocation || dupe?.obf?.storeLocation || null },
+      { label: "Where to buy", value: dupe?.whereToBuy || dupe?.obf?.whereToBuy || null },
       {
         label: "Ingredient match",
-        value: matchedCount && sourceCount ? `${matchedCount} of ${sourceCount}` : "Not provided",
+        value: matchedCount && sourceCount ? `${matchedCount} of ${sourceCount}` : null,
       },
-      { label: "Match score", value: formatScore(dupe?.matchScore) },
-      { label: "Name score", value: formatScore(dupe?.nameScore) },
-      { label: "Brand score", value: formatScore(dupe?.brandScore) },
-      { label: "Scent score", value: formatScore(dupe?.scentScore) },
-      { label: "Composite score", value: formatScore(dupe?.compositeScore) },
+      { label: "Match score", value: dupe?.matchScore ?? null },
+      { label: "Name score", value: dupe?.nameScore ?? null },
+      { label: "Brand score", value: dupe?.brandScore ?? null },
+      { label: "Scent score", value: dupe?.scentScore ?? null },
+      { label: "Composite score", value: dupe?.compositeScore ?? null },
     ];
+
+    const clean = (v) => {
+      if (v === null || v === undefined) return null;
+      const s = String(v).trim();
+      if (!s) return null;
+      if (s.toLowerCase() === "not provided") return null;
+      if (s.toLowerCase() === "n/a") return null;
+      return s;
+    };
+
+    const filtered = rows
+      .map((r) => ({ ...r, value: clean(r.value) }))
+      .filter((r) => r.value);
+
+    return filtered.length ? filtered : [{ label: "Details", value: "Limited data returned for this item" }];
   }, [dupe]);
 
   return (
@@ -219,17 +305,28 @@ export const DupeCard = ({
       </div>
 
       <div className="aspect-square bg-muted/30 relative">
-        {!imageLoaded && !imageError && <div className="absolute inset-0 animate-pulse bg-muted" />}
+        {showSkeleton && <div className="absolute inset-0 animate-pulse bg-muted" />}
+
         <img
           src={displayImage}
           alt={`${brand} ${name}`}
           className={cn(
             "w-full h-full transition-all",
             displayImage === noImageFound ? "object-contain p-6" : "object-cover",
-            imageLoaded ? "opacity-100" : "opacity-0"
+            imageLoaded || !displayImageRaw ? "opacity-100" : "opacity-0"
           )}
           onLoad={() => setImageLoaded(true)}
-          onError={() => setImageError(true)}
+          onError={() => {
+            // silently try next candidate
+            if (imgIdx < imageCandidates.length - 1) {
+              setImgIdx((v) => v + 1);
+              return;
+            }
+
+            // fall back
+            setImgIdx(imageCandidates.length);
+            setImageLoaded(true);
+          }}
         />
       </div>
 

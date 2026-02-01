@@ -87,8 +87,8 @@ const HowItWorks = ({ id }: HowItWorksProps) => {
           ))}
         </div>
         <div className="max-w-4xl mx-auto bg-primary-foreground/10 border border-primary-foreground/20 rounded-xl p-6 text-center text-sm text-primary-foreground/80">
-          Beta Transparency: First-time product entry takes 20-40 seconds. Once in our database, analysis drops to 5-7 seconds.
-          You're not just using <BrandName /> - you're building it with us.
+          Timing Note: First-time product entry takes 20-40 seconds. Once in our database, analysis drops to 5-7 seconds.
+          Thanks for helping improve <BrandName /> over time.
         </div>
       </div>
     </section>

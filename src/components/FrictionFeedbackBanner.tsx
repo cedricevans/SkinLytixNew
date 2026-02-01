@@ -16,17 +16,17 @@ export const FrictionFeedbackBanner = ({ trigger, context }: FrictionFeedbackBan
 
   const handleShareFeedback = () => {
     trackEvent({
-      eventName: 'beta_feedback_page_viewed',
+      eventName: 'feedback_page_viewed',
       eventCategory: 'feedback',
       eventProperties: { source: 'friction', trigger, context }
     });
-    navigate('/beta-feedback');
+    navigate('/feedback');
   };
 
   const handleDismiss = () => {
     setIsVisible(false);
     trackEvent({
-      eventName: 'beta_feedback_dismissed',
+      eventName: 'feedback_dismissed',
       eventCategory: 'feedback',
       eventProperties: { location: 'friction_banner', trigger }
     });

@@ -146,12 +146,11 @@ RESPONSE FORMAT:
 - Reference specific ingredients/data from the analysis
 - If you mention professional referral, start response with "⚕️ REFERRAL:" so it can be detected`;
 
+    const GEMINI_API_KEY = Deno.env.get('GEMINI_API_KEY');
     const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
-    if (!LOVABLE_API_KEY) {
-      throw new Error('LOVABLE_API_KEY not configured');
+    if (!GEMINI_API_KEY && !LOVABLE_API_KEY) {
+      throw new Error('No AI keys configured');
     }
-
-    console.log('Calling AI Gateway with', messages.length, 'messages');
 
     // Save user message if we have a conversation
     const userMessage = messages[messages.length - 1];
@@ -183,37 +182,180 @@ RESPONSE FORMAT:
       });
     }
 
-    const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${LOVABLE_API_KEY}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: 'google/gemini-2.5-flash',
-        messages: [
-          { role: 'system', content: systemPrompt },
-          ...messages
-        ],
-        stream: true,
-      }),
-    });
+    const saveAssistantMessage = async (assistantResponse: string) => {
+      console.log('🔄 SAVE: Checking save conditions...', {
+        hasConversationId: !!currentConversationId,
+        conversationId: currentConversationId,
+        hasResponse: !!assistantResponse,
+        responseLength: assistantResponse.length,
+        responsePreview: assistantResponse.substring(0, 100)
+      });
 
-    if (!response.ok) {
-      console.error('AI Gateway error:', response.status, response.statusText);
-      if (response.status === 429) {
+      if (!currentConversationId || !assistantResponse) {
+        console.warn('⚠️ SAVE: Missing conversation or response, skipping save');
+        return;
+      }
+
+      try {
+        console.log('💾 SAVE: Inserting assistant message to database...', {
+          conversationId: currentConversationId,
+          contentLength: assistantResponse.length
+        });
+
+        const { data: messageData, error: messageError } = await supabase
+          .from('chat_messages')
+          .insert({
+            conversation_id: currentConversationId,
+            role: 'assistant',
+            content: assistantResponse,
+            metadata: {}
+          })
+          .select();
+
+        if (messageError) {
+          console.error('❌ SAVE: Failed to save assistant message:', messageError);
+          throw messageError;
+        }
+
+        console.log('✅ SAVE: Assistant message saved successfully:', {
+          messageId: messageData?.[0]?.id,
+          conversationId: currentConversationId
+        });
+
+        console.log('🕒 SAVE: Updating conversation timestamp...');
+        const { error: updateError } = await supabase
+          .from('chat_conversations')
+          .update({ updated_at: new Date().toISOString() })
+          .eq('id', currentConversationId);
+
+        if (updateError) {
+          console.error('❌ SAVE: Failed to update conversation timestamp:', updateError);
+        } else {
+          console.log('✅ SAVE: Conversation timestamp updated successfully');
+        }
+      } catch (error) {
+        console.error('❌ SAVE: Error during database save:', error);
+        console.error('❌ SAVE: Error details:', {
+          error: error instanceof Error ? error.message : String(error),
+          conversationId: currentConversationId,
+          responseLength: assistantResponse.length
+        });
+      }
+    };
+
+    const streamFromContent = async (assistantContent: string) => {
+      await saveAssistantMessage(assistantContent);
+      const encoder = new TextEncoder();
+      const stream = new ReadableStream({
+        start(controller) {
+          const payload = JSON.stringify({
+            choices: [{ delta: { content: assistantContent } }]
+          });
+          controller.enqueue(encoder.encode(`data: ${payload}\n\n`));
+          controller.enqueue(encoder.encode(`data: [DONE]\n\n`));
+          controller.close();
+        }
+      });
+
+      return new Response(stream, {
+        headers: {
+          ...corsHeaders,
+          'Content-Type': 'text/event-stream',
+          'X-Conversation-Id': currentConversationId || '',
+        },
+      });
+    };
+
+    const callGeminiDirect = async (): Promise<Response | null> => {
+      if (!GEMINI_API_KEY) return null;
+      console.log('Calling Gemini direct with', messages.length, 'messages');
+
+      const geminiMessages = messages.map((m: { role: string; content: string }) => ({
+        role: m.role === 'assistant' ? 'model' : 'user',
+        parts: [{ text: m.content }]
+      }));
+
+      const geminiResponse = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key=${GEMINI_API_KEY}`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            system_instruction: {
+              parts: [{ text: systemPrompt }]
+            },
+            contents: geminiMessages
+          }),
+        }
+      );
+
+      if (!geminiResponse.ok) {
+        const errText = await geminiResponse.text().catch(() => '');
+        console.error('Gemini direct error:', geminiResponse.status, errText);
+        return null;
+      }
+
+      const geminiData = await geminiResponse.json();
+      const assistantContent = geminiData?.candidates?.[0]?.content?.parts
+        ?.map((p: { text?: string }) => p?.text || '')
+        .join('') || '';
+
+      if (!assistantContent) {
+        return null;
+      }
+
+      return await streamFromContent(assistantContent);
+    };
+
+    const callLovable = async (): Promise<Response | null> => {
+      if (!LOVABLE_API_KEY) return null;
+      console.log('Calling Lovable gateway with', messages.length, 'messages');
+      try {
+        return await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${LOVABLE_API_KEY}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            model: 'google/gemini-2.5-flash',
+            messages: [
+              { role: 'system', content: systemPrompt },
+              ...messages
+            ],
+            stream: true,
+          }),
+        });
+      } catch (error) {
+        console.error('Lovable request failed:', error);
+        return null;
+      }
+    };
+
+    const geminiStream = await callGeminiDirect();
+    if (geminiStream) {
+      return geminiStream;
+    }
+
+    const response = await callLovable();
+
+    if (!response || !response.ok || !response.body) {
+      if (response) {
+        console.error('AI Gateway error:', response.status, response.statusText);
+      }
+      if (response?.status === 429) {
         return new Response(JSON.stringify({ error: 'Rate limit exceeded. Please try again in a moment.' }), {
           status: 429,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
       }
-      if (response.status === 402) {
+      if (response?.status === 402) {
         return new Response(JSON.stringify({ error: 'AI credits depleted. Please add credits to continue.' }), {
           status: 402,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
       }
-      throw new Error(`AI Gateway error: ${response.status}`);
+      throw new Error(`AI Gateway error: ${response?.status || 'unknown'}`);
     }
 
     console.log('Streaming response back to client');
@@ -239,80 +381,11 @@ RESPONSE FORMAT:
         controller.enqueue(chunk);
       },
       async flush() {
-        // Save assistant message after stream completes
-        console.log('🔄 FLUSH: Stream completed, checking save conditions...', {
-          hasConversationId: !!currentConversationId,
-          conversationId: currentConversationId,
-          hasResponse: !!assistantResponse,
-          responseLength: assistantResponse.length,
-          responsePreview: assistantResponse.substring(0, 100)
-        });
-
-        if (!currentConversationId) {
-          console.warn('⚠️ FLUSH: No conversation ID, skipping database save');
-          return;
-        }
-
-        if (!assistantResponse) {
-          console.warn('⚠️ FLUSH: No assistant response captured, skipping database save');
-          return;
-        }
-
-        try {
-          // Save assistant message
-          console.log('💾 FLUSH: Inserting assistant message to database...', {
-            conversationId: currentConversationId,
-            contentLength: assistantResponse.length
-          });
-
-          const { data: messageData, error: messageError } = await supabase
-            .from('chat_messages')
-            .insert({
-              conversation_id: currentConversationId,
-              role: 'assistant',
-              content: assistantResponse,
-              metadata: {}
-            })
-            .select();
-
-          if (messageError) {
-            console.error('❌ FLUSH: Failed to save assistant message:', messageError);
-            throw messageError;
-          }
-
-          console.log('✅ FLUSH: Assistant message saved successfully:', {
-            messageId: messageData?.[0]?.id,
-            conversationId: currentConversationId
-          });
-
-          // Update conversation timestamp
-          console.log('🕒 FLUSH: Updating conversation timestamp...');
-          
-          const { error: updateError } = await supabase
-            .from('chat_conversations')
-            .update({ updated_at: new Date().toISOString() })
-            .eq('id', currentConversationId);
-
-          if (updateError) {
-            console.error('❌ FLUSH: Failed to update conversation timestamp:', updateError);
-          } else {
-            console.log('✅ FLUSH: Conversation timestamp updated successfully');
-          }
-
-          console.log('✨ FLUSH: Database save operations completed successfully');
-
-        } catch (error) {
-          console.error('❌ FLUSH: Error during database save:', error);
-          console.error('❌ FLUSH: Error details:', {
-            error: error instanceof Error ? error.message : String(error),
-            conversationId: currentConversationId,
-            responseLength: assistantResponse.length
-          });
-        }
+        await saveAssistantMessage(assistantResponse);
       }
     });
 
-    response.body?.pipeTo(writable);
+    response.body.pipeTo(writable);
 
     return new Response(readable, {
       headers: {

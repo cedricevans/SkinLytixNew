@@ -29,7 +29,6 @@ const FEATURE_ACCESS: Record<Feature, SubscriptionTier[]> = {
 interface SubscriptionState {
   tier: SubscriptionTier;
   isAdmin: boolean;
-  demoModeTier: SubscriptionTier | null;
   isLoading: boolean;
   trialEndsAt: Date | null;
   isInTrial: boolean;
@@ -40,7 +39,6 @@ export function useSubscription() {
   const [state, setState] = useState<SubscriptionState>({
     tier: 'free',
     isAdmin: false,
-    demoModeTier: null,
     isLoading: true,
     trialEndsAt: null,
     isInTrial: false,
@@ -69,7 +67,7 @@ export function useSubscription() {
       // Get profile with subscription info
       const { data: profile } = await supabase
         .from('profiles')
-        .select('subscription_tier, demo_mode_tier, trial_ends_at')
+        .select('subscription_tier, trial_ends_at')
         .eq('id', user.id)
         .single();
 
@@ -79,7 +77,6 @@ export function useSubscription() {
       setState({
         tier: (profile?.subscription_tier as SubscriptionTier) || 'free',
         isAdmin,
-        demoModeTier: profile?.demo_mode_tier as SubscriptionTier | null,
         isLoading: false,
         trialEndsAt,
         isInTrial,
@@ -125,11 +122,6 @@ export function useSubscription() {
 
   // Get effective tier (considers admin bypass and demo mode)
   const getEffectiveTier = (): SubscriptionTier => {
-    // Admin in demo mode: use demo tier
-    if (state.isAdmin && state.demoModeTier) {
-      return state.demoModeTier;
-    }
-    
     // Admin NOT in demo mode: full Pro access
     if (state.isAdmin) {
       return 'pro';
@@ -151,26 +143,10 @@ export function useSubscription() {
     return allowedTiers.includes(effectiveTier);
   };
 
-  // Set demo mode tier (admin only)
-  const setDemoMode = async (tier: SubscriptionTier | null) => {
-    if (!state.isAdmin) return;
-
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return;
-
-    await supabase
-      .from('profiles')
-      .update({ demo_mode_tier: tier })
-      .eq('id', user.id);
-
-    setState(prev => ({ ...prev, demoModeTier: tier }));
-  };
-
   return {
     ...state,
     effectiveTier: getEffectiveTier(),
     canAccess,
-    setDemoMode,
     refresh: loadSubscriptionStatus,
   };
 }

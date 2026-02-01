@@ -95,36 +95,6 @@ ${items.map((item) => `- ${item.name} (role: ${item.role}) ${item.context}` ).jo
     return mapped;
   };
 
-  if (lovableApiKey) {
-    try {
-      const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${lovableApiKey}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          model: "google/gemini-2.5-flash-lite",
-          messages: [
-            { role: "system", content: systemPrompt },
-            { role: "user", content: userMessage },
-          ],
-          max_tokens: 600,
-          temperature: 0.3,
-        }),
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        const content = data?.choices?.[0]?.message?.content ?? "";
-        const parsed = parseResponse(content);
-        if (parsed) return parsed;
-      }
-    } catch (error) {
-      console.error("Lovable batch explanation error:", error);
-    }
-  }
-
   if (geminiApiKey) {
     try {
       const response = await fetch(
@@ -158,6 +128,36 @@ ${items.map((item) => `- ${item.name} (role: ${item.role}) ${item.context}` ).jo
       }
     } catch (error) {
       console.error("Gemini batch explanation error:", error);
+    }
+  }
+
+  if (lovableApiKey) {
+    try {
+      const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${lovableApiKey}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          model: "google/gemini-2.5-flash-lite",
+          messages: [
+            { role: "system", content: systemPrompt },
+            { role: "user", content: userMessage },
+          ],
+          max_tokens: 600,
+          temperature: 0.3,
+        }),
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        const content = data?.choices?.[0]?.message?.content ?? "";
+        const parsed = parseResponse(content);
+        if (parsed) return parsed;
+      }
+    } catch (error) {
+      console.error("Lovable batch explanation error:", error);
     }
   }
 
@@ -284,7 +284,7 @@ serve(async (req) => {
           normalized_name: ingredient.normalized,
           role,
           explanation,
-          source: knowledge?.description ? "knowledge" : lovableApiKey ? "ai" : "fallback",
+          source: knowledge?.description ? "knowledge" : (lovableApiKey || geminiApiKey) ? "ai" : "fallback",
           updated_at: new Date().toISOString(),
         };
       });

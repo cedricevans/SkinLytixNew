@@ -555,7 +555,10 @@ const Upload = () => {
 
       if (error) throw error;
 
-      const aiIngredients = (data?.ingredients || "").trim();
+      const aiIngredientsRaw = Array.isArray(data?.ingredients)
+        ? data.ingredients.join(", ")
+        : String(data?.ingredients ?? "");
+      const aiIngredients = aiIngredientsRaw.trim();
       const aiLooksBad =
         !aiIngredients ||
         aiIngredients.length < 40 ||
@@ -566,8 +569,9 @@ const Upload = () => {
 
       setIngredientsList(aiIngredients);
       if (data?.brand) setBrand(data.brand);
-      if (data?.category) setCategory(data.category);
+      if (data?.product_name) setProductName(data.product_name);
       if (data?.productName) setProductName(data.productName);
+      if (data?.category) setCategory(data.category);
 
       setOcrProgress(100);
       toast({

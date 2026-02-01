@@ -17,7 +17,7 @@ const CTASection = () => {
         <div className="inline-flex items-center gap-2 px-4 py-2 bg-primary-foreground/20 rounded-full mb-6 animate-fade-in-up">
           <Sparkles className="w-4 h-4 text-primary-foreground" />
           <span className="text-sm font-subheading font-medium text-primary-foreground">
-            Free Beta - Sign Up Today
+            Sign Up Today
           </span>
         </div>
 
@@ -26,7 +26,7 @@ const CTASection = () => {
         </h2>
 
         <p className="text-lg md:text-xl font-subheading text-primary-foreground/90 mb-8 md:mb-10 animate-fade-in-up" style={{ animationDelay: "0.2s" }}>
-          Join beauty enthusiasts who analyze before they buy. Start analyzing your products for free—no waiting, no credit card required.
+          Join beauty enthusiasts who analyze before they buy. Start analyzing your products today—no waiting, no credit card required.
         </p>
 
         <div className="flex justify-center items-center animate-fade-in-up" style={{ animationDelay: "0.3s" }}>
@@ -36,13 +36,13 @@ const CTASection = () => {
             className="touch-target text-base px-8 py-5 md:py-6 h-auto w-full sm:w-auto bg-cta hover:bg-cta/90"
             onClick={() => navigate('/auth')}
           >
-            Get Started Free
+            Get Started
             <ArrowRight className="ml-2 w-5 h-5" />
           </Button>
         </div>
 
         <p className="mt-8 text-sm font-body text-primary-foreground/70 animate-fade-in-up" style={{ animationDelay: "0.4s" }}>
-          No credit card required • Instant access • Free during beta
+          No credit card required • Instant access
         </p>
       </div>
     </section>
