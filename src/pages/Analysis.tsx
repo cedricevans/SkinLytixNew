@@ -726,16 +726,7 @@ const Analysis = () => {
               </div>
             </Alert>
           )}
-          <div className="flex flex-wrap gap-2 mt-5">
-            <Button
-              variant="cta"
-              onClick={handleAddToRoutine}
-              disabled={addingToRoutine}
-              className="touch-target whitespace-nowrap shrink-0"
-            >
-              <Plus className="w-4 h-4 mr-2" />
-              {addingToRoutine ? "Adding..." : "Add to Routine"}
-            </Button>
+          <div className="mt-5 grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
             <Button
               variant="outline"
               onClick={() => {
@@ -746,13 +737,14 @@ const Analysis = () => {
                   eventProperties: { analysisId: analysis.id, source: 'quick_takeaways' }
                 });
               }}
+              className="w-full sm:w-auto"
             >
               Ask SkinLytixGPT
             </Button>
             <Button
               variant="outline"
               onClick={() => navigate(`/compare?productId=${analysis.id}`)}
-              className="gap-2"
+              className="gap-2 w-full sm:w-auto"
             >
               <Sparkles className="w-4 h-4" />
               Find Dupes
