@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -102,6 +102,11 @@ const Auth = () => {
   };
 
   const defaultTab = searchParams.get('tab') === 'signup' ? 'signup' : 'signin';
+  const [activeTab, setActiveTab] = useState<"signin" | "signup">(defaultTab);
+
+  useEffect(() => {
+    setActiveTab(defaultTab);
+  }, [defaultTab]);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-secondary/40 to-accent/10 flex flex-col">
@@ -137,22 +142,26 @@ const Auth = () => {
                 <p className="text-sm text-muted-foreground">
                   Ingredient insights, sensitivity signals, and smarter alternatives in minutes.
                 </p>
-                <div className="flex flex-wrap items-center gap-2 text-[11px] text-primary/80">
-                  <span className="rounded-full border border-primary/20 bg-primary/10 px-2.5 py-0.5 text-primary/90">
-                    Free to start
-                  </span>
-                  <span className="rounded-full border border-primary/20 bg-primary/10 px-2.5 py-0.5 text-primary/90">
-                    No spam
-                  </span>
-                </div>
-                <div className="space-y-2 rounded-lg border border-primary/20 bg-primary/5 px-3 py-2 text-sm text-foreground/80">
-                  <p className="text-sm font-semibold text-foreground">Here&apos;s what you get</p>
-                  <ul className="space-y-1 text-sm">
-                    <li>Ingredient match scores and routine-ready dupes.</li>
-                    <li>Sensitivity signals before you buy.</li>
-                    <li>Built on real consumer research.</li>
-                  </ul>
-                </div>
+                {activeTab === "signup" && (
+                  <>
+                    <div className="flex flex-wrap items-center gap-2 text-[11px] text-primary/80">
+                      <span className="rounded-full border border-primary/20 bg-primary/10 px-2.5 py-0.5 text-primary/90">
+                        Free to start
+                      </span>
+                      <span className="rounded-full border border-primary/20 bg-primary/10 px-2.5 py-0.5 text-primary/90">
+                        No spam
+                      </span>
+                    </div>
+                    <div className="space-y-2 rounded-lg border border-primary/20 bg-primary/5 px-3 py-2 text-sm text-foreground/80">
+                      <p className="text-sm font-semibold text-foreground">Here&apos;s what you get</p>
+                      <ul className="space-y-1 text-sm">
+                        <li>Ingredient match scores and routine-ready dupes.</li>
+                        <li>Sensitivity signals before you buy.</li>
+                        <li>Built on real consumer research.</li>
+                      </ul>
+                    </div>
+                  </>
+                )}
               </div>
 
               <div className="hidden lg:block space-y-8">
@@ -227,7 +236,7 @@ const Auth = () => {
                 </p>
               </div>
 
-              <Tabs defaultValue={defaultTab} className="w-full">
+              <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as "signin" | "signup")} className="w-full">
                 <TabsList className="grid w-full grid-cols-2 rounded-full bg-primary/10 p-1 text-primary/70">
                   <TabsTrigger
                     value="signin"
