@@ -135,6 +135,17 @@ function dispatch(action: Action) {
 type Toast = Omit<ToasterToast, "id">;
 
 function toast({ ...props }: Toast) {
+  if (props.variant === "destructive") {
+    if (import.meta.env.DEV) {
+      console.error("Suppressed toast:", props.title, props.description);
+    }
+    const id = genId();
+    return {
+      id,
+      dismiss: () => {},
+      update: () => {},
+    };
+  }
   const id = genId();
 
   const update = (props: ToasterToast) =>

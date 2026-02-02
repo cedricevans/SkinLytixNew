@@ -9,7 +9,6 @@ import FreeChecklist from "@/components/landing/FreeChecklist";
 import HowItWorks from "@/components/landing/HowItWorks";
 import SocialProof from "@/components/landing/SocialProof";
 import Testimonials from "@/components/landing/Testimonials";
-import CommunityPhotos from "@/components/landing/CommunityPhotos";
 import Footer from "@/components/landing/Footer";
 import Waitlist from "@/components/landing/Waitlist";
 import PricingPreview from "@/components/PricingPreview";
@@ -54,7 +53,6 @@ const Index = () => {
       </div>
       <Waitlist />
       <Testimonials id="testimonials" />
-      <CommunityPhotos />
       <Footer />
     </main>
   );

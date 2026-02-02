@@ -4,7 +4,7 @@ import { Download, Lock, Crown } from "lucide-react";
 import { useSubscription } from "@/hooks/useSubscription";
 import { useUsageLimits } from "@/hooks/useUsageLimits";
 import { PaywallModal } from "@/components/paywall/PaywallModal";
-import { toast } from "sonner";
+import { toast } from "@/components/ui/sonner";
 
 interface ExportAnalysisButtonProps {
   analysisId: string;

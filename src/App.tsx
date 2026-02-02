@@ -6,7 +6,7 @@ import { BrowserRouter, Routes, Route, useLocation } from "react-router-dom";
 import { useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import invokeFunction from "@/lib/functions-client";
-import { toast } from "sonner";
+import { toast } from "@/components/ui/sonner";
 import Index from "./pages/Index";
 import Home from "./pages/Home";
 import Upload from "./pages/Upload";

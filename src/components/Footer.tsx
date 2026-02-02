@@ -36,7 +36,9 @@ const Footer = () => {
         <div className="space-y-8 mb-8">
           <div className="lg:grid lg:grid-cols-4 lg:gap-8">
             <div className="lg:col-span-2">
-              <h3 className="text-2xl font-heading font-bold mb-3">SkinLytix</h3>
+              <h3 className="text-2xl font-heading font-bold mb-3">
+                SkinLytix<sup className="text-[0.6em] align-super ml-0.5">TM</sup>
+              </h3>
               <p className="font-body text-primary-foreground/80 text-sm leading-relaxed max-w-md">
                 Evidence-based skincare intelligence for people tired of wasting money on products that don't work.
                 Built on real consumer research. Powered by free, open APIs.
@@ -59,7 +61,7 @@ const Footer = () => {
         {/* Bottom Bar */}
         <div className="pt-8 border-t border-primary-foreground/20 flex flex-col md:flex-row justify-between items-center gap-4">
           <p className="text-sm font-body text-primary-foreground/60">
-            © 2026 SkinLytix. Built with open science & real user data.
+            © 2026 SkinLytix<sup className="text-[10px] align-super ml-0.5">TM</sup>. Built with open science & real user data.
           </p>
           {showFeedback && (
             <Button variant="cta" size="sm" onClick={() => navigate("/feedback")}>

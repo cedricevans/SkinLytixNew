@@ -34,17 +34,6 @@ const PricingPreview = () => {
       variant: 'default' as const,
       href: '/auth',
     },
-    {
-      name: 'Free',
-      icon: null,
-      price: '$0',
-      period: '/forever',
-      description: 'Get started',
-      features: ['Unlimited analyses', 'Basic EpiQ Score', '1 routine'],
-      cta: 'Get Started Free',
-      variant: 'outline' as const,
-      href: '/auth',
-    },
   ];
 
   return (
@@ -93,7 +82,7 @@ const PricingPreview = () => {
         </div>
 
         {/* Pricing Cards */}
-        <div className="grid md:grid-cols-3 gap-6 mb-8">
+        <div className="grid md:grid-cols-2 gap-6 mb-8">
           {tiers.map((tier) => {
             const Icon = tier.icon;
             return (

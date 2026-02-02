@@ -101,7 +101,7 @@ const Footer = () => {
             Built on real consumer research. Powered by free, open APIs.
           </p>
           <p className="text-xs text-primary-foreground/50">
-            (c) 2026 <BrandName />. Built with open science &amp; real user data.
+            (c) 2026 <BrandName /><sup className="text-[10px] align-super ml-0.5">TM</sup>. Built with open science &amp; real user data.
           </p>
         </div>
       </div>

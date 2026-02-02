@@ -153,6 +153,50 @@ const deriveIngredientList = (dupe) => {
   return (list || []).map((v) => String(v || "").trim()).filter(Boolean);
 };
 
+const POSITIVE_FLAG_PATTERNS = [
+  /fragrance\s*-?\s*free/i,
+  /non\s*-?\s*comedogenic/i,
+  /noncomedogenic/i,
+  /hypoallergenic/i,
+  /dermatologist\s*tested/i,
+  /oil\s*-?\s*free/i,
+  /paraben\s*-?\s*free/i,
+  /sulfate\s*-?\s*free/i,
+  /silicone\s*-?\s*free/i,
+  /phthalate\s*-?\s*free/i,
+  /mineral\s*oil\s*-?\s*free/i,
+  /dye\s*-?\s*free/i,
+  /soap\s*-?\s*free/i,
+  /cruelty\s*-?\s*free/i,
+  /vegan/i,
+  /gluten\s*-?\s*free/i,
+  /no\s*fragrance/i,
+  /without\s*fragrance/i,
+];
+
+const splitFlags = (rawFlags) => {
+  const watchOuts = [];
+  const claims = [];
+
+  for (const flag of rawFlags || []) {
+    const text = String(flag || "").trim();
+    if (!text) continue;
+    const lower = text.toLowerCase();
+
+    if (POSITIVE_FLAG_PATTERNS.some((p) => p.test(lower)) || /\bfree\b/.test(lower)) {
+      claims.push(text);
+      continue;
+    }
+
+    watchOuts.push(text);
+  }
+
+  return {
+    watchOuts: uniq(watchOuts),
+    claims: uniq(claims),
+  };
+};
+
 const formatScore = (v) => {
   if (v === null || v === undefined) return "N/A";
   const num = Number(v);
@@ -225,6 +269,7 @@ export const DupeCard = ({
     if (explicit.length) return uniq(explicit);
     return detectFlagsFromIngredients(ingredientList);
   }, [dupe, ingredientList]);
+  const { watchOuts, claims } = useMemo(() => splitFlags(flags), [flags]);
 
   const ingredientsCount =
     typeof dupe?.ingredientsCount === "number"
@@ -400,12 +445,12 @@ export const DupeCard = ({
             <div>
               <div className="flex items-center gap-1.5">
                 <ShieldAlert className="w-3.5 h-3.5 text-yellow-600" />
-                <p className="text-[10px] uppercase font-medium text-muted-foreground">Watch outs</p>
+                <p className="text-[10px] uppercase font-medium text-muted-foreground">Potential sensitivities</p>
               </div>
 
-              {flags.length > 0 ? (
+              {watchOuts.length > 0 ? (
                 <div className="flex flex-wrap gap-1">
-                  {flags.map((f, i) => (
+                  {watchOuts.map((f, i) => (
                     <span
                       key={i}
                       className="bg-yellow-100 text-yellow-800 px-1.5 py-0.5 rounded text-[10px] font-semibold"
@@ -418,6 +463,25 @@ export const DupeCard = ({
                 <p className="text-xs text-muted-foreground">None detected</p>
               )}
             </div>
+
+            {claims.length > 0 && (
+              <div>
+                <div className="flex items-center gap-1.5">
+                  <Info className="w-3.5 h-3.5 text-muted-foreground" />
+                  <p className="text-[10px] uppercase font-medium text-muted-foreground">Claims</p>
+                </div>
+                <div className="flex flex-wrap gap-1">
+                  {claims.map((f, i) => (
+                    <span
+                      key={i}
+                      className="bg-muted px-1.5 py-0.5 rounded text-[10px] font-semibold"
+                    >
+                      {toTitle(f)}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
 
             {ingredientCountText && <p className="text-[10px] text-muted-foreground">{ingredientCountText}</p>}
 

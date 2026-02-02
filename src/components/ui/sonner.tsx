@@ -1,5 +1,5 @@
 import { useTheme } from "next-themes";
-import { Toaster as Sonner, toast } from "sonner";
+import { Toaster as Sonner, toast as baseToast } from "sonner";
 
 type ToasterProps = React.ComponentProps<typeof Sonner>;
 
@@ -23,5 +23,15 @@ const Toaster = ({ ...props }: ToasterProps) => {
     />
   );
 };
+
+const toast = ((...args: Parameters<typeof baseToast>) => baseToast(...args)) as typeof baseToast;
+
+toast.error = ((...args: Parameters<typeof baseToast.error>) => {
+  if (import.meta.env.DEV) {
+    // Keep error visibility in console without surfacing to users
+    console.error(...args);
+  }
+  return undefined as unknown as ReturnType<typeof baseToast.error>;
+}) as typeof baseToast.error;
 
 export { Toaster, toast };
