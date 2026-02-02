@@ -174,6 +174,11 @@ const POSITIVE_FLAG_PATTERNS = [
   /without\s*fragrance/i,
 ];
 
+const PRICE_FLAG_PATTERNS = [
+  /\bexpensive\b/i,
+  /\baffordable\b/i,
+];
+
 const splitFlags = (rawFlags) => {
   const watchOuts = [];
   const claims = [];
@@ -182,6 +187,10 @@ const splitFlags = (rawFlags) => {
     const text = String(flag || "").trim();
     if (!text) continue;
     const lower = text.toLowerCase();
+
+    if (PRICE_FLAG_PATTERNS.some((p) => p.test(lower))) {
+      continue;
+    }
 
     if (POSITIVE_FLAG_PATTERNS.some((p) => p.test(lower)) || /\bfree\b/.test(lower)) {
       claims.push(text);
