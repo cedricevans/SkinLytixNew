@@ -4,6 +4,7 @@ import Navigation from "@/components/Navigation";
 import Footer from "@/components/Footer";
 import { ResponsiveBottomNav, ResponsiveBottomNavProps } from "@/components/ResponsiveBottomNav";
 import BrandName from "@/components/landing/BrandName";
+import TopLoadingBar from "@/components/TopLoadingBar";
 
 type AppShellProps = {
   children: ReactNode;
@@ -16,6 +17,8 @@ type AppShellProps = {
   onAskGpt?: () => void;
   className?: string;
   contentClassName?: string;
+  loading?: boolean;
+  loadingLabel?: string;
 };
 
 const AppShell = ({
@@ -29,9 +32,12 @@ const AppShell = ({
   onAskGpt,
   className,
   contentClassName,
+  loading = false,
+  loadingLabel,
 }: AppShellProps) => {
   return (
     <div className={cn("min-h-screen bg-background flex flex-col", className)}>
+      {loading ? <TopLoadingBar label={loadingLabel} /> : null}
       {showNavigation && (
         <header className="w-full bg-primary shadow-soft">
           <div className="max-w-6xl mx-auto px-[10px] md:px-6 py-3 md:py-4 flex justify-between items-center">

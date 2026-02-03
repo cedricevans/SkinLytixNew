@@ -36,6 +36,16 @@ type RoutineProduct = {
   category: string | null;
 };
 
+type HomeCachePayload = {
+  timestamp: number;
+  recentAnalyses: Analysis[];
+  totalAnalyses: number;
+  favorites: Favorite[];
+  routineProducts: RoutineProduct[];
+};
+
+const HOME_CACHE_TTL_MS = 30 * 60 * 1000;
+
 const formatDate = (value?: string | null) => {
   if (!value) return "—";
   const date = new Date(value);
@@ -55,14 +65,38 @@ const Home = () => {
   const [totalAnalyses, setTotalAnalyses] = useState(0);
   const [favorites, setFavorites] = useState<Favorite[]>([]);
   const [routineProducts, setRoutineProducts] = useState<RoutineProduct[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
     const loadData = async () => {
-      setIsLoading(true);
       try {
-        const { data: { user } } = await supabase.auth.getUser();
+        const { data: { session } } = await supabase.auth.getSession();
+        const user = session?.user;
         if (!user) return;
+
+        const cacheKey = `sl_home_cache_${user.id}`;
+        let cached: HomeCachePayload | null = null;
+        if (typeof window !== "undefined") {
+          try {
+            const cachedRaw = localStorage.getItem(cacheKey);
+            cached = cachedRaw ? JSON.parse(cachedRaw) : null;
+          } catch {
+            cached = null;
+          }
+        }
+        const isCacheFresh = cached && Date.now() - cached.timestamp < HOME_CACHE_TTL_MS;
+
+        if (cached) {
+          setRecentAnalyses(cached.recentAnalyses || []);
+          setTotalAnalyses(cached.totalAnalyses || 0);
+          setFavorites(cached.favorites || []);
+          setRoutineProducts(cached.routineProducts || []);
+          setIsLoading(false);
+        } else {
+          setIsLoading(true);
+        }
+
+        if (isCacheFresh) return;
 
         const [analysesRes, totalRes, favoritesRes, routineRes] = await Promise.all([
           supabase
@@ -84,12 +118,12 @@ const Home = () => {
           supabase
             .from("routine_products")
             .select("id, product_price, category, user_analyses (product_name, epiq_score)")
-      .eq("user_analyses.user_id", user.id)
-    ]);
+            .eq("user_analyses.user_id", user.id),
+        ]);
 
-    setRecentAnalyses(analysesRes.data || []);
-    setTotalAnalyses(totalRes.count ?? 0);
-    setFavorites(favoritesRes.data || []);
+        const nextRecentAnalyses = analysesRes.data || [];
+        const nextTotal = totalRes.count ?? 0;
+        const nextFavorites = favoritesRes.data || [];
 
         const routineEntries = (routineRes.data || []).map((entry: any) => ({
           id: entry.id,
@@ -98,7 +132,23 @@ const Home = () => {
           product_price: entry.product_price ?? null,
           category: entry.category ?? "Routine",
         }));
-        setRoutineProducts(routineEntries);
+        const nextRoutineProducts = routineEntries;
+
+        setRecentAnalyses(nextRecentAnalyses);
+        setTotalAnalyses(nextTotal);
+        setFavorites(nextFavorites);
+        setRoutineProducts(nextRoutineProducts);
+
+        if (typeof window !== "undefined") {
+          const payload: HomeCachePayload = {
+            timestamp: Date.now(),
+            recentAnalyses: nextRecentAnalyses,
+            totalAnalyses: nextTotal,
+            favorites: nextFavorites,
+            routineProducts: nextRoutineProducts,
+          };
+          localStorage.setItem(cacheKey, JSON.stringify(payload));
+        }
       } catch (error: any) {
         toast({
           title: "Unable to load dashboard",
@@ -144,7 +194,13 @@ const Home = () => {
   }, [recentAnalyses.length, routineProducts.length, hydrationScore]);
 
   return (
-    <AppShell showNavigation showBottomNav contentClassName="bg-[#f4f7fb] px-[5px] lg:px-4 py-8">
+    <AppShell
+      showNavigation
+      showBottomNav
+      contentClassName="bg-[#f4f7fb] px-[5px] lg:px-4 py-8"
+      loading={isLoading}
+      loadingLabel="Loading your dashboard..."
+    >
       <PageHeader>
         <div className="flex flex-col gap-2 md:flex-row md:justify-between md:items-center">
           <div>

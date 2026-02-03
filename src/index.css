@@ -191,6 +191,21 @@ All colors MUST be HSL.
   }
 }
 
+@keyframes sl-topbar {
+  0% {
+    transform: translateX(-60%);
+    opacity: 0.5;
+  }
+  50% {
+    transform: translateX(20%);
+    opacity: 1;
+  }
+  100% {
+    transform: translateX(120%);
+    opacity: 0.5;
+  }
+}
+
 /* 3D Flip Card Styles */
 .ingredient-card-perspective {
   perspective: 1000px;
