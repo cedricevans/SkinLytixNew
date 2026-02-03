@@ -17,7 +17,7 @@ const FreeChecklist = () => {
                 />
                 <div className="absolute inset-0 bg-gradient-to-t from-primary/40 via-transparent to-transparent" />
                 <div className="absolute left-6 top-6 inline-flex items-center gap-2 rounded-full bg-primary/85 px-3 py-1.5 text-xs font-semibold text-primary-foreground shadow-soft">
-                  Product preview
+                  Free skincare guide
                 </div>
               </div>
 
