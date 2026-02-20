@@ -9,3 +9,5 @@ coverage
 .vscode
 .idea
 .vercel
+supabase/user_analyses-export-2026-02-18_12-45-38.csv
+supabase/*.csv

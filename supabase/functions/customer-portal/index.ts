@@ -41,15 +41,54 @@ serve(async (req) => {
     if (!user?.email) throw new Error("User not authenticated or email not available");
     logStep("User authenticated", { userId: user.id, email: user.email });
 
-    const stripe = new Stripe(stripeKey, { apiVersion: "2025-08-27.basil" });
-    const customers = await stripe.customers.list({ email: user.email, limit: 1 });
+    // Check for stored stripe_customer_id in profiles
+    const { data: profile } = await supabaseClient
+      .from('profiles')
+      .select('stripe_customer_id')
+      .eq('id', user.id)
+      .single();
     
-    if (customers.data.length === 0) {
+    const stripe = new Stripe(stripeKey, { apiVersion: "2025-08-27.basil" });
+    let customerId: string | null = null;
+
+    // First, try the stored customer ID if available
+    if (profile?.stripe_customer_id) {
+      logStep("Found stored stripe_customer_id", { storedId: profile.stripe_customer_id });
+      try {
+        // Verify the customer still exists in Stripe
+        const customer = await stripe.customers.retrieve(profile.stripe_customer_id);
+        if (customer && !customer.deleted) {
+          customerId = profile.stripe_customer_id;
+          logStep("Verified stored customer exists in Stripe", { customerId });
+        } else {
+          logStep("Stored customer was deleted in Stripe, will try email lookup");
+        }
+      } catch (e) {
+        logStep("Stored customer ID invalid or not found, will try email lookup", { error: String(e) });
+      }
+    }
+
+    // Fall back to email lookup if no valid stored customer
+    if (!customerId) {
+      const customers = await stripe.customers.list({ email: user.email, limit: 1 });
+      if (customers.data.length > 0) {
+        customerId = customers.data[0].id;
+        logStep("Found customer via email lookup", { customerId });
+        
+        // Update the profile with the found customer ID for future lookups
+        await supabaseClient
+          .from('profiles')
+          .update({ stripe_customer_id: customerId })
+          .eq('id', user.id);
+        logStep("Updated profile with found customer ID");
+      }
+    }
+    
+    if (!customerId) {
       throw new Error("No Stripe customer found for this user. Please subscribe first.");
     }
     
-    const customerId = customers.data[0].id;
-    logStep("Found Stripe customer", { customerId });
+    logStep("Using Stripe customer", { customerId });
 
     const origin = req.headers.get("origin") || "https://yflbjaetupvakadqjhfb.lovableproject.com";
     const portalSession = await stripe.billingPortal.sessions.create({

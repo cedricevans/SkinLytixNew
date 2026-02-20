@@ -1,4 +1,4 @@
-export const COMMON_INGREDIENTS = [
+export const COMMON_INGREDIENTS: string[] = [
   "water",
   "aqua",
   "eau",

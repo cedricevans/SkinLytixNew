@@ -134,7 +134,7 @@ const Home = () => {
         }));
         const nextRoutineProducts = routineEntries;
 
-        setRecentAnalyses(nextRecentAnalyses);
+        setRecentAnalyses(analysesRes.data || []);
         setTotalAnalyses(nextTotal);
         setFavorites(nextFavorites);
         setRoutineProducts(nextRoutineProducts);
@@ -142,7 +142,7 @@ const Home = () => {
         if (typeof window !== "undefined") {
           const payload: HomeCachePayload = {
             timestamp: Date.now(),
-            recentAnalyses: nextRecentAnalyses,
+            recentAnalyses: (analysesRes.data || []),
             totalAnalyses: nextTotal,
             favorites: nextFavorites,
             routineProducts: nextRoutineProducts,

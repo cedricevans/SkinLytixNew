@@ -308,18 +308,20 @@ const Upload = () => {
     if (ocrWorkerReadyRef.current && ocrWorkerRef.current) return ocrWorkerRef.current;
 
     // Suppress type error for workerPath by casting to any
-    const worker = await (Tesseract.createWorker as any)({
-      workerPath: "https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/worker.min.js",
-      corePath: "https://cdn.jsdelivr.net/npm/tesseract.js-core@5/tesseract-core.wasm.js",
-      langPath: "https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/lang-data",
-      logger: (m: any) => {
-        if (!m) return;
-        if (typeof m.progress === "number") setOcrProgress(Math.max(1, Math.round(m.progress * 100)));
-      },
-    });
-
-    await worker.loadLanguage("eng");
-    await worker.initialize("eng");
+    const worker = await (Tesseract.createWorker as any)(
+      "eng",
+      1,
+      {
+        workerPath: "https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/worker.min.js",
+        corePath: "https://cdn.jsdelivr.net/npm/tesseract.js-core@5/tesseract-core.wasm.js",
+        // Use a stable tessdata CDN to avoid jsdelivr lang-data 404s
+        langPath: "https://tessdata.projectnaptha.com/4.0.0",
+        logger: (m: any) => {
+          if (!m) return;
+          if (typeof m.progress === "number") setOcrProgress(Math.max(1, Math.round(m.progress * 100)));
+        },
+      }
+    );
     await worker.setParameters({
       preserve_interword_spaces: "1",
       user_defined_dpi: "300",

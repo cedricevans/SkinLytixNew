@@ -5,8 +5,6 @@ const corsHeaders: Record<string, string> = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-const MODEL_OPENROUTER = "google/gemma-3-4b-it:free";
-
 const jsonResponse = (body: unknown, status = 200, extraHeaders: Record<string, string> = {}) => {
   return new Response(JSON.stringify(body), {
     status,
@@ -42,7 +40,10 @@ const normalizeText = (v: unknown) => {
 const normalizeLabelText = (v: unknown) => {
   if (typeof v !== "string") return "";
   // keep line breaks, collapse repeated spaces only
-  return v.normalize("NFKC").replace(/[ \t]+/g, " ").trim();
+  return v
+    .normalize("NFKC")
+    .replace(/[ \t]+/g, " ")
+    .trim();
 };
 
 const safeReadText = async (r: Response) => {
@@ -63,9 +64,8 @@ const tryParseJson = (raw: string) => {
 
 const extractFromText = (raw: string) => {
   const brand = raw.match(/"brand"\s*:\s*"([^"]*)"/i)?.[1] ?? "";
-  const productName = raw.match(/"product_name"\s*:\s*"([^"]*)"/i)?.[1]
-    ?? raw.match(/"productName"\s*:\s*"([^"]*)"/i)?.[1]
-    ?? "";
+  const productName =
+    raw.match(/"product_name"\s*:\s*"([^"]*)"/i)?.[1] ?? raw.match(/"productName"\s*:\s*"([^"]*)"/i)?.[1] ?? "";
   const variant = raw.match(/"variant"\s*:\s*"([^"]*)"/i)?.[1] ?? "";
   const size = raw.match(/"size"\s*:\s*"([^"]*)"/i)?.[1] ?? "";
   const ingredients = raw.match(/"ingredients"\s*:\s*\[(.*?)\]/i)?.[1] ?? "";
@@ -172,9 +172,7 @@ const normalizeDupes = (value: unknown) => {
     seen.add(key);
     const matchReason = normalizeText(item?.match_reason);
     const scoreRaw = typeof item?.match_score === "number" ? item.match_score : Number(item?.match_score);
-    const matchScore = Number.isFinite(scoreRaw)
-      ? Math.min(1, Math.max(0, scoreRaw))
-      : 0;
+    const matchScore = Number.isFinite(scoreRaw) ? Math.min(1, Math.max(0, scoreRaw)) : 0;
     result.push({
       brand,
       product_name: productName,
@@ -230,9 +228,7 @@ const parseAndValidate = (content: string) => {
 
   const confidenceRaw =
     typeof extracted?.confidence === "number" ? extracted.confidence : Number(extracted?.confidence);
-  const confidence = Number.isFinite(confidenceRaw)
-    ? Math.min(1, Math.max(0, confidenceRaw))
-    : 0;
+  const confidence = Number.isFinite(confidenceRaw) ? Math.min(1, Math.max(0, confidenceRaw)) : 0;
 
   let notes = normalizeText(extracted?.notes) || null;
   if (confidence >= 0.7) {
@@ -258,7 +254,9 @@ const parseAndValidate = (content: string) => {
   };
 };
 
-const buildPrompt = (labelText: string | null) => `You are SkinLytix OBF. You extract structured product facts from provided product label text, packaging copy, and OCR. Output strict JSON only. No markdown. No backticks. No extra text.
+const buildPrompt = (
+  labelText: string | null,
+) => `You are SkinLytix OBF. You extract structured product facts from provided product label text, packaging copy, and OCR. Output strict JSON only. No markdown. No backticks. No extra text.
 
 Goal
 Produce clean, grounded, non-duplicative data for:
@@ -428,7 +426,7 @@ Final validation gates before output
 - dupes must contain no duplicates after de-duplication.
 - where_to_buy must be empty unless retailer names appear in the input.
 
-${labelText ? `Input text:\\n${labelText}` : "Now process the provided input and return only the JSON object."}`; 
+${labelText ? `Input text:\\n${labelText}` : "Now process the provided input and return only the JSON object."}`;
 
 const validateImageInput = (image: unknown) => {
   if (!image || typeof image !== "string" || !image.trim()) return "Missing or invalid image input";
@@ -475,97 +473,14 @@ serve(async (req) => {
     const imageError = validateImageInput(image);
     if (imageError) {
       const status = imageError.includes("too large") ? 413 : 400;
-      return jsonResponse(
-        { ...emptyResult(), error: imageError },
-        status,
-      );
+      return jsonResponse({ ...emptyResult(), error: imageError }, status);
     }
 
-    const OPENROUTER_API_KEY = Deno.env.get("OPENROUTER_API_KEY");
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     const GEMINI_API_KEY = Deno.env.get("GEMINI_API_KEY");
 
     const prompt = buildPrompt(labelText);
 
     const errors: string[] = [];
-
-    const callOpenRouter = async (): Promise<string | null> => {
-      if (!OPENROUTER_API_KEY) return null;
-
-      const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${OPENROUTER_API_KEY}`,
-          "Content-Type": "application/json",
-          "HTTP-Referer": "https://skin-lytix.vercel.app",
-          "X-Title": "SkinLytix",
-        },
-        body: JSON.stringify({
-          model: MODEL_OPENROUTER,
-          messages: [
-            { role: "system", content: "Return ONLY valid JSON. No extra text." },
-            {
-              role: "user",
-              content: [
-                { type: "text", text: prompt },
-                { type: "image_url", image_url: { url: image } },
-              ],
-            },
-          ],
-          temperature: 0.2,
-          max_tokens: 900,
-        }),
-      });
-
-      if (!response.ok) {
-        const err = await safeReadText(response);
-        console.error("OpenRouter error:", response.status, err);
-        errors.push(`OpenRouter ${response.status}: ${err.slice(0, 800)}`);
-        return null;
-      }
-
-      const openrouterData = await response.json().catch(() => null);
-      const content = openrouterData?.choices?.[0]?.message?.content ?? null;
-      return typeof content === "string" ? content : null;
-    };
-
-    const callLovable = async (): Promise<string | null> => {
-      if (!LOVABLE_API_KEY) return null;
-
-      const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${LOVABLE_API_KEY}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          model: "google/gemini-2.5-flash-lite",
-          messages: [
-            { role: "system", content: "Return ONLY valid JSON. No extra text." },
-            {
-              role: "user",
-              content: [
-                { type: "text", text: prompt },
-                { type: "image_url", image_url: { url: image } },
-              ],
-            },
-          ],
-          temperature: 0.2,
-          max_tokens: 900,
-        }),
-      });
-
-      if (!response.ok) {
-        const err = await safeReadText(response);
-        console.error("Lovable error:", response.status, err);
-        errors.push(`Lovable ${response.status}: ${err.slice(0, 800)}`);
-        return null;
-      }
-
-      const lovableData = await response.json().catch(() => null);
-      const content = lovableData?.choices?.[0]?.message?.content ?? null;
-      return typeof content === "string" ? content : null;
-    };
 
     const callGeminiDirect = async (): Promise<string | null> => {
       if (!GEMINI_API_KEY) return null;
@@ -620,10 +535,18 @@ serve(async (req) => {
       }
     };
 
-    const result =
-      (await tryCall(callGeminiDirect, "Gemini")) ||
-      (await tryCall(callLovable, "Lovable")) ||
-      (await tryCall(callOpenRouter, "OpenRouter"));
+    if (!GEMINI_API_KEY) {
+      return jsonResponse(
+        {
+          ...emptyResult(),
+          error: "GEMINI_API_KEY not configured",
+          errors: ["Gemini key missing"],
+        },
+        500,
+      );
+    }
+
+    const result = await tryCall(callGeminiDirect, "Gemini");
 
     if (!result) {
       return jsonResponse(

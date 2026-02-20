@@ -1,0 +1,22 @@
+{
+  "user_roles": [
+    {"id":"b2eddb01-91e7-4fa0-b3c1-1f9dba8f0316","user_id":"4efb5df3-ce0a-40f6-ae13-6defa1610d3a","role":"admin","created_at":"2025-12-09T19:15:48.633578+00"}
+  ],
+  "academic_institutions": [
+    {"id":"990e1db5-b58e-4501-ac76-d5256263a3da","name":"Spelman College","short_code":"SPELMAN","partnership_tier":"founding","active":true,"contact_email":null,"logo_url":null,"created_at":"2026-01-04T00:28:24.566025+00"}
+  ],
+  "saved_dupes": [
+    {"id":"76048256-4884-446a-b5f4-f32669a31cdb","user_id":"80c09810-7a89-4c4f-abc5-8f59036cd080","source_product_id":"630d9539-1481-494f-8f63-b3daa465e699","product_name":"CANTU AVOCADO WITH OLIVE OIL, ALOE AND SHEA BUTTER","brand":"L'Occitane","image_url":"https://images.openbeautyfacts.org/images/products/081/751/301/9890/front_en.4.400.jpg","reasons":null,"shared_ingredients":null,"price_estimate":"$49","saved_at":"2026-01-25T22:36:34.733+00"},
+    {"id":"a6ef0082-7771-4cdd-aca0-2ab180d6064d","user_id":"80c09810-7a89-4c4f-abc5-8f59036cd080","source_product_id":"630d9539-1481-494f-8f63-b3daa465e699","product_name":"Rituals Ultra Rich Whipped Body Cream Touch of Happiness","brand":"Weleda","image_url":null,"reasons":null,"shared_ingredients":null,"price_estimate":"$22","saved_at":"2026-01-25T22:36:37.162+00"},
+    {"id":"f6040fc3-e581-43f3-b72f-539b32ea6951","user_id":"80c09810-7a89-4c4f-abc5-8f59036cd080","source_product_id":"b257f7e6-5ff7-4410-88e5-243cdcf40575","product_name":"daily moisturizing cream","brand":"cerave","image_url":"https://images.openbeautyfacts.org/images/products/360/600/053/7743/front_en.37.400.jpg","reasons":null,"shared_ingredients":null,"price_estimate":"$15","saved_at":"2026-01-25T23:01:12.581+00"},
+    {"id":"256b912e-511a-4e57-b5ca-0a3dc5222e74","user_id":"80c09810-7a89-4c4f-abc5-8f59036cd080","source_product_id":"bf1182d6-8174-41ad-813c-b4dcc9bceaf4","product_name":"daily moisturizing cream","brand":"cerave","image_url":"https://images.openbeautyfacts.org/images/products/360/600/053/7743/front_en.37.400.jpg","reasons":null,"shared_ingredients":null,"price_estimate":"$18","saved_at":"2026-01-26T13:40:08.072+00"},
+    {"id":"389eb836-89f9-4413-bfb6-1d4ab5d53d7f","user_id":"80c09810-7a89-4c4f-abc5-8f59036cd080","source_product_id":"630d9539-1481-494f-8f63-b3daa465e699","product_name":"out of Africa shea butter body lotion","brand":"L'Occitane","image_url":"https://images.openbeautyfacts.org/images/products/081/196/601/0923/front_en.9.400.jpg","reasons":null,"shared_ingredients":null,"price_estimate":"$30","saved_at":"2026-01-26T23:22:03.894+00"}
+  ],
+  "user_badges": [],
+  "student_certifications": [],
+  "expert_reviews": [],
+  "ingredient_validations": [],
+  "ingredient_articles": [],
+  "product_cache": [],
+  "waitlist": []
+}

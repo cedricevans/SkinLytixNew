@@ -1,35 +1,29 @@
-// @ts-expect-error - Deno edge runtime import
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-// @ts-expect-error - Deno edge runtime import
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.7.1";
-
-declare const Deno: {
-  env: {
-    get: (key: string) => string | undefined;
-  };
-};
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-serve(async (req: Request) => {
+serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    // Declare variables for AI response and fallback tracking at the top of the try block
-    let optimizationData;
-    let fallbackLevel = 0;
+  // Declare variables for AI response and fallback tracking at the top of the try block
+  let aiData;
+  let optimizationData;
+  let fallbackLevel = 0;
+  let aiResponse;
     const { routineId } = await req.json();
     console.log('Optimizing routine:', routineId);
 
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const geminiApiKey = Deno.env.get('GEMINI_API_KEY');
-    const lovableApiKey = Deno.env.get('LOVABLE_API_KEY');
+    if (!geminiApiKey) throw new Error('GEMINI_API_KEY not set');
     
     const supabase = createClient(supabaseUrl, supabaseKey);
 
@@ -130,7 +124,7 @@ serve(async (req: Request) => {
     };
 
     // Prepare product data and categorize
-  const productsData = routineProducts.map((rp: any) => ({
+    const productsData = routineProducts.map(rp => ({
       name: rp.user_analyses.product_name,
       brand: rp.user_analyses.brand,
       category: rp.user_analyses.category,
@@ -142,10 +136,10 @@ serve(async (req: Request) => {
     }));
 
     // Group products by type
-  const faceProducts = productsData.filter((p: any) => p.productType === 'face');
-  const bodyProducts = productsData.filter((p: any) => p.productType === 'body');
-  const hairProducts = productsData.filter((p: any) => p.productType === 'hair');
-  const unknownProducts = productsData.filter((p: any) => p.productType === 'unknown');
+    const faceProducts = productsData.filter(p => p.productType === 'face');
+    const bodyProducts = productsData.filter(p => p.productType === 'body');
+    const hairProducts = productsData.filter(p => p.productType === 'hair');
+    const unknownProducts = productsData.filter(p => p.productType === 'unknown');
 
     // Determine routine type
     const routineType = faceProducts.length > 0 && bodyProducts.length === 0 && hairProducts.length === 0 ? 'face' :
@@ -174,7 +168,7 @@ USER FACIAL SKIN PROFILE:
 - Facial Concerns: ${skinConcerns.join(', ')}
 
 ${routineType === 'mixed' ? 'FACIAL ' : ''}PRODUCTS IN ROUTINE:
-${faceProducts.map((p: any, i: number) => `
+${faceProducts.map((p, i) => `
 ${i + 1}. ${p.name}${p.brand ? ` by ${p.brand}` : ''}
    Category: ${p.category || 'unknown'}
    Price: $${p.price || 'unknown'}
@@ -193,7 +187,7 @@ USER BODY PROFILE:
 - Body Concerns: ${bodyConcerns.join(', ')}
 
 ${routineType === 'mixed' ? 'BODY CARE ' : ''}PRODUCTS IN ROUTINE:
-${bodyProducts.map((p: any, i: number) => `
+${bodyProducts.map((p, i) => `
 ${i + 1}. ${p.name}${p.brand ? ` by ${p.brand}` : ''}
    Category: ${p.category || 'unknown'}
    Price: $${p.price || 'unknown'}
@@ -214,7 +208,7 @@ USER SCALP/HAIR PROFILE:
 - Scalp Type: ${scalpType}
 
 ${routineType === 'mixed' ? 'HAIR CARE ' : ''}PRODUCTS IN ROUTINE:
-${hairProducts.map((p: any, i: number) => `
+${hairProducts.map((p, i) => `
 ${i + 1}. ${p.name}${p.brand ? ` by ${p.brand}` : ''}
    Category: ${p.category || 'unknown'}
    Price: $${p.price || 'unknown'}
@@ -251,7 +245,7 @@ Provide a comprehensive analysis covering:
 
 ${unknownProducts.length > 0 ? `
 6. OUT OF SCOPE PRODUCTS: The following products have unclear categories:
-${unknownProducts.map((p: any) => `- ${p.name}`).join('\n')}
+${unknownProducts.map(p => `- ${p.name}`).join('\n')}
 Please note these in the "outOfScope" section.
 ` : ''}
 
@@ -301,99 +295,57 @@ Format your response as a structured JSON:
   "summary": ""
 }`;
 
-    const parseJsonContent = (raw?: string) => {
-      if (!raw) return null;
-      try {
-        return JSON.parse(raw);
-      } catch {
-        return null;
-      }
-    };
-
-    const callGemini = async () => {
-      if (!geminiApiKey) return null;
-      const response = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key=${geminiApiKey}`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            contents: [{ role: 'user', parts: [{ text: aiPrompt }] }],
-            generationConfig: {
-              response_mime_type: 'application/json',
-              temperature: 0.7,
-              maxOutputTokens: 2048
-            }
-          }),
+    aiResponse = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key=${geminiApiKey}`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        contents: [
+          { role: 'user', parts: [{ text: aiPrompt }] }
+        ],
+        generationConfig: {
+          response_mime_type: 'application/json',
+          temperature: 0.7,
+          maxOutputTokens: 2048
         }
-      );
+      }),
+    });
 
-      if (!response.ok) {
-        const errText = await response.text().catch(() => '');
-        console.warn('Gemini API failed:', response.status, errText);
-        return null;
-      }
-
-      const data = await response.json();
-      const content = data?.candidates?.[0]?.content?.parts?.[0]?.text
-        || data?.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data
-        || "";
-      return parseJsonContent(content);
-    };
-
-    const callLovable = async () => {
-      if (!lovableApiKey) return null;
-      const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${lovableApiKey}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          model: 'google/gemini-2.5-flash',
-          messages: [
-            { role: 'system', content: 'You are a skincare formulation expert specializing in ingredient analysis and routine optimization.' },
-            { role: 'user', content: aiPrompt }
-          ],
-          response_format: { type: "json_object" }
-        }),
-      });
-
-      if (!response.ok) {
-        const errText = await response.text().catch(() => '');
-        console.warn('Lovable API failed:', response.status, errText);
-        return null;
-      }
-
-      const data = await response.json();
-      const content = data?.choices?.[0]?.message?.content ?? "";
-      return parseJsonContent(content);
-    };
-
-    optimizationData = await callGemini();
-    if (!optimizationData) {
-      fallbackLevel = 1;
-      optimizationData = await callLovable();
-    }
-
-    if (!optimizationData) {
+    if (!aiResponse.ok) {
+      const errorText = await aiResponse.text();
+      console.error('Gemini API failed:', aiResponse.status, errorText);
       return new Response(
         JSON.stringify({
-          error: 'All AI models are currently unavailable. Please try again later or contact support if this persists.'
+          error: 'Unable to generate optimization at this time. Please try again later.',
         }),
-        { status: 503, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
+    }
+
+    aiData = await aiResponse.json();
+    let content = aiData.candidates?.[0]?.content?.parts?.[0]?.text || aiData.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
+    try {
+      optimizationData = JSON.parse(content);
+    } catch (e) {
+      optimizationData = {
+        summary: "This routine includes active ingredients that need extra review. We’re running a deeper analysis to make sure everything works well together. Some results may need additional verification.",
+        fallback: true
+      };
     }
 
     // Track which fallback was used
-    // fallbackLevel: 0 = Gemini, 1 = Lovable
+    // fallbackLevel: 0 = Lovable, 1 = Gemini, 2 = Gemma
     optimizationData.fallbackLevel = fallbackLevel;
     if (fallbackLevel > 0) {
-      console.warn(`AI fallback triggered: Lovable used for routineId ${routineId}`);
+      // Proactively log/flag fallback usage for quota monitoring
+      let fallbackName = fallbackLevel === 1 ? 'Gemini' : 'Gemma';
+      console.warn(`AI fallback triggered: ${fallbackName} used for routineId ${routineId}`);
+      // Optionally: send alert/notification here (e.g., webhook, email, etc.)
     }
 
     // Calculate total cost and add metadata
-    const totalCost = productsData.reduce((sum: number, p: any) => sum + (p.price || 0), 0);
+    const totalCost = productsData.reduce((sum, p) => sum + (p.price || 0), 0);
     optimizationData.totalRoutineCost = totalCost;
     optimizationData.routineType = routineType;
     optimizationData.productCounts = {

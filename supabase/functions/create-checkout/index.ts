@@ -7,7 +7,7 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-// Stripe price IDs for SkinLytix subscription tiers
+// Stripe price IDs for SkinLytix subscription tiers (PRODUCTION)
 const PRICE_IDS = {
   premium_monthly: "price_1ScXKURVBtzyxfn0XLp1QfCr",
   premium_annual: "price_1ScXKyRVBtzyxfn0V0g7e97r",

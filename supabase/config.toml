@@ -1,4 +1,4 @@
-project_id = "yflbjaetupvakadqjhfb"
+project_id = "mzprefkjpyavwbtkebqj"
 
 [functions.find-dupes]
 verify_jwt = false
@@ -29,3 +29,6 @@ verify_jwt = true
 
 [functions.explain-ingredients]
 verify_jwt = true
+
+[functions.extract-ingredients]
+verify_jwt = false

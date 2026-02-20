@@ -79,7 +79,7 @@ serve(async (req) => {
       limit: 5,
     });
     
-    const activeSubscription = subscriptions.data.find((subscription) =>
+    const activeSubscription = subscriptions.data.find((subscription: { status: string }) =>
       subscription.status === "active" || subscription.status === "trialing"
     );
     const hasActiveSub = !!activeSubscription;
@@ -90,9 +90,14 @@ serve(async (req) => {
 
     if (hasActiveSub) {
       const subscription = activeSubscription!;
-      subscriptionEnd = new Date(subscription.current_period_end * 1000).toISOString();
       subscriptionId = subscription.id;
-      if (subscription.status === "trialing" && subscription.trial_end) {
+      
+      // Safely parse dates - check for valid timestamps
+      if (subscription.current_period_end && typeof subscription.current_period_end === 'number') {
+        subscriptionEnd = new Date(subscription.current_period_end * 1000).toISOString();
+      }
+      
+      if (subscription.status === "trialing" && subscription.trial_end && typeof subscription.trial_end === 'number') {
         trialEndsAt = new Date(subscription.trial_end * 1000).toISOString();
       }
       

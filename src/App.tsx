@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, useLocation } from "react-router-dom";
 import { useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { useDevModeLogin } from "@/hooks/useDevModeLogin";
 import invokeFunction from "@/lib/functions-client";
 import { toast } from "@/components/ui/sonner";
 import Index from "./pages/Index";
@@ -68,6 +69,23 @@ const SessionRefreshGate = () => {
   return null;
 };
 
+const DevModeLoginGate = () => {
+  const { isAttempting, error } = useDevModeLogin();
+  
+  if (error) {
+    console.error("Dev mode login error:", error);
+    // Show diagnostics when dev mode fails
+    if (typeof window !== 'undefined' && window.location.search.includes('devMode=true')) {
+      // Redirect to diagnostics page
+      const diagnosticsUrl = window.location.pathname + '?diagnostic=true&' + 
+        window.location.search.substring(1);
+      // console.log("Would show diagnostics at:", diagnosticsUrl);
+    }
+  }
+  
+  return null;
+};
+
 const SubscriptionSyncGate = () => {
   const location = useLocation();
 
@@ -116,9 +134,10 @@ const App = () => (
       <Toaster />
       <Sonner />
       <TrialCountdown />
-      <BrowserRouter>
+      <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
         <ScrollToTop />
         <SessionRefreshGate />
+        <DevModeLoginGate />
         <SubscriptionSyncGate />
         <Routes>
           <Route path="/" element={<Index />} />

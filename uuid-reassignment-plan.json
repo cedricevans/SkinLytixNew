@@ -1,0 +1,1213 @@
+{
+  "timestamp": "2026-02-20T02:14:25.627Z",
+  "totalScans": 173,
+  "totalUsers": 78,
+  "needsReassignment": 172,
+  "scansPerUserTarget": "2.2",
+  "reassignments": [
+    {
+      "scanId": "49ebe977-52d4-4958-9b70-ff21b612988c",
+      "oldUserUuid": "4efb5df3-ce0a-40f6-ae13-6defa1610d3a",
+      "newUserUuid": "1efb1396-aa1e-419c-8ba2-1b6366143783",
+      "productName": "SkinCeuticals C E Ferulic® with 15% L-Ascorbic Acid",
+      "brand": null
+    },
+    {
+      "scanId": "ede5efae-130f-4a2e-81cc-ff25cf1ba93b",
+      "oldUserUuid": "4efb5df3-ce0a-40f6-ae13-6defa1610d3a",
+      "newUserUuid": "002235e1-89ca-4524-a4b4-7f3553d023ce",
+      "productName": "Skin better science AlphaRet Body Overnight Cream",
+      "brand": null
+    },
+    {
+      "scanId": "19cdf30d-4c80-4869-a37a-cffffb08c7da",
+      "oldUserUuid": "4efb5df3-ce0a-40f6-ae13-6defa1610d3a",
+      "newUserUuid": "5880857f-ef2b-4b83-834f-5a312ee67152",
+      "productName": "Reparative Moisture Emulsion",
+      "brand": "iS Clinical"
+    },
+    {
+      "scanId": "dbc4dd27-c178-4abb-9ba1-c7ef43ed955e",
+      "oldUserUuid": "4efb5df3-ce0a-40f6-ae13-6defa1610d3a",
+      "newUserUuid": "69a15571-b5e7-4417-90fe-ef1039e2c6a7",
+      "productName": "Cleansing Complex",
+      "brand": "iS Clinical"
+    },
+    {
+      "scanId": "7337febc-1d94-48d6-939b-126547b01976",
+      "oldUserUuid": "4efb5df3-ce0a-40f6-ae13-6defa1610d3a",
+      "newUserUuid": "e02f0cae-fe80-4066-adf9-d67225abc3d4",
+      "productName": "Toleriane Purifying Foaming Face Wash",
+      "brand": "La Roche-Posay"
+    },
+    {
+      "scanId": "b31aa717-b717-4675-89f7-31d3c76db0a2",
+      "oldUserUuid": "4efb5df3-ce0a-40f6-ae13-6defa1610d3a",
+      "newUserUuid": "f8330e90-48bb-431e-b64e-b71866305698",
+      "productName": "Rose & Hyaluronic Acid Deep Hydration Toner",
+      "brand": "Fresh"
+    },
+    {
+      "scanId": "42f45db1-7f7d-49da-a173-9e599cf52ea9",
+      "oldUserUuid": "4efb5df3-ce0a-40f6-ae13-6defa1610d3a",
+      "newUserUuid": "431d1313-0264-4315-8820-e815ce651170",
+      "productName": "Daily Moisturizing Lotion",
+      "brand": "CeraVe"
+    },
+    {
+      "scanId": "a2750e11-9e68-43c5-bf89-cf8e2d50cb43",
+      "oldUserUuid": "4efb5df3-ce0a-40f6-ae13-6defa1610d3a",
+      "newUserUuid": "c4feb2ce-5a3f-47c2-9b87-058d110e6ce7",
+      "productName": "Biolumin-C Vitamin C Night Restore Serum",
+      "brand": "Dermalogica"
+    },
+    {
+      "scanId": "e52eb3a2-9764-4d9f-b036-b455990652a1",
+      "oldUserUuid": "4efb5df3-ce0a-40f6-ae13-6defa1610d3a",
+      "newUserUuid": "02484e4b-b2dd-4c13-9879-65df2995b579",
+      "productName": "Unseen Sunscreen SPF 50 Invisible Sun Protection",
+      "brand": "Supergoop"
+    },
+    {
+      "scanId": "eddb8c39-bdaa-4ac1-81fa-77ac745962b4",
+      "oldUserUuid": "4efb5df3-ce0a-40f6-ae13-6defa1610d3a",
+      "newUserUuid": "8534f2c2-24fb-4d55-a99e-1864f058eb97",
+      "productName": "Zero Pore Pad",
+      "brand": "Medicube"
+    },
+    {
+      "scanId": "e561ff9e-40eb-41ee-9790-7c047295e326",
+      "oldUserUuid": "4efb5df3-ce0a-40f6-ae13-6defa1610d3a",
+      "newUserUuid": "4d732879-4cfa-49c1-8b6a-328e707a0428",
+      "productName": "Melt Awf Jelly Oil Makeup-Melting Cleanser",
+      "brand": "Fenty Beauty"
+    },
+    {
+      "scanId": "56ce5890-83e7-4cfe-a8ba-6cc4a639cea2",
+      "oldUserUuid": "4efb5df3-ce0a-40f6-ae13-6defa1610d3a",
+      "newUserUuid": "f87f24a9-30a4-4367-ad56-6674f9642dc8",
+      "productName": "Butta Drop Whipped Oil Body Cream with Tropical Oils + Shea Butter - Guava Getaway",
+      "brand": "Fenty Beauty"
+    },
+    {
+      "scanId": "e319ad84-2de2-463b-9e4c-eabedc575828",
+      "oldUserUuid": "4efb5df3-ce0a-40f6-ae13-6defa1610d3a",
+      "newUserUuid": "5ca997e4-9613-49d4-ab4f-ff56464127a6",
+      "productName": "Big Dripp'r Body Wash",
+      "brand": "Fenty Beauty"
+    },
+    {
+      "scanId": "df0b76a2-f17e-442a-8495-07ee3be58200",
+      "oldUserUuid": "4efb5df3-ce0a-40f6-ae13-6defa1610d3a",
+      "newUserUuid": "7d88a687-a996-4b58-ab5f-a60f0648ceff",
+      "productName": "Gentle Cleanser",
+      "brand": "Buttah"
+    },
+    {
+      "scanId": "57be3e80-8f35-4c72-b2a7-481b39f58dab",
+      "oldUserUuid": "4efb5df3-ce0a-40f6-ae13-6defa1610d3a",
+      "newUserUuid": "01a3e2bf-65f8-4395-ae05-c8609cf28dcf",
+      "productName": "Toleriane Purifying Foaming Face Wash",
+      "brand": "La Roche-Posay"
+    },
+    {
+      "scanId": "55ee9945-3bb9-456e-8877-4a502652a3ab",
+      "oldUserUuid": "4efb5df3-ce0a-40f6-ae13-6defa1610d3a",
+      "newUserUuid": "21f8419c-671c-4e13-a8cf-15c099e6b702",
+      "productName": "Toleriane Repair Matte Moisturizer",
+      "brand": "La Roche-Posay"
+    },
+    {
+      "scanId": "3f96ab49-7c17-4615-9a9d-f0b676104613",
+      "oldUserUuid": "1efb1396-aa1e-419c-8ba2-1b6366143783",
+      "newUserUuid": "ed1ca66f-4cf0-4d6f-8db4-87012cbc3ddf",
+      "productName": "micro - exfoliating Honey Cleanser",
+      "brand": "Circadia "
+    },
+    {
+      "scanId": "042f48ef-a45c-4867-8954-bdf8b51245e9",
+      "oldUserUuid": "1efb1396-aa1e-419c-8ba2-1b6366143783",
+      "newUserUuid": "d26626ba-cd39-47f0-9347-67642bffd452",
+      "productName": "TOLERIANE DOUBLE REPAIR MATTE FACE MOISTURIZER FOR OILY SKIN",
+      "brand": "La Roche Posay"
+    },
+    {
+      "scanId": "168f8a26-afbf-4688-a8a3-7c0269e5c602",
+      "oldUserUuid": "1efb1396-aa1e-419c-8ba2-1b6366143783",
+      "newUserUuid": "a74a5827-731c-4e0b-a2ba-ab19a867f76b",
+      "productName": "Toleriane Double Repair Matte Face Moisturizer",
+      "brand": "La Roche-Posay"
+    },
+    {
+      "scanId": "f3d817a4-feee-427b-9681-4448bec9499a",
+      "oldUserUuid": "1efb1396-aa1e-419c-8ba2-1b6366143783",
+      "newUserUuid": "198309c8-8802-47f7-9839-3cce2c8d05f7",
+      "productName": "Santa bloom 5% AHA serum Deodorant",
+      "brand": "Saltair"
+    },
+    {
+      "scanId": "37947d80-85de-45bc-b372-20c16c25921e",
+      "oldUserUuid": "4efb5df3-ce0a-40f6-ae13-6defa1610d3a",
+      "newUserUuid": "fc196879-6d44-42c4-a17b-740d9200fe52",
+      "productName": "Skin Perfecting 2% BHA Exfoliating Toner for Clear Skin",
+      "brand": "Paula's Choice"
+    },
+    {
+      "scanId": "cc17f0b7-7681-400d-bd0b-9ade85bbdcb5",
+      "oldUserUuid": "002235e1-89ca-4524-a4b4-7f3553d023ce",
+      "newUserUuid": "9ee9e215-b981-4869-9486-0fda6a8f4925",
+      "productName": "The Ordinary Niacinamide",
+      "brand": null
+    },
+    {
+      "scanId": "c85d20bb-05ba-4aa6-965e-62a7f42e2bbc",
+      "oldUserUuid": "69a15571-b5e7-4417-90fe-ef1039e2c6a7",
+      "newUserUuid": "8bfa87b4-c056-4daa-ad9b-bddeede986f3",
+      "productName": "Moroccan Rose ",
+      "brand": "Tree Hut "
+    },
+    {
+      "scanId": "c33eb2ba-425a-4ff1-b527-5bc774be5962",
+      "oldUserUuid": "4efb5df3-ce0a-40f6-ae13-6defa1610d3a",
+      "newUserUuid": "bb48eb0a-83ef-4e4d-8732-2ec88712397b",
+      "productName": "Toleraine cleanser ",
+      "brand": "La roche posay"
+    },
+    {
+      "scanId": "65f60a9e-9b66-46b5-86d1-0054188d5736",
+      "oldUserUuid": "f8330e90-48bb-431e-b64e-b71866305698",
+      "newUserUuid": "80399f65-b72d-4111-8aaf-7d101d724c4a",
+      "productName": "Superfood Antioxidant Cleanser",
+      "brand": "Youth to the People"
+    },
+    {
+      "scanId": "95511cde-0162-4fcf-bc03-7ecf70442a42",
+      "oldUserUuid": "4efb5df3-ce0a-40f6-ae13-6defa1610d3a",
+      "newUserUuid": "a62e50b1-9611-4952-aa8e-074373bd7134",
+      "productName": "toleraine double moisture matte moisturizer",
+      "brand": "La Roche-Posay"
+    },
+    {
+      "scanId": "9b09e78e-7d1c-4121-9f8c-2e11d61957b2",
+      "oldUserUuid": "c4feb2ce-5a3f-47c2-9b87-058d110e6ce7",
+      "newUserUuid": "3871787a-f143-4a06-8425-ee3d98edfde0",
+      "productName": "Pure Cocoa Butter",
+      "brand": "Red Fox Cocoa Butter"
+    },
+    {
+      "scanId": "7af20646-33b5-4284-8652-a4c02b61ac29",
+      "oldUserUuid": "c4feb2ce-5a3f-47c2-9b87-058d110e6ce7",
+      "newUserUuid": "2596e354-cde3-4045-87dd-f4aa815f44a2",
+      "productName": "Odele",
+      "brand": "Odele"
+    },
+    {
+      "scanId": "942ae136-929b-422a-9faa-25e537ebaf0c",
+      "oldUserUuid": "4efb5df3-ce0a-40f6-ae13-6defa1610d3a",
+      "newUserUuid": "512f5664-03c8-4604-b912-f045c946a352",
+      "productName": "72Hr! Odor Control Aluminum Free Deodorant",
+      "brand": "Lume"
+    },
+    {
+      "scanId": "2031ab67-b39d-4f32-bfdc-898c161bcbea",
+      "oldUserUuid": "cb8048b3-a6bd-481b-8774-560dada2af59",
+      "newUserUuid": "86b3f49a-2113-4981-9cd5-cb222ad03fe1",
+      "productName": "72Hr! Odor Control Aluminum Free Deodorant",
+      "brand": "Lumë"
+    },
+    {
+      "scanId": "50c9af50-3fef-4422-b16b-4fa34560b8f6",
+      "oldUserUuid": "4d732879-4cfa-49c1-8b6a-328e707a0428",
+      "newUserUuid": "5974c70a-9ee6-4907-9244-107ad4271372",
+      "productName": "Hydro Boost cleanser WATER GEL",
+      "brand": "Neutrogena"
+    },
+    {
+      "scanId": "10b9be03-47b6-4bcd-a811-85d90486ec2e",
+      "oldUserUuid": "cb8048b3-a6bd-481b-8774-560dada2af59",
+      "newUserUuid": "1b530127-2966-47b3-9743-daa8c8e089a8",
+      "productName": "72Hr! Odor Control",
+      "brand": "Lume"
+    },
+    {
+      "scanId": "6a4ed9fd-7eaa-4764-883c-f40acb27fd85",
+      "oldUserUuid": "4d732879-4cfa-49c1-8b6a-328e707a0428",
+      "newUserUuid": "0d47b715-e7ec-428c-81e6-586bbd202f91",
+      "productName": "Lhyaluronic acid 2% + b5",
+      "brand": "The ordinary "
+    },
+    {
+      "scanId": "a05a5cf1-bcd7-4eb2-b932-27689bffb381",
+      "oldUserUuid": "4d732879-4cfa-49c1-8b6a-328e707a0428",
+      "newUserUuid": "b35ff543-4919-4604-8f11-3effc991ffb3",
+      "productName": "Daily moisturizer ",
+      "brand": "Good clean goop beauty "
+    },
+    {
+      "scanId": "4c9623e3-46fd-4dde-ab73-df8ffba122db",
+      "oldUserUuid": "4d732879-4cfa-49c1-8b6a-328e707a0428",
+      "newUserUuid": "f8641708-edd7-48c7-987d-c5a29df85326",
+      "productName": "THE NUTRIENT-RICH DAILY MOISTURIZER",
+      "brand": "goop"
+    },
+    {
+      "scanId": "de64606b-a0a6-4310-aa16-2a20cfba3132",
+      "oldUserUuid": "f87f24a9-30a4-4367-ad56-6674f9642dc8",
+      "newUserUuid": "b9338781-e5f9-49c1-8ee5-583f2117d357",
+      "productName": "TOLERIANE DOUBLE REPAIR FACE MOISTURIZER UV BROAD SPECTRUM SPF 30",
+      "brand": "LA ROCHE-POSAY"
+    },
+    {
+      "scanId": "ebae9135-c8d9-4cc6-bf1a-6bc2a97acc6a",
+      "oldUserUuid": "5ca997e4-9613-49d4-ab4f-ff56464127a6",
+      "newUserUuid": "8c1d419a-a50a-4810-9f6a-80a3a5d8be71",
+      "productName": "Dry & Itchy Scalp Care Olive & Tea Tree Oil Shampoo",
+      "brand": "As I Am."
+    },
+    {
+      "scanId": "da52e1f0-8915-4553-b9e3-8b0d32a3859e",
+      "oldUserUuid": "7d88a687-a996-4b58-ab5f-a60f0648ceff",
+      "newUserUuid": "66e520a5-fc74-456a-8e8d-fef5339875ec",
+      "productName": "collagen dream night cream",
+      "brand": "OSEA"
+    },
+    {
+      "scanId": "28aeb05e-98d5-4bb1-a28e-929d53341e28",
+      "oldUserUuid": "4efb5df3-ce0a-40f6-ae13-6defa1610d3a",
+      "newUserUuid": "7f226ed2-9623-4bca-a473-5ecf31389e2e",
+      "productName": "72Hr! Odor Control",
+      "brand": "Lumë"
+    },
+    {
+      "scanId": "4d309691-e0ac-4d09-991e-9af05b885243",
+      "oldUserUuid": "01a3e2bf-65f8-4395-ae05-c8609cf28dcf",
+      "newUserUuid": "c56a505a-7bf9-4d3e-a4f7-a35bb7f8b8be",
+      "productName": "Moroccan Rose ",
+      "brand": "Tree Hut "
+    },
+    {
+      "scanId": "00fa95da-b601-4a83-a5cf-79339e95c711",
+      "oldUserUuid": "4efb5df3-ce0a-40f6-ae13-6defa1610d3a",
+      "newUserUuid": "d67f34ee-650b-4f5a-818c-86d699c5252a",
+      "productName": "72Hr! Odor Control",
+      "brand": "Lume"
+    },
+    {
+      "scanId": "2470a0d6-8f6f-4747-957c-ff2abacf1885",
+      "oldUserUuid": "4efb5df3-ce0a-40f6-ae13-6defa1610d3a",
+      "newUserUuid": "625b088e-5977-4203-8d7b-27d3ca2ae27b",
+      "productName": "toleraine cleanser",
+      "brand": "La Roche-Posay"
+    },
+    {
+      "scanId": "b268aa0e-fdb6-4ad1-b59c-0e0dde296124",
+      "oldUserUuid": "d26626ba-cd39-47f0-9347-67642bffd452",
+      "newUserUuid": "c2ac2da8-acc0-48c0-a7cb-51f96c56f327",
+      "productName": "Cerave",
+      "brand": null
+    },
+    {
+      "scanId": "95be4e2b-1129-48ef-b7bb-ae8ef639a2c4",
+      "oldUserUuid": "4efb5df3-ce0a-40f6-ae13-6defa1610d3a",
+      "newUserUuid": "7d2fac66-0c35-4e8b-8a06-e3430e87c85b",
+      "productName": "eos Shea Better Moisture Body Lotion - Vanilla Cashmere",
+      "brand": "EOS"
+    },
+    {
+      "scanId": "afb1f8b7-a715-4ae5-a4d1-4d76cbf83d7b",
+      "oldUserUuid": "4efb5df3-ce0a-40f6-ae13-6defa1610d3a",
+      "newUserUuid": "26348ac5-dbfc-4a17-80ca-b0a79ab05084",
+      "productName": "Palmers Cocoa Butter Formula Moisturizing Body Oil Cocoa & Shea ",
+      "brand": "Palmers"
+    },
+    {
+      "scanId": "b7fc1414-ef47-4db0-9dbf-c4734bd9a058",
+      "oldUserUuid": "4efb5df3-ce0a-40f6-ae13-6defa1610d3a",
+      "newUserUuid": "4e3c3de3-62f2-462d-818d-78d16dfe4c93",
+      "productName": "Body wash Santal & Veviter",
+      "brand": "Salt And Stone"
+    },
+    {
+      "scanId": "9e1f0269-db63-4ab2-b055-d85c3902bcfd",
+      "oldUserUuid": "4efb5df3-ce0a-40f6-ae13-6defa1610d3a",
+      "newUserUuid": "682e9c56-2d14-4cf0-b874-6596b0ef1a60",
+      "productName": "Rose Petal Toner",
+      "brand": "THAYER'S"
+    },
+    {
+      "scanId": "f672c778-c442-490f-b97c-96dcec892b5c",
+      "oldUserUuid": "4efb5df3-ce0a-40f6-ae13-6defa1610d3a",
+      "newUserUuid": "543ad727-efaf-4964-b4c6-cf7cb431657d",
+      "productName": "Shampoo",
+      "brand": "Cecred"
+    },
+    {
+      "scanId": "8a6b4fe6-b9b8-49f0-816f-3b1c88b9e2ab",
+      "oldUserUuid": "4efb5df3-ce0a-40f6-ae13-6defa1610d3a",
+      "newUserUuid": "edf703c1-3d54-4092-b80e-f11dea1ef40c",
+      "productName": "Daily Microfoliant Exfoliator",
+      "brand": "dermalogica"
+    },
+    {
+      "scanId": "d432a721-b193-4a71-ae09-9e2868713e20",
+      "oldUserUuid": "4efb5df3-ce0a-40f6-ae13-6defa1610d3a",
+      "newUserUuid": "1b0b1f16-aa8f-4679-a127-ba094eea3524",
+      "productName": "Rose Petal Toner",
+      "brand": "THAYERS"
+    },
+    {
+      "scanId": "37c7263f-e580-44bc-9743-48efc4ede74f",
+      "oldUserUuid": "4efb5df3-ce0a-40f6-ae13-6defa1610d3a",
+      "newUserUuid": "3b44e62c-c194-4dda-8b4d-70874139318e",
+      "productName": "body wash",
+      "brand": "saltair"
+    },
+    {
+      "scanId": "a329c788-fdb2-436b-9171-174f742d2c21",
+      "oldUserUuid": "4efb5df3-ce0a-40f6-ae13-6defa1610d3a",
+      "newUserUuid": "a3de44aa-d650-4b02-b46e-c452827112b4",
+      "productName": "Multi-Lipid Body Butter",
+      "brand": "Saltair"
+    },
+    {
+      "scanId": "9812e62b-9883-484f-9bad-03b7d1da9308",
+      "oldUserUuid": "4d732879-4cfa-49c1-8b6a-328e707a0428",
+      "newUserUuid": "6e8995ac-7f8d-4341-b59c-ea0741259f5a",
+      "productName": "THE NUTRIENT-RICH DAILY MOISTURIZER",
+      "brand": "good. clean. goop beauty"
+    },
+    {
+      "scanId": "927e1732-1f5d-4f6e-aae2-5e2cd5c7564b",
+      "oldUserUuid": "4d732879-4cfa-49c1-8b6a-328e707a0428",
+      "newUserUuid": "181cb709-a11b-411e-acbb-5e32a33c31c7",
+      "productName": "Glycolic Acid 7% Exfoliating and Brightening Daily Toner",
+      "brand": "The ordinary"
+    },
+    {
+      "scanId": "ea965646-a91b-4f6f-84b2-80dad9ebd46e",
+      "oldUserUuid": "4d732879-4cfa-49c1-8b6a-328e707a0428",
+      "newUserUuid": "1216d737-ce6e-4b85-ac38-ec16c9ac6c50",
+      "productName": "Hyaluronic Acid 2% + B5 Hydrating Serum with Ceramides",
+      "brand": "The ordinary"
+    },
+    {
+      "scanId": "501e7d09-2634-43da-9ce0-f01426a7290a",
+      "oldUserUuid": "4d732879-4cfa-49c1-8b6a-328e707a0428",
+      "newUserUuid": "356b550b-87d4-468c-879e-4d529a98ee91",
+      "productName": "Niacinamide 10% + Zinc 1% Serum for Oily Skin",
+      "brand": "The ordinary "
+    },
+    {
+      "scanId": "6429a04f-0a30-4a47-aa5a-781ea8416d18",
+      "oldUserUuid": "4d732879-4cfa-49c1-8b6a-328e707a0428",
+      "newUserUuid": "fafddd84-9740-4789-a215-78e5c1d8cddc",
+      "productName": "Ascorbyl Glucoside Solution 12%, Vitamin C Serum",
+      "brand": "The ordinary "
+    },
+    {
+      "scanId": "1b401907-2bb9-4bb7-9c13-d1d2ab9b868d",
+      "oldUserUuid": "4d732879-4cfa-49c1-8b6a-328e707a0428",
+      "newUserUuid": "b56a05ad-cc29-4c51-9778-c2f1d8d769f9",
+      "productName": "Shea butter ",
+      "brand": null
+    },
+    {
+      "scanId": "4a675c82-1a3d-405b-8560-e4455d72235c",
+      "oldUserUuid": "4d732879-4cfa-49c1-8b6a-328e707a0428",
+      "newUserUuid": "e039d423-aca3-45a9-8852-b572c65cbb75",
+      "productName": "HYDRATING GEL MOISTURIZER WITH ELECTROLYTES",
+      "brand": "GOOD MOLECULES"
+    },
+    {
+      "scanId": "cc84618a-e48b-4c63-a338-3c84b9547238",
+      "oldUserUuid": "4d732879-4cfa-49c1-8b6a-328e707a0428",
+      "newUserUuid": "a116901f-7d76-44d2-97e0-4d140a3d7333",
+      "productName": "MAKE IT HYBRID Mineral Combo",
+      "brand": "BLACK GIRL SUNSCREEN"
+    },
+    {
+      "scanId": "8c5b94b9-2779-4a25-93ed-1aa9052626a4",
+      "oldUserUuid": "4efb5df3-ce0a-40f6-ae13-6defa1610d3a",
+      "newUserUuid": "efbe63bc-6d9f-47b2-a4a6-b3a687c8618f",
+      "productName": "Zero Pore Pad",
+      "brand": "Medicube"
+    },
+    {
+      "scanId": "b6377921-57f2-4fef-a68f-78ca2595185a",
+      "oldUserUuid": "4efb5df3-ce0a-40f6-ae13-6defa1610d3a",
+      "newUserUuid": "c3a94f39-6841-4b8a-8521-02185a573b8a",
+      "productName": "Zero Pore Pad",
+      "brand": "Medicube"
+    },
+    {
+      "scanId": "1694725a-e615-4309-bae3-cd0dfd0b78f6",
+      "oldUserUuid": "4efb5df3-ce0a-40f6-ae13-6defa1610d3a",
+      "newUserUuid": "14a16c5f-5afb-4443-855b-7711d13eab6f",
+      "productName": "Lipikar AP+M Triple Repair Body Moisturizing Cream for Dry Skin",
+      "brand": "La Roche-Posay"
+    },
+    {
+      "scanId": "0c4486f2-ad19-4cb5-afc6-1e06bbcc1a44",
+      "oldUserUuid": "4efb5df3-ce0a-40f6-ae13-6defa1610d3a",
+      "newUserUuid": "8e6ca83d-b7e8-4d46-8af0-e2910676210a",
+      "productName": "Lipikar AP+M Triple Repair Body Moisturizing Cream for Dry Skin",
+      "brand": "La Roche-Posay"
+    },
+    {
+      "scanId": "c8d51784-fa17-47ca-ba6f-fc7103ad8262",
+      "oldUserUuid": "4efb5df3-ce0a-40f6-ae13-6defa1610d3a",
+      "newUserUuid": "5f9ef85f-3d28-4024-948d-89d9f658886c",
+      "productName": "Lipikar AP+M Triple Repair Body Moisturizing Cream for Dry Skin",
+      "brand": "La Roche-Posay"
+    },
+    {
+      "scanId": "44e4c367-0511-4039-b3be-dc1788d534a0",
+      "oldUserUuid": "4d732879-4cfa-49c1-8b6a-328e707a0428",
+      "newUserUuid": "6b7d62fb-7c3d-4fde-918f-26c937261e2e",
+      "productName": "Toleriane Purifying Foaming Face Wash for Oily Skin",
+      "brand": "La Roche-Posay"
+    },
+    {
+      "scanId": "15a0a0cf-3821-4db0-b186-99b434aae0cc",
+      "oldUserUuid": "4d732879-4cfa-49c1-8b6a-328e707a0428",
+      "newUserUuid": "bbe9a7bf-cbd3-4dce-84c7-e2a9782af92a",
+      "productName": "Witch Hazel Alcohol Free Toner with Rose Petal",
+      "brand": "Thayers Natural Remedies"
+    },
+    {
+      "scanId": "d471fe01-ee68-4a8e-ab63-5f9f4be23b3f",
+      "oldUserUuid": "4d732879-4cfa-49c1-8b6a-328e707a0428",
+      "newUserUuid": "45d28611-5076-431e-9236-bbd5f806c414",
+      "productName": "Original Witch Hazel Pore Perfecting 100% Natural Toner",
+      "brand": "Dickinson's"
+    },
+    {
+      "scanId": "dded6b8e-07b3-4119-8984-942673a6dd13",
+      "oldUserUuid": "4d732879-4cfa-49c1-8b6a-328e707a0428",
+      "newUserUuid": "3442d1fc-939b-4076-ad3b-0f908be2ce43",
+      "productName": "Multi-Peptide Moisturizer",
+      "brand": "Naturium"
+    },
+    {
+      "scanId": "82de249e-587f-4047-82cb-6c3f67dea087",
+      "oldUserUuid": "4d732879-4cfa-49c1-8b6a-328e707a0428",
+      "newUserUuid": "80c09810-7a89-4c4f-abc5-8f59036cd080",
+      "productName": "Vitamin C Complex Serum",
+      "brand": "Naturium"
+    },
+    {
+      "scanId": "a9bab84e-babd-49e2-9c6e-1aa61d51282e",
+      "oldUserUuid": "a62e50b1-9611-4952-aa8e-074373bd7134",
+      "newUserUuid": "890229b4-8fba-4521-9989-5483dcee62f7",
+      "productName": "Hydro Boost Hydrating Serum",
+      "brand": "Neutrogena"
+    },
+    {
+      "scanId": "a32df877-6f8c-4204-93e6-51aac4975462",
+      "oldUserUuid": "4efb5df3-ce0a-40f6-ae13-6defa1610d3a",
+      "newUserUuid": "2a492020-7e11-4bf2-a028-590b07538859",
+      "productName": "Cleansing Complex",
+      "brand": "iS Clinical"
+    },
+    {
+      "scanId": "753de877-a93b-474b-9479-2ac24c1764f5",
+      "oldUserUuid": "4efb5df3-ce0a-40f6-ae13-6defa1610d3a",
+      "newUserUuid": "5e93f015-e9ce-45aa-bc2c-ecfdbfbd6027",
+      "productName": "Lipikar AP+M Triple Repair Body Moisturizing Cream for Dry Skin",
+      "brand": "La Roche-Posay"
+    },
+    {
+      "scanId": "18935c91-83f5-41c5-b5a9-09a06857d179",
+      "oldUserUuid": "4efb5df3-ce0a-40f6-ae13-6defa1610d3a",
+      "newUserUuid": "64132369-513f-4bd4-982c-e9c31c5a01d9",
+      "productName": "Lightweight Daily moisturizer",
+      "brand": "Good molecules"
+    },
+    {
+      "scanId": "592cf2d2-f60f-4b00-9c21-50f9b9dc6eca",
+      "oldUserUuid": "3871787a-f143-4a06-8425-ee3d98edfde0",
+      "newUserUuid": "b9eb3aa9-49e2-4e70-92ea-a23d35de53f5",
+      "productName": "Glymed+",
+      "brand": "GlyMed Plus"
+    },
+    {
+      "scanId": "459b11c5-f704-4eb7-a4a2-3748d3bae698",
+      "oldUserUuid": "2596e354-cde3-4045-87dd-f4aa815f44a2",
+      "newUserUuid": "cb4efe71-632f-4f0c-831e-96e9b12a708e",
+      "productName": "Lightweight Daily moisturizer",
+      "brand": "Good molecules"
+    },
+    {
+      "scanId": "bb5ec49a-bbca-4d70-a22b-d4271ea58703",
+      "oldUserUuid": "2596e354-cde3-4045-87dd-f4aa815f44a2",
+      "newUserUuid": "8963c7a4-a1bb-4f04-8145-84654e63bc84",
+      "productName": "Lightweight Daily moisturizer",
+      "brand": "Good molecules"
+    },
+    {
+      "scanId": "3287694c-e3d4-4bba-b197-54b6ba802ea0",
+      "oldUserUuid": "4d732879-4cfa-49c1-8b6a-328e707a0428",
+      "newUserUuid": "4efb5df3-ce0a-40f6-ae13-6defa1610d3a",
+      "productName": "WATER DRENCH® HYALURONIC JELLY MOISTURIZER",
+      "brand": "PETERTHOMASROTH"
+    },
+    {
+      "scanId": "1747a06d-cbf1-44fd-ac2b-24c93f90aa10",
+      "oldUserUuid": "4d732879-4cfa-49c1-8b6a-328e707a0428",
+      "newUserUuid": "1efb1396-aa1e-419c-8ba2-1b6366143783",
+      "productName": "WATER DRENCH ICE-FACIAL COOLING MIST",
+      "brand": "PETERTHOMASROT"
+    },
+    {
+      "scanId": "41b7d9c6-3507-4247-8441-8bae280cfddc",
+      "oldUserUuid": "4d732879-4cfa-49c1-8b6a-328e707a0428",
+      "newUserUuid": "002235e1-89ca-4524-a4b4-7f3553d023ce",
+      "productName": "WATER DRENCH® HYALURONIC CLOUD HYDRA-GEL EYE PATCHES",
+      "brand": "PETERTHOMASROTH"
+    },
+    {
+      "scanId": "fa3b9da3-2b30-46dc-a562-1d64d30d0497",
+      "oldUserUuid": "4d732879-4cfa-49c1-8b6a-328e707a0428",
+      "newUserUuid": "5880857f-ef2b-4b83-834f-5a312ee67152",
+      "productName": "Advanced Snail 96 Mucin Power Essence",
+      "brand": "COSRX"
+    },
+    {
+      "scanId": "43b325cf-3240-4d51-9782-ca7ded2b75fa",
+      "oldUserUuid": "4d732879-4cfa-49c1-8b6a-328e707a0428",
+      "newUserUuid": "69a15571-b5e7-4417-90fe-ef1039e2c6a7",
+      "productName": "The 6 Peptide Skin Booster",
+      "brand": "COSRX"
+    },
+    {
+      "scanId": "c8fe77d5-c7ae-4d84-90ab-e02dbf887c9f",
+      "oldUserUuid": "86b3f49a-2113-4981-9cd5-cb222ad03fe1",
+      "newUserUuid": "e02f0cae-fe80-4066-adf9-d67225abc3d4",
+      "productName": "limpiador facial",
+      "brand": "Black Girl Sunscreen"
+    },
+    {
+      "scanId": "69922dab-4f2c-45d4-854e-bc7ca63bee57",
+      "oldUserUuid": "86b3f49a-2113-4981-9cd5-cb222ad03fe1",
+      "newUserUuid": "f8330e90-48bb-431e-b64e-b71866305698",
+      "productName": "FACE CLEANSER",
+      "brand": "Fenty"
+    },
+    {
+      "scanId": "aa79905f-eca3-46bd-8579-b496d517086b",
+      "oldUserUuid": "86b3f49a-2113-4981-9cd5-cb222ad03fe1",
+      "newUserUuid": "431d1313-0264-4315-8820-e815ce651170",
+      "productName": "Fat water",
+      "brand": "Fenty Skin"
+    },
+    {
+      "scanId": "7b569ff8-817f-4247-b107-c01296212a00",
+      "oldUserUuid": "86b3f49a-2113-4981-9cd5-cb222ad03fe1",
+      "newUserUuid": "c4feb2ce-5a3f-47c2-9b87-058d110e6ce7",
+      "productName": "Watermelon Glow Niacinamide Dew Drops",
+      "brand": null
+    },
+    {
+      "scanId": "c7df6fe0-24e0-42e8-a0cf-a0195c197616",
+      "oldUserUuid": "86b3f49a-2113-4981-9cd5-cb222ad03fe1",
+      "newUserUuid": "02484e4b-b2dd-4c13-9879-65df2995b579",
+      "productName": "innisfree Green Tea Seed Hyaluronic Acid Cream",
+      "brand": "Innsfree"
+    },
+    {
+      "scanId": "e2131f03-d726-4dde-ba34-b23ea430d85a",
+      "oldUserUuid": "5974c70a-9ee6-4907-9244-107ad4271372",
+      "newUserUuid": "8534f2c2-24fb-4d55-a99e-1864f058eb97",
+      "productName": "Neutrogena HydroBoost",
+      "brand": "Neutrogena"
+    },
+    {
+      "scanId": "a5d9728e-b275-4a1b-a095-7307c29a2df5",
+      "oldUserUuid": "b35ff543-4919-4604-8f11-3effc991ffb3",
+      "newUserUuid": "4d732879-4cfa-49c1-8b6a-328e707a0428",
+      "productName": "2% BHA Liquid Exfoliant with Salicylic Acid",
+      "brand": "Walgreens"
+    },
+    {
+      "scanId": "f2015ae7-8814-482b-bdb4-3a5730651261",
+      "oldUserUuid": "4efb5df3-ce0a-40f6-ae13-6defa1610d3a",
+      "newUserUuid": "f87f24a9-30a4-4367-ad56-6674f9642dc8",
+      "productName": "Hydro Boost Hyaluronic Acid Water Gel Moisturizer",
+      "brand": "Neutrogena"
+    },
+    {
+      "scanId": "39f22f0a-6830-4117-b570-fb92052b08d3",
+      "oldUserUuid": "86b3f49a-2113-4981-9cd5-cb222ad03fe1",
+      "newUserUuid": "5ca997e4-9613-49d4-ab4f-ff56464127a6",
+      "productName": "Moisturizers",
+      "brand": "Jergens"
+    },
+    {
+      "scanId": "7c76e397-afd1-48e2-b6ae-f473a28f10a0",
+      "oldUserUuid": "86b3f49a-2113-4981-9cd5-cb222ad03fe1",
+      "newUserUuid": "7d88a687-a996-4b58-ab5f-a60f0648ceff",
+      "productName": "Bermuda BushBalm dark spot scrub",
+      "brand": "Bushbalm"
+    },
+    {
+      "scanId": "40afc36d-bc82-4545-86f4-aa652a49aadb",
+      "oldUserUuid": "86b3f49a-2113-4981-9cd5-cb222ad03fe1",
+      "newUserUuid": "01a3e2bf-65f8-4395-ae05-c8609cf28dcf",
+      "productName": "Dove Body Wash",
+      "brand": "Dove"
+    },
+    {
+      "scanId": "fe265a77-5109-40d4-a52c-4e71a6763bb6",
+      "oldUserUuid": "86b3f49a-2113-4981-9cd5-cb222ad03fe1",
+      "newUserUuid": "21f8419c-671c-4e13-a8cf-15c099e6b702",
+      "productName": "Tea tree body wash",
+      "brand": "Botanic Hearth"
+    },
+    {
+      "scanId": "dad66cb7-85e1-43fe-b4ab-eb312c25aaea",
+      "oldUserUuid": "4efb5df3-ce0a-40f6-ae13-6defa1610d3a",
+      "newUserUuid": "ed1ca66f-4cf0-4d6f-8db4-87012cbc3ddf",
+      "productName": "Effaclar Face Serum with Salicylic Acid",
+      "brand": "La Roche-Posay"
+    },
+    {
+      "scanId": "71add450-453b-42a9-8987-c7c7d125ee90",
+      "oldUserUuid": "4efb5df3-ce0a-40f6-ae13-6defa1610d3a",
+      "newUserUuid": "d26626ba-cd39-47f0-9347-67642bffd452",
+      "productName": "Advanced Snail 96 Mucin Power Essence",
+      "brand": "COSRX"
+    },
+    {
+      "scanId": "65b9a0ab-e860-4554-964e-00cccc9f2d22",
+      "oldUserUuid": "4efb5df3-ce0a-40f6-ae13-6defa1610d3a",
+      "newUserUuid": "a74a5827-731c-4e0b-a2ba-ab19a867f76b",
+      "productName": "Effaclar Clarifying Solution Acne Toner",
+      "brand": "La Roche-Posay"
+    },
+    {
+      "scanId": "fca04b79-3cb2-40e2-b5e8-3cf52925bd5c",
+      "oldUserUuid": "4efb5df3-ce0a-40f6-ae13-6defa1610d3a",
+      "newUserUuid": "198309c8-8802-47f7-9839-3cce2c8d05f7",
+      "productName": "Super C Ferulic 30% Ethylated L-Ascorbic Acid (Vitamin C) Serum",
+      "brand": "Medik8"
+    },
+    {
+      "scanId": "59c5358e-8908-468d-a7dc-6ad18d3860c8",
+      "oldUserUuid": "4efb5df3-ce0a-40f6-ae13-6defa1610d3a",
+      "newUserUuid": "fc196879-6d44-42c4-a17b-740d9200fe52",
+      "productName": "Super C Ferulic 30% Ethylated L-Ascorbic Acid (Vitamin C) Serum",
+      "brand": "Medik8"
+    },
+    {
+      "scanId": "5a2e882a-6ca7-4d63-97d0-b954e0cefe81",
+      "oldUserUuid": "c4feb2ce-5a3f-47c2-9b87-058d110e6ce7",
+      "newUserUuid": "9ee9e215-b981-4869-9486-0fda6a8f4925",
+      "productName": "Eos moisture body lotion",
+      "brand": "eos"
+    },
+    {
+      "scanId": "271efedf-9c20-4f58-9499-2ba2ea77882e",
+      "oldUserUuid": "4d732879-4cfa-49c1-8b6a-328e707a0428",
+      "newUserUuid": "8bfa87b4-c056-4daa-ad9b-bddeede986f3",
+      "productName": "Superfood Air-Whip Moisture Cream",
+      "brand": "Youth To The People"
+    },
+    {
+      "scanId": "569ed17d-03a4-4674-b079-12dc8a148a4c",
+      "oldUserUuid": "682e9c56-2d14-4cf0-b874-6596b0ef1a60",
+      "newUserUuid": "bb48eb0a-83ef-4e4d-8732-2ec88712397b",
+      "productName": "la roche posay",
+      "brand": "N"
+    },
+    {
+      "scanId": "8c0fbfa1-898f-46b8-be9c-63e39b18757b",
+      "oldUserUuid": "181cb709-a11b-411e-acbb-5e32a33c31c7",
+      "newUserUuid": "80399f65-b72d-4111-8aaf-7d101d724c4a",
+      "productName": "Foaming Facial Cleanser",
+      "brand": "CeraVe"
+    },
+    {
+      "scanId": "30144d0f-7e42-4d20-8b84-1a9cc0dfb0ff",
+      "oldUserUuid": "181cb709-a11b-411e-acbb-5e32a33c31c7",
+      "newUserUuid": "a62e50b1-9611-4952-aa8e-074373bd7134",
+      "productName": "Foaming Facial Cleanser",
+      "brand": "CeraVe"
+    },
+    {
+      "scanId": "3d966afe-e3ad-4351-911e-c3ea49001858",
+      "oldUserUuid": "181cb709-a11b-411e-acbb-5e32a33c31c7",
+      "newUserUuid": "3871787a-f143-4a06-8425-ee3d98edfde0",
+      "productName": "Hydrating Facial Cleanser",
+      "brand": "CeraVe"
+    },
+    {
+      "scanId": "b4c67902-239e-4fda-8b67-6c888ef8d81a",
+      "oldUserUuid": "181cb709-a11b-411e-acbb-5e32a33c31c7",
+      "newUserUuid": "2596e354-cde3-4045-87dd-f4aa815f44a2",
+      "productName": "Hydrating Facial Cleanser",
+      "brand": "CeraVe"
+    },
+    {
+      "scanId": "68ba0245-a718-425b-88c4-b181be0beaf3",
+      "oldUserUuid": "181cb709-a11b-411e-acbb-5e32a33c31c7",
+      "newUserUuid": "512f5664-03c8-4604-b912-f045c946a352",
+      "productName": "Hydrating Facial Cleanser",
+      "brand": "CeraVe"
+    },
+    {
+      "scanId": "02162606-ec13-4c81-8be8-386878afcfbd",
+      "oldUserUuid": "fafddd84-9740-4789-a215-78e5c1d8cddc",
+      "newUserUuid": "86b3f49a-2113-4981-9cd5-cb222ad03fe1",
+      "productName": "Cleansing Gel For Fresh, Clear Skin Gentle Hydrating Cleanser With Glycerin",
+      "brand": "MELE"
+    },
+    {
+      "scanId": "8879381e-20b6-40d1-9a16-108f42b805b6",
+      "oldUserUuid": "80399f65-b72d-4111-8aaf-7d101d724c4a",
+      "newUserUuid": "5974c70a-9ee6-4907-9244-107ad4271372",
+      "productName": "Renewing SA Cleanser",
+      "brand": "CeraVe"
+    },
+    {
+      "scanId": "2889dba4-8c18-41d4-8770-2da61c85d2a1",
+      "oldUserUuid": "80399f65-b72d-4111-8aaf-7d101d724c4a",
+      "newUserUuid": "1b530127-2966-47b3-9743-daa8c8e089a8",
+      "productName": "Milk Shake",
+      "brand": "BEEKMAN 1802"
+    },
+    {
+      "scanId": "09308b61-1734-49aa-94ec-8f9adae96b01",
+      "oldUserUuid": "80399f65-b72d-4111-8aaf-7d101d724c4a",
+      "newUserUuid": "0d47b715-e7ec-428c-81e6-586bbd202f91",
+      "productName": "Advanced Snail 92",
+      "brand": "COSRX"
+    },
+    {
+      "scanId": "4adc0603-d0f9-443e-8d09-a4d3d8a05360",
+      "oldUserUuid": "4d732879-4cfa-49c1-8b6a-328e707a0428",
+      "newUserUuid": "b35ff543-4919-4604-8f11-3effc991ffb3",
+      "productName": "PHA 5% Exfoliating Lip Serum",
+      "brand": "The Ordinary."
+    },
+    {
+      "scanId": "020c43bf-1596-4cea-ae99-70cf529f8686",
+      "oldUserUuid": "4efb5df3-ce0a-40f6-ae13-6defa1610d3a",
+      "newUserUuid": "f8641708-edd7-48c7-987d-c5a29df85326",
+      "productName": "Brightening & Dark Spots Bar",
+      "brand": "Good molecules"
+    },
+    {
+      "scanId": "6b644deb-a532-48d0-94db-cb97149e7c00",
+      "oldUserUuid": "b56a05ad-cc29-4c51-9778-c2f1d8d769f9",
+      "newUserUuid": "b9338781-e5f9-49c1-8ee5-583f2117d357",
+      "productName": "Matrescence  Rose Glow",
+      "brand": null
+    },
+    {
+      "scanId": "7190f8dd-a64c-4014-a55c-b3e8077fe2bc",
+      "oldUserUuid": "f87f24a9-30a4-4367-ad56-6674f9642dc8",
+      "newUserUuid": "8c1d419a-a50a-4810-9f6a-80a3a5d8be71",
+      "productName": "HYALU B5 SERUM",
+      "brand": "LA ROCHE-POSAY"
+    },
+    {
+      "scanId": "03c79100-7f79-48de-b747-8c602cf711c5",
+      "oldUserUuid": "f87f24a9-30a4-4367-ad56-6674f9642dc8",
+      "newUserUuid": "66e520a5-fc74-456a-8e8d-fef5339875ec",
+      "productName": "Lipikar Soothing Relief Cream",
+      "brand": "La Roche-Posay"
+    },
+    {
+      "scanId": "e4310140-d4e9-43cd-9fc3-3bacb42de976",
+      "oldUserUuid": "efbe63bc-6d9f-47b2-a4a6-b3a687c8618f",
+      "newUserUuid": "7f226ed2-9623-4bca-a473-5ecf31389e2e",
+      "productName": "STUDIO FINISH CONCEALER SPF 35",
+      "brand": "MAC"
+    },
+    {
+      "scanId": "be490d62-f571-4b17-b483-9939fdfeba6b",
+      "oldUserUuid": "8e6ca83d-b7e8-4d46-8af0-e2910676210a",
+      "newUserUuid": "c56a505a-7bf9-4d3e-a4f7-a35bb7f8b8be",
+      "productName": "Sulfur 8 ",
+      "brand": "Sulfura"
+    },
+    {
+      "scanId": "2ea7cae2-f405-4699-9025-24e257419526",
+      "oldUserUuid": "ed1ca66f-4cf0-4d6f-8db4-87012cbc3ddf",
+      "newUserUuid": "d67f34ee-650b-4f5a-818c-86d699c5252a",
+      "productName": "Gentle exfoliating SA cleanser",
+      "brand": "cetaphil"
+    },
+    {
+      "scanId": "d0586380-c3d0-4575-ab2b-30d434706fa0",
+      "oldUserUuid": "ed1ca66f-4cf0-4d6f-8db4-87012cbc3ddf",
+      "newUserUuid": "625b088e-5977-4203-8d7b-27d3ca2ae27b",
+      "productName": "Amazon basics oil free facial lotion",
+      "brand": null
+    },
+    {
+      "scanId": "1ff04c53-feb8-48d2-9958-c909103ffb93",
+      "oldUserUuid": "ed1ca66f-4cf0-4d6f-8db4-87012cbc3ddf",
+      "newUserUuid": "c2ac2da8-acc0-48c0-a7cb-51f96c56f327",
+      "productName": "Oil-Free Moisturizer",
+      "brand": "Amazon Basics"
+    },
+    {
+      "scanId": "0970d2e7-55c6-4cbd-970b-237f902ed9a1",
+      "oldUserUuid": "bbe9a7bf-cbd3-4dce-84c7-e2a9782af92a",
+      "newUserUuid": "7d2fac66-0c35-4e8b-8a06-e3430e87c85b",
+      "productName": "Daily Facial Cleanser",
+      "brand": "LA ROCHE-POSAY"
+    },
+    {
+      "scanId": "ef00f438-b161-44c4-928d-c3879109f33f",
+      "oldUserUuid": "bbe9a7bf-cbd3-4dce-84c7-e2a9782af92a",
+      "newUserUuid": "26348ac5-dbfc-4a17-80ca-b0a79ab05084",
+      "productName": "Daily Facial Cleanser",
+      "brand": "Cetaphil"
+    },
+    {
+      "scanId": "5a6a7495-9952-42fd-991a-777810e57f72",
+      "oldUserUuid": "bbe9a7bf-cbd3-4dce-84c7-e2a9782af92a",
+      "newUserUuid": "4e3c3de3-62f2-462d-818d-78d16dfe4c93",
+      "productName": "Double repair face moisturizer ",
+      "brand": "La Roche-Posay"
+    },
+    {
+      "scanId": "78225532-11fa-42e8-8e4a-4b00e21d9c90",
+      "oldUserUuid": "4efb5df3-ce0a-40f6-ae13-6defa1610d3a",
+      "newUserUuid": "682e9c56-2d14-4cf0-b874-6596b0ef1a60",
+      "productName": "Advanced Night Repair ",
+      "brand": "Estee Lauder"
+    },
+    {
+      "scanId": "fca2ca39-72c8-49fc-9b78-026cd27cfc98",
+      "oldUserUuid": "4efb5df3-ce0a-40f6-ae13-6defa1610d3a",
+      "newUserUuid": "543ad727-efaf-4964-b4c6-cf7cb431657d",
+      "productName": "Advanced Night Repair ",
+      "brand": "Estee Lauder"
+    },
+    {
+      "scanId": "b3649df0-7d45-4b96-b24a-64f39e7ef189",
+      "oldUserUuid": "4efb5df3-ce0a-40f6-ae13-6defa1610d3a",
+      "newUserUuid": "edf703c1-3d54-4092-b80e-f11dea1ef40c",
+      "productName": "Advanced Night Repair ",
+      "brand": "Estee Lauder"
+    },
+    {
+      "scanId": "3f3fdbc1-a716-4fa9-b32b-cbb0b0a605b0",
+      "oldUserUuid": "4efb5df3-ce0a-40f6-ae13-6defa1610d3a",
+      "newUserUuid": "1b0b1f16-aa8f-4679-a127-ba094eea3524",
+      "productName": "test",
+      "brand": "La Roche-Posay"
+    },
+    {
+      "scanId": "40a87eba-3391-47db-9c67-ca23a541cb2f",
+      "oldUserUuid": "4efb5df3-ce0a-40f6-ae13-6defa1610d3a",
+      "newUserUuid": "3b44e62c-c194-4dda-8b4d-70874139318e",
+      "productName": "Advanced Night Repair ",
+      "brand": null
+    },
+    {
+      "scanId": "9fb00703-6805-453c-b582-d29486cc60d5",
+      "oldUserUuid": "4efb5df3-ce0a-40f6-ae13-6defa1610d3a",
+      "newUserUuid": "a3de44aa-d650-4b02-b46e-c452827112b4",
+      "productName": "Effaclar Face Serum with Salicylic Acid",
+      "brand": "La Roche-Posay"
+    },
+    {
+      "scanId": "974c5352-9390-4626-9a59-2a2d7e752ebe",
+      "oldUserUuid": "f8330e90-48bb-431e-b64e-b71866305698",
+      "newUserUuid": "6e8995ac-7f8d-4341-b59c-ea0741259f5a",
+      "productName": "Anua Niacinamide 10 TXA 4 Serum",
+      "brand": null
+    },
+    {
+      "scanId": "b5e070ed-9bc9-460d-a35f-211dd2de6efa",
+      "oldUserUuid": "80c09810-7a89-4c4f-abc5-8f59036cd080",
+      "newUserUuid": "181cb709-a11b-411e-acbb-5e32a33c31c7",
+      "productName": "Eye Secrum",
+      "brand": "My Test Brand"
+    },
+    {
+      "scanId": "00555a96-a494-4a54-82e1-ef6447714a0c",
+      "oldUserUuid": "80c09810-7a89-4c4f-abc5-8f59036cd080",
+      "newUserUuid": "1216d737-ce6e-4b85-ac38-ec16c9ac6c50",
+      "productName": "Eye Secrum",
+      "brand": "My Test Brand2"
+    },
+    {
+      "scanId": "f7937894-264e-41c2-bcb9-14f9b87992a4",
+      "oldUserUuid": "4efb5df3-ce0a-40f6-ae13-6defa1610d3a",
+      "newUserUuid": "356b550b-87d4-468c-879e-4d529a98ee91",
+      "productName": "Super C Ferulic",
+      "brand": "Medik8"
+    },
+    {
+      "scanId": "04a6c330-722d-40c7-87d7-51ef0072013d",
+      "oldUserUuid": "4efb5df3-ce0a-40f6-ae13-6defa1610d3a",
+      "newUserUuid": "fafddd84-9740-4789-a215-78e5c1d8cddc",
+      "productName": "Super C Ferulic",
+      "brand": "Medik8"
+    },
+    {
+      "scanId": "9940ec5b-06d6-4633-a603-63cc32240ad1",
+      "oldUserUuid": "80c09810-7a89-4c4f-abc5-8f59036cd080",
+      "newUserUuid": "b56a05ad-cc29-4c51-9778-c2f1d8d769f9",
+      "productName": "Eye Secrum",
+      "brand": "Tree Hut"
+    },
+    {
+      "scanId": "b6d766d1-611e-4a83-85bb-4d2eb20a147c",
+      "oldUserUuid": "80c09810-7a89-4c4f-abc5-8f59036cd080",
+      "newUserUuid": "e039d423-aca3-45a9-8852-b572c65cbb75",
+      "productName": "Coconut Oil",
+      "brand": "Columbus Vegetable Oils"
+    },
+    {
+      "scanId": "37c2b8cb-e203-4089-bbbb-15765b8b3449",
+      "oldUserUuid": "80c09810-7a89-4c4f-abc5-8f59036cd080",
+      "newUserUuid": "a116901f-7d76-44d2-97e0-4d140a3d7333",
+      "productName": "Shea Cream",
+      "brand": null
+    },
+    {
+      "scanId": "f085b308-6da4-4926-a15c-0a0482631678",
+      "oldUserUuid": "80c09810-7a89-4c4f-abc5-8f59036cd080",
+      "newUserUuid": "efbe63bc-6d9f-47b2-a4a6-b3a687c8618f",
+      "productName": "Shea Cream",
+      "brand": null
+    },
+    {
+      "scanId": "67bf1813-5f38-4a80-a1c6-5d27e2c079df",
+      "oldUserUuid": "80c09810-7a89-4c4f-abc5-8f59036cd080",
+      "newUserUuid": "c3a94f39-6841-4b8a-8521-02185a573b8a",
+      "productName": "Face cream",
+      "brand": null
+    },
+    {
+      "scanId": "e6e1b28e-669d-4707-9455-f34bbd565300",
+      "oldUserUuid": "80c09810-7a89-4c4f-abc5-8f59036cd080",
+      "newUserUuid": "14a16c5f-5afb-4443-855b-7711d13eab6f",
+      "productName": "Bath and Body",
+      "brand": "Bath & Body Works"
+    },
+    {
+      "scanId": "bc553f10-ac4c-4767-8d1c-c86827b81d87",
+      "oldUserUuid": "4efb5df3-ce0a-40f6-ae13-6defa1610d3a",
+      "newUserUuid": "8e6ca83d-b7e8-4d46-8af0-e2910676210a",
+      "productName": "Youth to the people",
+      "brand": "Ingredients"
+    },
+    {
+      "scanId": "7d67a0e5-2a07-42a5-88ef-e592dc313d5d",
+      "oldUserUuid": "4efb5df3-ce0a-40f6-ae13-6defa1610d3a",
+      "newUserUuid": "5f9ef85f-3d28-4024-948d-89d9f658886c",
+      "productName": "Superfood Gentle Antioxidant Refillable Cleanser",
+      "brand": "Youth to the People"
+    },
+    {
+      "scanId": "a6947599-0d84-4b8b-83b1-0e76eee7fcd3",
+      "oldUserUuid": "4efb5df3-ce0a-40f6-ae13-6defa1610d3a",
+      "newUserUuid": "6b7d62fb-7c3d-4fde-918f-26c937261e2e",
+      "productName": "Superfood Gentle Antioxidant Refillable Cleanser",
+      "brand": "Youth to the People"
+    },
+    {
+      "scanId": "3815c2d8-0484-40c4-9021-ba420889071e",
+      "oldUserUuid": "4efb5df3-ce0a-40f6-ae13-6defa1610d3a",
+      "newUserUuid": "bbe9a7bf-cbd3-4dce-84c7-e2a9782af92a",
+      "productName": "Superfood Gentle Antioxidant Refillable Cleanser",
+      "brand": "Ingredients"
+    },
+    {
+      "scanId": "98ec014a-ebd9-4f21-b204-e29055b03e45",
+      "oldUserUuid": "4efb5df3-ce0a-40f6-ae13-6defa1610d3a",
+      "newUserUuid": "45d28611-5076-431e-9236-bbd5f806c414",
+      "productName": "Superfood Gentle Antioxidant Refillable Cleanser",
+      "brand": "Ingredients"
+    },
+    {
+      "scanId": "19c11dbc-1d26-40db-beb9-19273dfbc49e",
+      "oldUserUuid": "4efb5df3-ce0a-40f6-ae13-6defa1610d3a",
+      "newUserUuid": "3442d1fc-939b-4076-ad3b-0f908be2ce43",
+      "productName": "Superfood Gentle Antioxidant Refillable Cleanser",
+      "brand": "Ingredients"
+    },
+    {
+      "scanId": "5a1a68b8-0730-4eaf-9d8e-10b7b0865c5c",
+      "oldUserUuid": "4efb5df3-ce0a-40f6-ae13-6defa1610d3a",
+      "newUserUuid": "80c09810-7a89-4c4f-abc5-8f59036cd080",
+      "productName": "Superfood Gentle Antioxidant Refillable Cleanser",
+      "brand": "Ingredients"
+    },
+    {
+      "scanId": "cf1cd369-d438-4a0b-801d-ef0a8b700616",
+      "oldUserUuid": "4efb5df3-ce0a-40f6-ae13-6defa1610d3a",
+      "newUserUuid": "890229b4-8fba-4521-9989-5483dcee62f7",
+      "productName": "Superfood Gentle Antioxidant Refillable Cleanser",
+      "brand": "Ingredients"
+    },
+    {
+      "scanId": "ff5449cb-0f8f-42ab-8ee7-15780e1bd77f",
+      "oldUserUuid": "80c09810-7a89-4c4f-abc5-8f59036cd080",
+      "newUserUuid": "2a492020-7e11-4bf2-a028-590b07538859",
+      "productName": "Jergens",
+      "brand": "Jergens"
+    },
+    {
+      "scanId": "b257f7e6-5ff7-4410-88e5-243cdcf40575",
+      "oldUserUuid": "80c09810-7a89-4c4f-abc5-8f59036cd080",
+      "newUserUuid": "5e93f015-e9ce-45aa-bc2c-ecfdbfbd6027",
+      "productName": "Cetaphil Moisturizing Lotion",
+      "brand": "Cetaphil"
+    },
+    {
+      "scanId": "7f0872e9-53d4-4448-824b-9468f26f58b4",
+      "oldUserUuid": "80c09810-7a89-4c4f-abc5-8f59036cd080",
+      "newUserUuid": "64132369-513f-4bd4-982c-e9c31c5a01d9",
+      "productName": "Moisturizing face creaem",
+      "brand": "Jergens"
+    },
+    {
+      "scanId": "776d6f8f-2f96-4cfe-9c27-6ef083bb17f0",
+      "oldUserUuid": "80c09810-7a89-4c4f-abc5-8f59036cd080",
+      "newUserUuid": "b9eb3aa9-49e2-4e70-92ea-a23d35de53f5",
+      "productName": "Lotion ",
+      "brand": "Jergens"
+    },
+    {
+      "scanId": "d04c832b-8473-491f-a026-d4b18290e233",
+      "oldUserUuid": "80c09810-7a89-4c4f-abc5-8f59036cd080",
+      "newUserUuid": "cb4efe71-632f-4f0c-831e-96e9b12a708e",
+      "productName": "Intensive Care Cocoa Radiant",
+      "brand": "Vaseline"
+    },
+    {
+      "scanId": "f2df6da5-aecf-4659-abd4-ae307fa58813",
+      "oldUserUuid": "80c09810-7a89-4c4f-abc5-8f59036cd080",
+      "newUserUuid": "8963c7a4-a1bb-4f04-8145-84654e63bc84",
+      "productName": "Moisturizing Lotion",
+      "brand": "Cetaphil"
+    },
+    {
+      "scanId": "464c7050-9baf-4240-a352-eaa08016ed31",
+      "oldUserUuid": "80c09810-7a89-4c4f-abc5-8f59036cd080",
+      "newUserUuid": "4efb5df3-ce0a-40f6-ae13-6defa1610d3a",
+      "productName": "Moisturizing Lotion",
+      "brand": "Jergens"
+    },
+    {
+      "scanId": "3a552a82-387b-4fe0-8127-44f7552f9ae8",
+      "oldUserUuid": "80c09810-7a89-4c4f-abc5-8f59036cd080",
+      "newUserUuid": "1efb1396-aa1e-419c-8ba2-1b6366143783",
+      "productName": "skin cream",
+      "brand": "jergan "
+    },
+    {
+      "scanId": "630d9539-1481-494f-8f63-b3daa465e699",
+      "oldUserUuid": "80c09810-7a89-4c4f-abc5-8f59036cd080",
+      "newUserUuid": "002235e1-89ca-4524-a4b4-7f3553d023ce",
+      "productName": "AROMATHERAPY ASSOCIATES",
+      "brand": "AROMATHERAPY ASSOCIATES"
+    },
+    {
+      "scanId": "bf1182d6-8174-41ad-813c-b4dcc9bceaf4",
+      "oldUserUuid": "80c09810-7a89-4c4f-abc5-8f59036cd080",
+      "newUserUuid": "5880857f-ef2b-4b83-834f-5a312ee67152",
+      "productName": "Moisturizing Lotion",
+      "brand": "Cetaphil"
+    },
+    {
+      "scanId": "3322fb3f-d8f5-4b30-9921-3aaa6f95e58a",
+      "oldUserUuid": "80c09810-7a89-4c4f-abc5-8f59036cd080",
+      "newUserUuid": "69a15571-b5e7-4417-90fe-ef1039e2c6a7",
+      "productName": "Moisturizing Lotion",
+      "brand": "Cetaphil"
+    },
+    {
+      "scanId": "40664ec7-b0c8-471c-8917-9f01e0e84da0",
+      "oldUserUuid": "80c09810-7a89-4c4f-abc5-8f59036cd080",
+      "newUserUuid": "e02f0cae-fe80-4066-adf9-d67225abc3d4",
+      "productName": "coco oil",
+      "brand": "Jergens"
+    },
+    {
+      "scanId": "e18fe913-23d8-4832-8d4f-4821cec16edf",
+      "oldUserUuid": "80c09810-7a89-4c4f-abc5-8f59036cd080",
+      "newUserUuid": "f8330e90-48bb-431e-b64e-b71866305698",
+      "productName": "Nourishing Shea Cream Orchard Peach",
+      "brand": "MARY KAY"
+    },
+    {
+      "scanId": "ce527b6b-8101-489a-ba72-9a45a5486992",
+      "oldUserUuid": "4efb5df3-ce0a-40f6-ae13-6defa1610d3a",
+      "newUserUuid": "431d1313-0264-4315-8820-e815ce651170",
+      "productName": "Daily exfoliating PHA TONIC WITH ENZYME ACTIVATOR",
+      "brand": "Medik8"
+    },
+    {
+      "scanId": "b5032d2a-bac2-4d59-a47a-67d1d901ca4f",
+      "oldUserUuid": "80c09810-7a89-4c4f-abc5-8f59036cd080",
+      "newUserUuid": "c4feb2ce-5a3f-47c2-9b87-058d110e6ce7",
+      "productName": "Vegan Collagen Eye Serum",
+      "brand": "AXIS-Y"
+    },
+    {
+      "scanId": "dd29080b-72da-4763-9d14-91243a5e786e",
+      "oldUserUuid": "4efb5df3-ce0a-40f6-ae13-6defa1610d3a",
+      "newUserUuid": "02484e4b-b2dd-4c13-9879-65df2995b579",
+      "productName": "HydroBoost Wet Gel Cleanser ",
+      "brand": null
+    },
+    {
+      "scanId": "0801a2ef-3f4e-4941-ac04-768f303bf671",
+      "oldUserUuid": "4efb5df3-ce0a-40f6-ae13-6defa1610d3a",
+      "newUserUuid": "8534f2c2-24fb-4d55-a99e-1864f058eb97",
+      "productName": "Hydro boost water gel cleanser ",
+      "brand": null
+    },
+    {
+      "scanId": "87bfd8a4-467d-4858-b159-6d672239dbb6",
+      "oldUserUuid": "4efb5df3-ce0a-40f6-ae13-6defa1610d3a",
+      "newUserUuid": "4d732879-4cfa-49c1-8b6a-328e707a0428",
+      "productName": "Hyaluronic Acid Face Serum",
+      "brand": "Good Molecules"
+    },
+    {
+      "scanId": "02066237-2c8b-4379-a884-5f80fc1a373a",
+      "oldUserUuid": "4efb5df3-ce0a-40f6-ae13-6defa1610d3a",
+      "newUserUuid": "f87f24a9-30a4-4367-ad56-6674f9642dc8",
+      "productName": "Press & Glow",
+      "brand": "MEDIK8"
+    },
+    {
+      "scanId": "4977593d-cde9-435f-9405-94554e2c5f9f",
+      "oldUserUuid": "80c09810-7a89-4c4f-abc5-8f59036cd080",
+      "newUserUuid": "5ca997e4-9613-49d4-ab4f-ff56464127a6",
+      "productName": "Jergens original scent ",
+      "brand": "JERGENS"
+    },
+    {
+      "scanId": "e6102af0-b9da-4293-8882-f38be44d7769",
+      "oldUserUuid": "80c09810-7a89-4c4f-abc5-8f59036cd080",
+      "newUserUuid": "7d88a687-a996-4b58-ab5f-a60f0648ceff",
+      "productName": "MEN WAS BUILT TO SERVE MEN OF COLOR",
+      "brand": "SHEAMOISTURE"
+    },
+    {
+      "scanId": "65dc77dc-c0a6-458d-a1d5-1260d58908c2",
+      "oldUserUuid": "4efb5df3-ce0a-40f6-ae13-6defa1610d3a",
+      "newUserUuid": "01a3e2bf-65f8-4395-ae05-c8609cf28dcf",
+      "productName": "Toleraine triple deep moisturizer ",
+      "brand": "LaRoche - Posay"
+    },
+    {
+      "scanId": "db0194fa-279b-4aab-8296-c2edae2061ab",
+      "oldUserUuid": "80c09810-7a89-4c4f-abc5-8f59036cd080",
+      "newUserUuid": "21f8419c-671c-4e13-a8cf-15c099e6b702",
+      "productName": "Men",
+      "brand": "SheaMoisture"
+    }
+  ]
+}

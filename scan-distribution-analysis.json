@@ -1,0 +1,99 @@
+{
+  "timestamp": "2026-02-20T02:13:03.843Z",
+  "totalScans": 173,
+  "totalUsers": 78,
+  "scanDistribution": [
+    {
+      "uuid": "4efb5df3-ce0a-40f6-ae13-6defa1610d3a",
+      "count": 70,
+      "user": "Adupass",
+      "email": "alicia@xiosolutionsllc.com"
+    },
+    {
+      "uuid": "80c09810-7a89-4c4f-abc5-8f59036cd080",
+      "count": 25,
+      "user": "Cedric Evans",
+      "email": "cedric.evans@gmail.com"
+    },
+    {
+      "uuid": "4d732879-4cfa-49c1-8b6a-328e707a0428",
+      "count": 24,
+      "user": "James",
+      "email": "james.goodnight05@gmail.com"
+    },
+    {
+      "uuid": "86b3f49a-2113-4981-9cd5-cb222ad03fe1",
+      "count": 9,
+      "user": "Christina Branch",
+      "email": "ct_hammonds@yahoo.com"
+    },
+    {
+      "uuid": "181cb709-a11b-411e-acbb-5e32a33c31c7",
+      "count": 5,
+      "user": "Traejrc",
+      "email": "cowartjames09@gmail.com"
+    },
+    {
+      "uuid": "1efb1396-aa1e-419c-8ba2-1b6366143783",
+      "count": 4,
+      "user": "Test User",
+      "email": "support@skinlytix.com"
+    },
+    {
+      "uuid": "c4feb2ce-5a3f-47c2-9b87-058d110e6ce7",
+      "count": 3,
+      "user": "Elvia Dupass ",
+      "email": "exdupass@gmail.com"
+    },
+    {
+      "uuid": "f87f24a9-30a4-4367-ad56-6674f9642dc8",
+      "count": 3,
+      "user": "So_ICy",
+      "email": "icruse125@gmail.com"
+    },
+    {
+      "uuid": "80399f65-b72d-4111-8aaf-7d101d724c4a",
+      "count": 3,
+      "user": "NateParker",
+      "email": "nate.p233@gmail.com"
+    },
+    {
+      "uuid": "ed1ca66f-4cf0-4d6f-8db4-87012cbc3ddf",
+      "count": 3,
+      "user": "Kandace Bridges",
+      "email": "kharris488@gmail.com"
+    },
+    {
+      "uuid": "bbe9a7bf-cbd3-4dce-84c7-e2a9782af92a",
+      "count": 3,
+      "user": "Suzie",
+      "email": "ssuziesuarez@gmail.com"
+    },
+    {
+      "uuid": "f8330e90-48bb-431e-b64e-b71866305698",
+      "count": 2,
+      "user": "Denae",
+      "email": "denaenicole@comcast.net"
+    },
+    {
+      "uuid": "cb8048b3-a6bd-481b-8774-560dada2af59",
+      "count": 2,
+      "user": "Test user",
+      "email": "axdupass@yahoo.com"
+    },
+    {
+      "uuid": "2596e354-cde3-4045-87dd-f4aa815f44a2",
+      "count": 2,
+      "user": "Test User 3",
+      "email": "a.dupass@gmail.com"
+    },
+    {
+      "uuid": "002235e1-89ca-4524-a4b4-7f3553d023ce",
+      "count": 1,
+      "user": "Skylar Farmer",
+      "email": "skylarxiomara@gmail.com"
+    }
+  ],
+  "observation": "Scans are concentrated in early-signup users (Adupass, Cedric, James)",
+  "nextStep": "Parse git backup SQL to get original scan-to-UUID mappings"
+}

@@ -1,4 +1,3 @@
-// @ts-expect-error - Deno edge runtime import
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 
 declare const Deno: {
@@ -9,7 +8,7 @@ declare const Deno: {
 
 /**
  * OPTIMIZED FIND-DUPES EDGE FUNCTION
- * 
+ *
  * Key fixes:
  * 1. Better request deduplication to prevent multiple simultaneous calls
  * 2. Smarter caching with request fingerprinting
@@ -65,7 +64,7 @@ class CacheManager {
   private static aiCache = new Map<string, CacheEntry<any[]>>();
   private static obfCache = new Map<string, CacheEntry<ObfEnriched | null>>();
   private static pendingRequests = new Map<string, PendingRequest>();
-  
+
   // Cache TTLs
   private static readonly AI_CACHE_TTL = 10 * 60 * 1000; // 10 minutes
   private static readonly OBF_CACHE_TTL = 30 * 60 * 1000; // 30 minutes
@@ -74,12 +73,12 @@ class CacheManager {
   static get<T>(cache: Map<string, CacheEntry<T>>, key: string): T | undefined {
     const entry = cache.get(key);
     if (!entry) return undefined;
-    
+
     if (Date.now() > entry.expiresAt) {
       cache.delete(key);
       return undefined;
     }
-    
+
     return entry.value;
   }
 
@@ -107,13 +106,13 @@ class CacheManager {
   static getPendingRequest(key: string): Promise<any> | undefined {
     const pending = this.pendingRequests.get(key);
     if (!pending) return undefined;
-    
+
     // Check if request has timed out
     if (Date.now() - pending.timestamp > this.PENDING_REQUEST_TIMEOUT) {
       this.pendingRequests.delete(key);
       return undefined;
     }
-    
+
     return pending.promise;
   }
 
@@ -131,17 +130,17 @@ class CacheManager {
   // Periodic cleanup
   static cleanup(): void {
     const now = Date.now();
-    
+
     // Clean expired AI cache
     for (const [key, entry] of this.aiCache.entries()) {
       if (now > entry.expiresAt) this.aiCache.delete(key);
     }
-    
+
     // Clean expired OBF cache
     for (const [key, entry] of this.obfCache.entries()) {
       if (now > entry.expiresAt) this.obfCache.delete(key);
     }
-    
+
     // Clean stale pending requests
     for (const [key, pending] of this.pendingRequests.entries()) {
       if (now - pending.timestamp > this.PENDING_REQUEST_TIMEOUT) {
@@ -159,7 +158,6 @@ setInterval(() => CacheManager.cleanup(), 5 * 60 * 1000);
 // ============================================================================
 
 const CONFIG = {
-  OPENROUTER_MODEL: "qwen/qwen3-coder:free",
   MAX_DUPES_TO_RETURN: 5,
   MAX_DUPES_TO_ENRICH: 3,
   MAX_PROMPT_INGREDIENTS: 40,
@@ -244,17 +242,17 @@ const Utils = {
   computeOverlapStats(sourceList: string[], targetList: string[]) {
     const sourceIngredients = this.normalizeIngredientList(sourceList);
     const targetIngredients = this.normalizeIngredientList(targetList);
-    
+
     if (!sourceIngredients.length || !targetIngredients.length) return null;
 
     let matched = 0;
     for (const sourceItem of sourceIngredients) {
       const isMatch = targetIngredients.some(
-        (targetItem) => targetItem.includes(sourceItem) || sourceItem.includes(targetItem)
+        (targetItem) => targetItem.includes(sourceItem) || sourceItem.includes(targetItem),
       );
       if (isMatch) matched += 1;
     }
-    
+
     if (matched === 0) return null;
 
     return {
@@ -290,7 +288,7 @@ const Utils = {
         brand: body?.brand || "",
         category: body?.category || "",
         ingredientsHash: ingHash,
-      })
+      }),
     );
   },
 };
@@ -301,11 +299,39 @@ const Utils = {
 
 const ScentAnalyzer = {
   keywords: [
-    "vanilla", "coconut", "shea", "cocoa", "chocolate", "almond", "honey",
-    "oat", "oatmeal", "lavender", "rose", "jasmine", "citrus", "orange",
-    "lemon", "grapefruit", "bergamot", "sandalwood", "musk", "amber",
-    "cherry", "berry", "mint", "eucalyptus", "tea tree", "chamomile",
-    "aloe", "argan", "jojoba", "cinnamon", "caramel", "sugar", "butter",
+    "vanilla",
+    "coconut",
+    "shea",
+    "cocoa",
+    "chocolate",
+    "almond",
+    "honey",
+    "oat",
+    "oatmeal",
+    "lavender",
+    "rose",
+    "jasmine",
+    "citrus",
+    "orange",
+    "lemon",
+    "grapefruit",
+    "bergamot",
+    "sandalwood",
+    "musk",
+    "amber",
+    "cherry",
+    "berry",
+    "mint",
+    "eucalyptus",
+    "tea tree",
+    "chamomile",
+    "aloe",
+    "argan",
+    "jojoba",
+    "cinnamon",
+    "caramel",
+    "sugar",
+    "butter",
   ],
 
   extractTokens(value: string): string[] {
@@ -321,12 +347,12 @@ const ScentAnalyzer = {
     if (!sourceTokens.length) return 0;
     const targetTokens = this.extractTokens(targetText);
     if (!targetTokens.length) return 0;
-    
+
     let matched = 0;
     for (const token of sourceTokens) {
       if (targetTokens.includes(token)) matched += 1;
     }
-    
+
     return matched / sourceTokens.length;
   },
 
@@ -347,12 +373,9 @@ const ScentAnalyzer = {
 // ============================================================================
 
 class AIProvider {
-  private static async callWithTimeout(
-    fetchPromise: Promise<Response>,
-    timeoutMs: number
-  ): Promise<Response> {
+  private static async callWithTimeout(fetchPromise: Promise<Response>, timeoutMs: number): Promise<Response> {
     const timeoutPromise = new Promise<Response>((_, reject) =>
-      setTimeout(() => reject(new Error("Request timeout")), timeoutMs)
+      setTimeout(() => reject(new Error("Request timeout")), timeoutMs),
     );
     return Promise.race([fetchPromise, timeoutPromise]);
   }
@@ -367,14 +390,14 @@ class AIProvider {
 
   private static parseAIArray(content: string | null): any[] {
     if (!content) return [];
-    
+
     const clean = content
       .replace(/```json\n?/gi, "")
       .replace(/```\n?/g, "")
       .trim();
-    
+
     const match = clean.match(/\[[\s\S]*\]/);
-    
+
     try {
       const parsed = JSON.parse(match ? match[0] : clean);
       if (Array.isArray(parsed)) return parsed;
@@ -387,22 +410,20 @@ class AIProvider {
 
   static async getDupes(
     params: {
-    productName: string;
-    brand: string;
-    ingredients: string[];
-    category: string;
-    skinType: string;
-    concerns: string;
+      productName: string;
+      brand: string;
+      ingredients: string[];
+      category: string;
+      skinType: string;
+      concerns: string;
     },
-    options: { preferredProvider?: "gemini" | "lovable" | "openrouter" } = {}
+    options: { preferredProvider?: "gemini" } = {},
   ): Promise<any[]> {
     const { productName, brand, ingredients, category, skinType, concerns } = params;
 
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     const GEMINI_API_KEY = Deno.env.get("GEMINI_API_KEY");
-    const OPENROUTER_API_KEY = Deno.env.get("OPENROUTER_API_KEY");
 
-    if (!LOVABLE_API_KEY && !GEMINI_API_KEY && !OPENROUTER_API_KEY) {
+    if (!GEMINI_API_KEY) {
       throw new Error("AI provider is not configured");
     }
 
@@ -448,7 +469,6 @@ Rules:
     const errorLog: string[] = [];
     let aiContent: string | null = null;
 
-    const preferred = options.preferredProvider;
     const tryGemini = async () => {
       if (!GEMINI_API_KEY || aiContent) return;
       try {
@@ -463,9 +483,9 @@ Rules:
                 contents: [{ role: "user", parts: [{ text: prompt }] }],
                 generationConfig: { temperature: 0.7 },
               }),
-            }
+            },
           ),
-          CONFIG.AI_TIMEOUT
+          CONFIG.AI_TIMEOUT,
         );
 
         if (response.ok) {
@@ -480,89 +500,7 @@ Rules:
       }
     };
 
-    const tryLovable = async () => {
-      if (!LOVABLE_API_KEY || aiContent) return;
-      try {
-        const response = await this.callWithTimeout(
-          fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-            method: "POST",
-            headers: {
-              Authorization: `Bearer ${LOVABLE_API_KEY}`,
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify({
-              model: "google/gemini-2.5-flash-lite",
-              messages: [
-                { role: "system", content: systemPrompt },
-                { role: "user", content: userPrompt },
-              ],
-              temperature: 0.7,
-            }),
-          }),
-          CONFIG.AI_TIMEOUT
-        );
-
-        if (response.ok) {
-          const data = await response.json();
-          aiContent = data.choices?.[0]?.message?.content ?? null;
-        } else {
-          const err = await this.safeReadText(response);
-          errorLog.push(`Lovable ${response.status}: ${err}`);
-        }
-      } catch (e) {
-        errorLog.push(`Lovable error: ${(e as Error)?.message || String(e)}`);
-      }
-    };
-
-    const tryOpenRouter = async () => {
-      if (!OPENROUTER_API_KEY || aiContent) return;
-      try {
-        const response = await this.callWithTimeout(
-          fetch("https://openrouter.ai/api/v1/chat/completions", {
-            method: "POST",
-            headers: {
-              Authorization: `Bearer ${OPENROUTER_API_KEY}`,
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify({
-              model: CONFIG.OPENROUTER_MODEL,
-              // Let the model return a JSON array as requested by the prompt.
-              // response_format removed on purpose.
-              messages: [
-                { role: "system", content: systemPrompt },
-                { role: "user", content: userPrompt },
-              ],
-              temperature: 0.7,
-            }),
-          }),
-          CONFIG.AI_TIMEOUT
-        );
-
-        if (response.ok) {
-          const data = await response.json();
-          aiContent = data.choices?.[0]?.message?.content ?? null;
-        } else {
-          const err = await this.safeReadText(response);
-          errorLog.push(`OpenRouter ${response.status}: ${err}`);
-        }
-      } catch (e) {
-        errorLog.push(`OpenRouter error: ${(e as Error)?.message || String(e)}`);
-      }
-    };
-
-    if (preferred === "lovable") {
-      await tryLovable();
-      await tryGemini();
-      await tryOpenRouter();
-    } else if (preferred === "openrouter") {
-      await tryOpenRouter();
-      await tryGemini();
-      await tryLovable();
-    } else {
-      await tryGemini();
-      await tryLovable();
-      await tryOpenRouter();
-    }
+    await tryGemini();
 
     const dupes = this.parseAIArray(aiContent);
 
@@ -652,12 +590,46 @@ class OpenBeautyFacts {
   }
 
   private static readonly STOP_WORDS = new Set([
-    "daily","everyday","day","night","intense","extra","ultimate","advanced",
-    "hydration","hydrating","moisture","moisturizing","moisturiser","moisturizer",
-    "lotion","cream","butter","gel","serum","mist","wash","cleanser",
-    "body","face","hand","feet","foot","skin",
-    "with","and","for","to","of","the","a","an",
-    "spf","uv","broad","spectrum",
+    "daily",
+    "everyday",
+    "day",
+    "night",
+    "intense",
+    "extra",
+    "ultimate",
+    "advanced",
+    "hydration",
+    "hydrating",
+    "moisture",
+    "moisturizing",
+    "moisturiser",
+    "moisturizer",
+    "lotion",
+    "cream",
+    "butter",
+    "gel",
+    "serum",
+    "mist",
+    "wash",
+    "cleanser",
+    "body",
+    "face",
+    "hand",
+    "feet",
+    "foot",
+    "skin",
+    "with",
+    "and",
+    "for",
+    "to",
+    "of",
+    "the",
+    "a",
+    "an",
+    "spf",
+    "uv",
+    "broad",
+    "spectrum",
   ]);
 
   private static coreName(value: string): string {
@@ -674,7 +646,7 @@ class OpenBeautyFacts {
   private static isBrandMatchStrict(
     obfBrand: string | null | undefined,
     obfName: string | null | undefined,
-    expectedBrand: string
+    expectedBrand: string,
   ): boolean {
     if (!expectedBrand) return false;
     if (!obfBrand && !obfName) return false;
@@ -699,11 +671,7 @@ class OpenBeautyFacts {
     return out;
   }
 
-  private static scoreCandidate(params: {
-    expectedName: string;
-    expectedBrand: string;
-    product: any;
-  }): number {
+  private static scoreCandidate(params: { expectedName: string; expectedBrand: string; product: any }): number {
     const { expectedName, expectedBrand, product } = params;
 
     const obfBrand = typeof product?.brands === "string" ? product.brands : "";
@@ -732,11 +700,7 @@ class OpenBeautyFacts {
     return score;
   }
 
-  private static async fetchCandidates(params: {
-    term: string;
-    timeoutMs: number;
-    pageSize: number;
-  }): Promise<any[]> {
+  private static async fetchCandidates(params: { term: string; timeoutMs: number; pageSize: number }): Promise<any[]> {
     const { term, timeoutMs, pageSize } = params;
 
     const encoded = encodeURIComponent(term);
@@ -749,7 +713,7 @@ class OpenBeautyFacts {
         {
           headers: { "User-Agent": "SkinLytix/1.0" },
           signal: controller.signal,
-        }
+        },
       );
 
       if (!response.ok) return [];
@@ -848,11 +812,11 @@ class OpenBeautyFacts {
         barcode: best?.code ?? null,
         packaging: best?.packaging ?? null,
         storeLocation:
-          (typeof best?.purchase_places === "string" && best.purchase_places.trim()
+          typeof best?.purchase_places === "string" && best.purchase_places.trim()
             ? best.purchase_places.trim()
             : typeof best?.stores === "string" && best.stores.trim()
               ? best.stores.trim()
-              : null),
+              : null,
       };
 
       CacheManager.setOBF(cacheKey, result);
@@ -935,9 +899,9 @@ class DupeProcessor {
       const name = dupe?.name || dupe?.productName || dupe?.product_name || "";
       const dupeBrand = dupe?.brand || dupe?.brandName || dupe?.brand_name || "";
       const sharedIngredients = Array.isArray(dupe?.sharedIngredients) ? dupe.sharedIngredients : [];
-      
+
       const ingredientSignal = sharedIngredients.length
-        ? Utils.computeOverlapStats(sourceIngredients, sharedIngredients)?.percent ?? 0
+        ? (Utils.computeOverlapStats(sourceIngredients, sharedIngredients)?.percent ?? 0)
         : 0;
 
       const nameScore = Utils.computeTokenSimilarity(productName, name);
@@ -953,15 +917,13 @@ class DupeProcessor {
       const scentScore = ScentAnalyzer.computeSimilarity(sourceScentTokens, scentText);
 
       const preScore = ingredientSignal / 100 + nameScore * 0.8 + brandScore * 0.5 + scentScore * 0.7;
-      
+
       return { index, preScore, nameScore, brandScore, scentScore };
     });
 
     // Sort by score and only enrich top N
     const sortedScores = scoredDupes.sort((a, b) => b.preScore - a.preScore);
-    const topIndexes = new Set(
-      sortedScores.slice(0, CONFIG.MAX_DUPES_TO_ENRICH).map((x) => x.index)
-    );
+    const topIndexes = new Set(sortedScores.slice(0, CONFIG.MAX_DUPES_TO_ENRICH).map((x) => x.index));
 
     // Process dupes with selective enrichment
     const finalDupes = await Promise.all(
@@ -997,7 +959,7 @@ class DupeProcessor {
             : null;
 
         // Build images array
-  const images: string[] = [];
+        const images: string[] = [];
 
         if (Array.isArray(obf?.images)) {
           for (const img of obf.images) {
@@ -1013,8 +975,7 @@ class DupeProcessor {
 
         // Extract other fields
         const productUrl: string | null =
-          (dupe?.productUrl && typeof dupe.productUrl === "string" ? dupe.productUrl : null) ??
-          (obf?.productUrl ?? null);
+          (dupe?.productUrl && typeof dupe.productUrl === "string" ? dupe.productUrl : null) ?? obf?.productUrl ?? null;
 
         const whereToBuy: string | null =
           (dupe?.whereToBuy && typeof dupe.whereToBuy === "string" ? dupe.whereToBuy : null) ??
@@ -1030,21 +991,18 @@ class DupeProcessor {
 
         const description: string | null =
           (dupe?.description && typeof dupe.description === "string" ? dupe.description : null) ??
-          (obf?.description ?? obf?.generic_name ?? null);
+          obf?.description ??
+          obf?.generic_name ??
+          null;
 
         const resolvedCategory: string | null =
-          (dupe?.category && typeof dupe.category === "string" ? dupe.category : null) ??
-          (obf?.categories ?? null);
+          (dupe?.category && typeof dupe.category === "string" ? dupe.category : null) ?? obf?.categories ?? null;
 
-        const highlights: string[] = Array.isArray(dupe?.highlights)
-          ? dupe.highlights.filter(Boolean).slice(0, 8)
-          : [];
+        const highlights: string[] = Array.isArray(dupe?.highlights) ? dupe.highlights.filter(Boolean).slice(0, 8) : [];
         const keyIngredients: string[] = Array.isArray(dupe?.keyIngredients)
           ? dupe.keyIngredients.filter(Boolean).slice(0, 15)
           : [];
-        const flags: string[] = Array.isArray(dupe?.flags)
-          ? dupe.flags.filter(Boolean).slice(0, 12)
-          : [];
+        const flags: string[] = Array.isArray(dupe?.flags) ? dupe.flags.filter(Boolean).slice(0, 12) : [];
 
         const ingredientList = targetIngredients ?? [];
 
@@ -1082,7 +1040,7 @@ class DupeProcessor {
           obf: obf ? { ...obf } : null,
           _score: finalScore,
         };
-      })
+      }),
     );
 
     return finalDupes
@@ -1129,11 +1087,7 @@ class UIMapper {
     }
     if (
       lower.some(
-        (x) =>
-          x.includes("limonene") ||
-          x.includes("linalool") ||
-          x.includes("citral") ||
-          x.includes("eugenol")
+        (x) => x.includes("limonene") || x.includes("linalool") || x.includes("citral") || x.includes("eugenol"),
       )
     ) {
       autoFlags.push("Potential allergens");
@@ -1185,9 +1139,7 @@ class UIMapper {
 
   static extractPriceEstimate(dupe: any): string | null {
     const v =
-      (typeof dupe?.priceEstimate === "string" && dupe.priceEstimate.trim()
-        ? dupe.priceEstimate.trim()
-        : null) ??
+      (typeof dupe?.priceEstimate === "string" && dupe.priceEstimate.trim() ? dupe.priceEstimate.trim() : null) ??
       (typeof dupe?.price_range === "string" && dupe.price_range.trim() ? dupe.price_range.trim() : null) ??
       (typeof dupe?.price === "string" && dupe.price.trim() ? dupe.price.trim() : null) ??
       (typeof dupe?.price === "number" ? `$${dupe.price}` : null) ??
@@ -1220,8 +1172,7 @@ class UIMapper {
       const highlights = this.extractHighlights(dupe);
       const priceEstimate = this.extractPriceEstimate(dupe);
 
-      const productUrl =
-        typeof dupe?.productUrl === "string" && dupe.productUrl.trim() ? dupe.productUrl.trim() : null;
+      const productUrl = typeof dupe?.productUrl === "string" && dupe.productUrl.trim() ? dupe.productUrl.trim() : null;
       const internalLink = `/dupes/${id}`;
 
       return {
@@ -1264,14 +1215,17 @@ serve(async (req: Request): Promise<Response> => {
 
   try {
     const body = await req.json();
-    
+
     // Validate required fields (allow partial OCR output)
     const rawProductName = typeof body?.productName === "string" ? body.productName.trim() : "";
     const rawBrand = typeof body?.brand === "string" ? body.brand.trim() : "";
     const rawCategory = typeof body?.category === "string" ? body.category.trim() : "";
     const rawSkinType = typeof body?.skinType === "string" ? body.skinType.trim() : "";
     const rawConcerns = Array.isArray(body?.concerns)
-      ? body.concerns.map((x: any) => String(x ?? "").trim()).filter(Boolean).join(", ")
+      ? body.concerns
+          .map((x: any) => String(x ?? "").trim())
+          .filter(Boolean)
+          .join(", ")
       : typeof body?.concerns === "string"
         ? body.concerns.trim()
         : "";
@@ -1288,19 +1242,15 @@ serve(async (req: Request): Promise<Response> => {
       .map((ing: any) => Utils.sanitizePromptText(String(ing ?? "")))
       .filter(Boolean);
 
-    const hasAnyInput = Boolean(
-      cleanedProductName || cleanedBrand || cleanedIngredients.length || cleanedCategory
-    );
+    const hasAnyInput = Boolean(cleanedProductName || cleanedBrand || cleanedIngredients.length || cleanedCategory);
 
     if (!hasAnyInput) {
-      return new Response(
-        JSON.stringify({ dupes: [], error: "productName or ingredients are required" }),
-        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      return new Response(JSON.stringify({ dupes: [], error: "productName or ingredients are required" }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
-    const productNameForAI =
-      cleanedProductName || cleanedBrand || cleanedIngredients[0] || "Unknown product";
+    const productNameForAI = cleanedProductName || cleanedBrand || cleanedIngredients[0] || "Unknown product";
     const productNameForResponse = rawProductName || productNameForAI;
 
     // Create request fingerprint for deduplication
@@ -1312,7 +1262,7 @@ serve(async (req: Request): Promise<Response> => {
       category: cleanedCategory,
       ingredients: cleanedIngredients,
     });
-    
+
     // Check if there's a pending request with the same fingerprint
     const pendingRequest = CacheManager.getPendingRequest(requestFingerprint);
     if (pendingRequest) {
@@ -1339,11 +1289,9 @@ serve(async (req: Request): Promise<Response> => {
     const cachedDupes = CacheManager.getAI(aiCacheKey);
     if (cachedDupes && cachedDupes.length > 0) {
       console.log("Returning cached dupes for:", productNameForResponse);
-      
+
       const sourceIngredients = Utils.normalizeIngredientList(cleanedIngredients);
-      const sourceScentTokens = ScentAnalyzer.extractTokens(
-        `${productNameForAI} ${cleanedIngredients.join(" ")}`
-      );
+      const sourceScentTokens = ScentAnalyzer.extractTokens(`${productNameForAI} ${cleanedIngredients.join(" ")}`);
 
       const processedDupes = await DupeProcessor.process({
         dupes: cachedDupes,
@@ -1355,50 +1303,18 @@ serve(async (req: Request): Promise<Response> => {
 
       let uiDupes = UIMapper.mapToUI(processedDupes);
       const hasAnyImages = uiDupes.some(
-        (dupe) => (Array.isArray(dupe.images) && dupe.images.length > 0) || dupe.imageUrl
+        (dupe) => (Array.isArray(dupe.images) && dupe.images.length > 0) || dupe.imageUrl,
       );
 
-      if (!hasAnyImages && Deno.env.get("LOVABLE_API_KEY")) {
-        console.warn("Cached dupes missing images. Retrying with Lovable.");
-        const retryDupes = await AIProvider.getDupes(
-          {
-            productName: productNameForAI,
-            brand: cleanedBrand,
-            ingredients: cleanedIngredients,
-            category: cleanedCategory,
-            skinType: cleanedSkinType,
-            concerns: cleanedConcerns,
-          },
-          { preferredProvider: "lovable" }
-        );
-
-        if (retryDupes?.length) {
-          const retryProcessed = await DupeProcessor.process({
-            dupes: retryDupes,
-            sourceIngredients,
-            sourceScentTokens,
-            productName: productNameForAI,
-            brand: cleanedBrand,
-          });
-          const retryUiDupes = UIMapper.mapToUI(retryProcessed);
-          const retryHasImages = retryUiDupes.some(
-            (dupe) => (Array.isArray(dupe.images) && dupe.images.length > 0) || dupe.imageUrl
-          );
-          if (retryHasImages) {
-            uiDupes = retryUiDupes;
-            CacheManager.setAI(aiCacheKey, retryDupes);
-          }
-        }
+      if (!hasAnyImages) {
+        console.warn("Cached dupes missing images. Returning without image enrichment.");
       }
 
       let bestMatchId: string | null = null;
       let bestValueId: string | null = null;
 
       if (uiDupes.length) {
-        const bestMatch = uiDupes.reduce(
-          (a, b) => ((b.matchPercent || 0) > (a.matchPercent || 0) ? b : a),
-          uiDupes[0]
-        );
+        const bestMatch = uiDupes.reduce((a, b) => ((b.matchPercent || 0) > (a.matchPercent || 0) ? b : a), uiDupes[0]);
         bestMatchId = bestMatch.id;
 
         const priceVals = uiDupes
@@ -1450,9 +1366,7 @@ serve(async (req: Request): Promise<Response> => {
 
         // Process dupes
         const sourceIngredients = Utils.normalizeIngredientList(cleanedIngredients);
-        const sourceScentTokens = ScentAnalyzer.extractTokens(
-          `${productNameForAI} ${cleanedIngredients.join(" ")}`
-        );
+        const sourceScentTokens = ScentAnalyzer.extractTokens(`${productNameForAI} ${cleanedIngredients.join(" ")}`);
 
         const processedDupes = await DupeProcessor.process({
           dupes: rawDupes,
@@ -1464,40 +1378,11 @@ serve(async (req: Request): Promise<Response> => {
 
         let uiDupes = UIMapper.mapToUI(processedDupes);
         const hasAnyImages = uiDupes.some(
-          (dupe) => (Array.isArray(dupe.images) && dupe.images.length > 0) || dupe.imageUrl
+          (dupe) => (Array.isArray(dupe.images) && dupe.images.length > 0) || dupe.imageUrl,
         );
 
-        if (!hasAnyImages && Deno.env.get("LOVABLE_API_KEY")) {
-          console.warn("No dupe images found from primary provider. Retrying with Lovable.");
-          const retryDupes = await AIProvider.getDupes(
-            {
-              productName: productNameForAI,
-              brand: cleanedBrand,
-              ingredients: cleanedIngredients,
-              category: cleanedCategory,
-              skinType: cleanedSkinType,
-              concerns: cleanedConcerns,
-            },
-            { preferredProvider: "lovable" }
-          );
-
-          if (retryDupes?.length) {
-            const retryProcessed = await DupeProcessor.process({
-              dupes: retryDupes,
-              sourceIngredients,
-              sourceScentTokens,
-              productName: productNameForAI,
-              brand: cleanedBrand,
-            });
-            const retryUiDupes = UIMapper.mapToUI(retryProcessed);
-            const retryHasImages = retryUiDupes.some(
-              (dupe) => (Array.isArray(dupe.images) && dupe.images.length > 0) || dupe.imageUrl
-            );
-            if (retryHasImages) {
-              uiDupes = retryUiDupes;
-              CacheManager.setAI(aiCacheKey, retryDupes);
-            }
-          }
+        if (!hasAnyImages) {
+          console.warn("No dupe images found from primary provider. Returning without image enrichment.");
         }
 
         // Calculate summary
@@ -1507,7 +1392,7 @@ serve(async (req: Request): Promise<Response> => {
         if (uiDupes.length) {
           const bestMatch = uiDupes.reduce(
             (a, b) => ((b.matchPercent || 0) > (a.matchPercent || 0) ? b : a),
-            uiDupes[0]
+            uiDupes[0],
           );
           bestMatchId = bestMatch.id;
 

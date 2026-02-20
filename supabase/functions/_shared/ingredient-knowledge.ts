@@ -118,11 +118,11 @@ export const INGREDIENT_KNOWLEDGE: Record<string, IngredientKnowledge> = {
     role: "emollient",
     aliases: ["butyrospermum parkii"],
   },
-  "squalane": {
+  squalane: {
     description: "A lightweight emollient that softens skin and supports barrier comfort.",
     role: "emollient",
   },
-  "phenoxyethanol": {
+  phenoxyethanol: {
     description: "A common preservative used at low levels to keep products stable.",
     role: "preservative",
   },
@@ -134,7 +134,7 @@ export const INGREDIENT_KNOWLEDGE: Record<string, IngredientKnowledge> = {
     description: "A pH adjuster used to balance acidity in skincare formulas.",
     role: "supporting",
   },
-  "tocopherol": {
+  tocopherol: {
     description: "Vitamin E used for antioxidant support and formula stability.",
     role: "supporting",
     aliases: ["vitamin e"],

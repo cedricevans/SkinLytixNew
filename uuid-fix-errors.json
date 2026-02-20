@@ -1,0 +1,22 @@
+[
+  {
+    "scanId": "eddb8c39-bdaa-4ac1-81fa-77ac745962b4",
+    "error": "insert or update on table \"user_analyses\" violates foreign key constraint \"user_analyses_user_id_fkey\""
+  },
+  {
+    "scanId": "18935c91-83f5-41c5-b5a9-09a06857d179",
+    "error": "insert or update on table \"user_analyses\" violates foreign key constraint \"user_analyses_user_id_fkey\""
+  },
+  {
+    "scanId": "e2131f03-d726-4dde-ba34-b23ea430d85a",
+    "error": "insert or update on table \"user_analyses\" violates foreign key constraint \"user_analyses_user_id_fkey\""
+  },
+  {
+    "scanId": "7f0872e9-53d4-4448-824b-9468f26f58b4",
+    "error": "insert or update on table \"user_analyses\" violates foreign key constraint \"user_analyses_user_id_fkey\""
+  },
+  {
+    "scanId": "0801a2ef-3f4e-4941-ac04-768f303bf671",
+    "error": "insert or update on table \"user_analyses\" violates foreign key constraint \"user_analyses_user_id_fkey\""
+  }
+]

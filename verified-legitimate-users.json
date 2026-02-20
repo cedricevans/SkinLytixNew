@@ -1,0 +1,301 @@
+{
+  "timestamp": "2026-02-19T23:24:37.096Z",
+  "summary": {
+    "totalProfiles": 63,
+    "legitimateProfiles": 45,
+    "orphanedTestProfiles": 18,
+    "totalScans": 173
+  },
+  "legitimateUsers": [
+    {
+      "email": "alicia@xiosolutionsllc.com",
+      "name": "Adupass",
+      "tier": "premium",
+      "scans": 70
+    },
+    {
+      "email": "cedric.evans@gmail.com",
+      "name": "Cedric Evans",
+      "tier": "free",
+      "scans": 25
+    },
+    {
+      "email": "james.goodnight05@gmail.com",
+      "name": "James",
+      "tier": "free",
+      "scans": 24
+    },
+    {
+      "email": "ct_hammonds@yahoo.com",
+      "name": "Christina Branch",
+      "tier": "free",
+      "scans": 9
+    },
+    {
+      "email": "cowartjames09@gmail.com",
+      "name": "Traejrc",
+      "tier": "free",
+      "scans": 5
+    },
+    {
+      "email": "support@skinlytix.com",
+      "name": "Test User",
+      "tier": "free",
+      "scans": 4
+    },
+    {
+      "email": "exdupass@gmail.com",
+      "name": "Elvia Dupass ",
+      "tier": "free",
+      "scans": 3
+    },
+    {
+      "email": "icruse125@gmail.com",
+      "name": "So_ICy",
+      "tier": "free",
+      "scans": 3
+    },
+    {
+      "email": "kharris488@gmail.com",
+      "name": "Kandace Bridges",
+      "tier": "free",
+      "scans": 3
+    },
+    {
+      "email": "nate.p233@gmail.com",
+      "name": "NateParker",
+      "tier": "free",
+      "scans": 3
+    },
+    {
+      "email": "ssuziesuarez@gmail.com",
+      "name": "Suzie",
+      "tier": "free",
+      "scans": 3
+    },
+    {
+      "email": "a.dupass@gmail.com",
+      "name": "Test User 3",
+      "tier": "free",
+      "scans": 2
+    },
+    {
+      "email": "axdupass@yahoo.com",
+      "name": "Test user",
+      "tier": "free",
+      "scans": 2
+    },
+    {
+      "email": "denaenicole@comcast.net",
+      "name": "Denae",
+      "tier": "free",
+      "scans": 2
+    },
+    {
+      "email": "alton.jx@gmail.com",
+      "name": "Alton (test)",
+      "tier": "free",
+      "scans": 1
+    },
+    {
+      "email": "andrecosby87@gmail.com",
+      "name": "Optimus",
+      "tier": "free",
+      "scans": 1
+    },
+    {
+      "email": "autley10@yahoo.com",
+      "name": "Anthony",
+      "tier": "free",
+      "scans": 1
+    },
+    {
+      "email": "daniele@toolhouse.ai",
+      "name": "daniele",
+      "tier": "free",
+      "scans": 1
+    },
+    {
+      "email": "jamienewby11@gmail.com",
+      "name": "Jamie",
+      "tier": "free",
+      "scans": 1
+    },
+    {
+      "email": "jones.k.kevin@gmail.com",
+      "name": "Kevin ",
+      "tier": "free",
+      "scans": 1
+    },
+    {
+      "email": "joneskkevin@gmail.com",
+      "name": "Kevin ",
+      "tier": "free",
+      "scans": 1
+    },
+    {
+      "email": "kimkelly.law@gmail.com",
+      "name": "Kim",
+      "tier": "free",
+      "scans": 1
+    },
+    {
+      "email": "ladygist1@gmail.com",
+      "name": "Ladygist",
+      "tier": "free",
+      "scans": 1
+    },
+    {
+      "email": "livwilson105@gmail.com",
+      "name": "LIV WILSON",
+      "tier": "free",
+      "scans": 1
+    },
+    {
+      "email": "milagrosestherfiguereo@gmail.com",
+      "name": "Milly Figuereo ",
+      "tier": "free",
+      "scans": 1
+    },
+    {
+      "email": "sandramccullough@yahoo.com",
+      "name": "Sandra",
+      "tier": "free",
+      "scans": 1
+    },
+    {
+      "email": "shanellebwilliams@gmail.com",
+      "name": "Shanelle",
+      "tier": "free",
+      "scans": 1
+    },
+    {
+      "email": "skylarxiomara@gmail.com",
+      "name": "Skylar Farmer",
+      "tier": "free",
+      "scans": 1
+    },
+    {
+      "email": "t_revere@yahoo.com",
+      "name": "T Revere",
+      "tier": "free",
+      "scans": 1
+    },
+    {
+      "email": "alicia@skinlytix.com",
+      "name": "alicia",
+      "tier": "free",
+      "scans": 0
+    },
+    {
+      "email": "alicia@xiosolutionsllc.com",
+      "name": "Adupass",
+      "tier": "premium",
+      "scans": 0
+    },
+    {
+      "email": "angelagrant.a@gmail.com",
+      "name": "Angela",
+      "tier": "free",
+      "scans": 0
+    },
+    {
+      "email": "autumnanniase@icloud.com",
+      "name": "A3",
+      "tier": "free",
+      "scans": 0
+    },
+    {
+      "email": "chriseothomas@gmail.com",
+      "name": "Chris \"CT\" Thomas",
+      "tier": "free",
+      "scans": 0
+    },
+    {
+      "email": "crtny_sumpter@yahoo.com",
+      "name": "Courtney Sumpter",
+      "tier": "free",
+      "scans": 0
+    },
+    {
+      "email": "cyntressadickey@yahoo.com",
+      "name": "Tres",
+      "tier": "free",
+      "scans": 0
+    },
+    {
+      "email": "danax16@gmail.com",
+      "name": "DXD",
+      "tier": "free",
+      "scans": 0
+    },
+    {
+      "email": "ejowharah@yahoo.com",
+      "name": "Ebony J",
+      "tier": "free",
+      "scans": 0
+    },
+    {
+      "email": "giger.shawnika@gmail.com",
+      "name": "Neekahgee",
+      "tier": "free",
+      "scans": 0
+    },
+    {
+      "email": "gtjumperzo@gmail.com",
+      "name": "gtjumperzo",
+      "tier": "free",
+      "scans": 0
+    },
+    {
+      "email": "kristi.hector@gmail.com",
+      "name": "Khec_",
+      "tier": "free",
+      "scans": 0
+    },
+    {
+      "email": "pdupass@gmail.com",
+      "name": "Paul",
+      "tier": "free",
+      "scans": 0
+    },
+    {
+      "email": "skifle3@gmail.com",
+      "name": "Sem",
+      "tier": "free",
+      "scans": 0
+    },
+    {
+      "email": "tiffany@outlook.con",
+      "name": "TcMiles",
+      "tier": "free",
+      "scans": 0
+    },
+    {
+      "email": "victor.hicks@codingwithculture.com",
+      "name": "Victor",
+      "tier": "free",
+      "scans": 0
+    }
+  ],
+  "orphanedProfiles": [
+    "beta-test-1757619142857@example.com",
+    "beta-test-1758659296143@example.com",
+    "test_1216@test.com",
+    "test_2a49@test.com",
+    "test_45d2@test.com",
+    "test_625b@test.com",
+    "test_6413@test.com",
+    "test_7f22@test.com",
+    "test_80c0@test.com",
+    "test_8902@test.com",
+    "test_8963@test.com",
+    "test_a116@test.com",
+    "test_b9eb@test.com",
+    "test_c3a9@test.com",
+    "test_cb4e@test.com",
+    "test_d67f@test.com",
+    "test_nov24@test.com",
+    "test.user@skinlytix.dev"
+  ]
+}

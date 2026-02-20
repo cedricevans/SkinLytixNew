@@ -1,9 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
-import {
-  lookupIngredientKnowledge,
-  normalizeIngredientName,
-} from "../_shared/ingredient-knowledge.ts";
+import { lookupIngredientKnowledge, normalizeIngredientName } from "../_shared/ingredient-knowledge.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -62,8 +59,7 @@ const isLowQualityExplanation = (value?: string | null): boolean => {
 
 async function generateBatchExplanations(
   items: Array<{ name: string; role: string; context: string }>,
-  lovableApiKey: string | null,
-  geminiApiKey: string | null
+  geminiApiKey: string | null,
 ): Promise<Record<string, string>> {
   const fallback: Record<string, string> = {};
   items.forEach((item) => {
@@ -78,7 +74,7 @@ Each entry should explain what the ingredient does in 1-2 concise sentences, non
   { "name": "Ingredient Name", "role": "role", "explanation": "..." }
 ]
 Ingredients:
-${items.map((item) => `- ${item.name} (role: ${item.role}) ${item.context}` ).join("\n")}
+${items.map((item) => `- ${item.name} (role: ${item.role}) ${item.context}`).join("\n")}
 `;
 
   const parseResponse = (content: string) => {
@@ -106,10 +102,7 @@ ${items.map((item) => `- ${item.name} (role: ${item.role}) ${item.context}` ).jo
             contents: [
               {
                 role: "user",
-                parts: [
-                  { text: systemPrompt },
-                  { text: userMessage },
-                ],
+                parts: [{ text: systemPrompt }, { text: userMessage }],
               },
             ],
             generationConfig: {
@@ -117,7 +110,7 @@ ${items.map((item) => `- ${item.name} (role: ${item.role}) ${item.context}` ).jo
               maxOutputTokens: 600,
             },
           }),
-        }
+        },
       );
 
       if (response.ok) {
@@ -128,36 +121,6 @@ ${items.map((item) => `- ${item.name} (role: ${item.role}) ${item.context}` ).jo
       }
     } catch (error) {
       console.error("Gemini batch explanation error:", error);
-    }
-  }
-
-  if (lovableApiKey) {
-    try {
-      const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${lovableApiKey}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          model: "google/gemini-2.5-flash-lite",
-          messages: [
-            { role: "system", content: systemPrompt },
-            { role: "user", content: userMessage },
-          ],
-          max_tokens: 600,
-          temperature: 0.3,
-        }),
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        const content = data?.choices?.[0]?.message?.content ?? "";
-        const parsed = parseResponse(content);
-        if (parsed) return parsed;
-      }
-    } catch (error) {
-      console.error("Lovable batch explanation error:", error);
     }
   }
 
@@ -180,14 +143,13 @@ serve(async (req) => {
     }
 
     const ingredients: IngredientInput[] = ingredientsInput.map((item: any) =>
-      typeof item === "string" ? { name: item } : { name: item.name, category: item.category }
+      typeof item === "string" ? { name: item } : { name: item.name, category: item.category },
     );
 
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    const lovableApiKey = Deno.env.get("LOVABLE_API_KEY");
     const geminiApiKey = Deno.env.get("GEMINI_API_KEY");
 
     const normalizedInputs = ingredients.map((ingredient) => ({
@@ -195,9 +157,7 @@ serve(async (req) => {
       normalized: normalizeIngredientName(ingredient.name),
     }));
 
-    const uniqueNormalized = Array.from(
-      new Set(normalizedInputs.map((item) => item.normalized))
-    );
+    const uniqueNormalized = Array.from(new Set(normalizedInputs.map((item) => item.normalized)));
 
     const { data: cachedRows } = await supabase
       .from("ingredient_explanations_cache")
@@ -238,24 +198,17 @@ serve(async (req) => {
       const items = batch.map((ingredient) => {
         const pubchemMatch = ingredientResults.find((r: any) => {
           const searched = r.searched_name?.toLowerCase();
-          const original =
-            typeof r.name === "string" ? normalizeIngredientName(r.name) : undefined;
+          const original = typeof r.name === "string" ? normalizeIngredientName(r.name) : undefined;
           return searched === ingredient.normalized || original === ingredient.normalized;
         });
         const pubchemData = pubchemMatch?.data ?? null;
         const role = classifyIngredientRole(ingredient.name, pubchemData);
-        const context = pubchemData?.molecular_weight
-          ? `(molecular weight: ${pubchemData.molecular_weight})`
-          : "";
+        const context = pubchemData?.molecular_weight ? `(molecular weight: ${pubchemData.molecular_weight})` : "";
         return { name: ingredient.name, role, context };
       });
 
-      if (lovableApiKey || geminiApiKey) {
-        const batchExplanations = await generateBatchExplanations(
-          items,
-          lovableApiKey,
-          geminiApiKey
-        );
+    if (geminiApiKey) {
+        const batchExplanations = await generateBatchExplanations(items, geminiApiKey ?? null);
         Object.assign(explanations, batchExplanations);
       } else {
         items.forEach((item) => {
@@ -269,8 +222,7 @@ serve(async (req) => {
         const knowledge = lookupIngredientKnowledge(ingredient.name);
         const pubchemMatch = ingredientResults.find((r: any) => {
           const searched = r.searched_name?.toLowerCase();
-          const original =
-            typeof r.name === "string" ? normalizeIngredientName(r.name) : undefined;
+          const original = typeof r.name === "string" ? normalizeIngredientName(r.name) : undefined;
           return searched === ingredient.normalized || original === ingredient.normalized;
         });
         const pubchemData = pubchemMatch?.data ?? null;
@@ -284,15 +236,13 @@ serve(async (req) => {
           normalized_name: ingredient.normalized,
           role,
           explanation,
-          source: knowledge?.description ? "knowledge" : (lovableApiKey || geminiApiKey) ? "ai" : "fallback",
+          source: knowledge?.description ? "knowledge" : geminiApiKey ? "ai" : "fallback",
           updated_at: new Date().toISOString(),
         };
       });
 
       if (upserts.length > 0) {
-        await supabase
-          .from("ingredient_explanations_cache")
-          .upsert(upserts, { onConflict: "normalized_name" });
+        await supabase.from("ingredient_explanations_cache").upsert(upserts, { onConflict: "normalized_name" });
       }
     }
 
@@ -311,8 +261,7 @@ serve(async (req) => {
       const knowledge = lookupIngredientKnowledge(ingredient.name);
       const pubchemMatch = ingredientResults.find((r: any) => {
         const searched = r.searched_name?.toLowerCase();
-        const original =
-          typeof r.name === "string" ? normalizeIngredientName(r.name) : undefined;
+        const original = typeof r.name === "string" ? normalizeIngredientName(r.name) : undefined;
         return searched === ingredient.normalized || original === ingredient.normalized;
       });
       const pubchemData = pubchemMatch?.data ?? null;
