@@ -117,7 +117,7 @@ const Home = () => {
             .limit(5),
           supabase
             .from("routine_products")
-            .select("id, product_price, category, user_analyses (product_name, epiq_score)")
+            .select("id, product_price, category, user_analyses (product_name, epiq_score, product_price)")
             .eq("user_analyses.user_id", user.id),
         ]);
 
@@ -129,7 +129,7 @@ const Home = () => {
           id: entry.id,
           product_name: entry.user_analyses?.product_name,
           epiq_score: entry.user_analyses?.epiq_score ?? null,
-          product_price: entry.product_price ?? null,
+          product_price: entry.user_analyses?.product_price ?? entry.product_price ?? null,
           category: entry.category ?? "Routine",
         }));
         const nextRoutineProducts = routineEntries;

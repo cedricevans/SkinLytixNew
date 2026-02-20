@@ -56,7 +56,8 @@ serve(async (req) => {
           category,
           epiq_score,
           ingredients_list,
-          recommendations_json
+          recommendations_json,
+          product_price
         )
       `)
       .eq('routine_id', routineId);
@@ -129,7 +130,7 @@ serve(async (req) => {
       brand: rp.user_analyses.brand,
       category: rp.user_analyses.category,
       ingredients: rp.user_analyses.ingredients_list,
-      price: rp.product_price,
+      price: rp.user_analyses?.product_price ?? rp.product_price ?? null,
       frequency: rp.usage_frequency,
       epiqScore: rp.user_analyses.epiq_score,
       productType: categorizeProduct(rp.user_analyses),

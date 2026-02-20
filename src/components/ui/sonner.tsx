@@ -24,7 +24,7 @@ const Toaster = ({ ...props }: ToasterProps) => {
   );
 };
 
-const toast = ((...args: Parameters<typeof baseToast>) => baseToast(...args)) as typeof baseToast;
+const toast = baseToast;
 
 toast.error = ((...args: Parameters<typeof baseToast.error>) => {
   if (import.meta.env.DEV) {
