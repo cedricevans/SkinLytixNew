@@ -34,6 +34,7 @@ import Pricing from "./pages/Pricing";
 import NotFound from "./pages/NotFound";
 import Settings from "./pages/Settings";
 import StudentReviewer from "./pages/dashboard/StudentReviewer";
+import AdminDashboard from "./pages/AdminDashboard";
 import FeedbackWidget from "@/components/FeedbackWidget";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { TrialCountdown } from "@/components/subscription/TrialCountdown";
@@ -166,6 +167,7 @@ const App = () => (
           <Route path="/connect" element={<Connect />} />
           <Route path="/contact" element={<Connect />} />
           <Route path="/dashboard/reviewer" element={<AppProtectedRoute><ProtectedRoute><StudentReviewer /></ProtectedRoute></AppProtectedRoute>} />
+          <Route path="/admin" element={<AppProtectedRoute><AdminDashboard /></AppProtectedRoute>} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>

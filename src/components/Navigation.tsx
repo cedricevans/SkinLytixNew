@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Bell, ClipboardCheck, LogOut, Menu, Settings, User } from "lucide-react";
+import { Bell, ClipboardCheck, LogOut, Menu, Settings, User, Shield } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import {
@@ -13,6 +13,12 @@ import { useNavigate } from "react-router-dom";
 import { useReviewerAccess } from "@/hooks/useReviewerAccess";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+
+const ADMIN_EMAILS = [
+  'alicia@xiosolutionsllc.com',
+  'cedric.evans@gmail.com',
+  'pte295@gmail.com'
+];
 
 type NavigationVariant = "marketing" | "app";
 
@@ -43,7 +49,9 @@ const Navigation = ({
   const navigate = useNavigate();
   const { hasAccess: hasReviewerAccess } = useReviewerAccess();
   const { toast } = useToast();
+  const [userEmail, setUserEmail] = useState<string | null>(null);
   const isAppNav = variant === "app";
+  const isAdmin = userEmail ? ADMIN_EMAILS.includes(userEmail) : false;
   const navigationItems = isAppNav ? appNavigationItems : marketingNavigationItems;
   const desktopNavigationItems = isAppNav
     ? appNavigationItems.filter((item) => item.label !== "Profile")
@@ -70,6 +78,7 @@ const Navigation = ({
       if (!isMounted) return;
       if (!user) {
         setUserInitials("SL");
+        setUserEmail(null);
         if (typeof window !== "undefined") {
           localStorage.removeItem("sl_user_initials");
         }
@@ -80,6 +89,7 @@ const Navigation = ({
       const initials = getInitials(name);
       const nextInitials = initials || "SL";
       setUserInitials(nextInitials);
+      setUserEmail(user.email || null);
       if (typeof window !== "undefined") {
         localStorage.setItem("sl_user_initials", nextInitials);
       }
@@ -153,6 +163,15 @@ const Navigation = ({
           <User className="mr-2 h-4 w-4" />
           Profile
         </DropdownMenuItem>
+        {isAdmin && (
+          <>
+            <DropdownMenuItem onClick={() => navigate("/admin")}>
+              <Shield className="mr-2 h-4 w-4" />
+              Admin Dashboard
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+          </>
+        )}
         <DropdownMenuItem onClick={() => navigate("/settings")}>
           <Settings className="mr-2 h-4 w-4" />
           Settings
@@ -250,6 +269,18 @@ const Navigation = ({
                 Reviewer
               </button>
             )}
+            {isAdmin && (
+              <button
+                onClick={() => {
+                  navigate('/admin');
+                  setOpen(false);
+                }}
+                className="text-left px-4 py-3 text-lg font-subheading hover:bg-accent/10 rounded-lg transition-colors flex items-center gap-2 text-red-600"
+              >
+                <Shield className="w-5 h-5" />
+                Admin Dashboard
+              </button>
+            )}
             {isAppNav && onAskGpt && (
               <div className="mt-2 px-4">
                 <Button
@@ -302,6 +333,15 @@ const Navigation = ({
           >
             <ClipboardCheck className="w-4 h-4" />
             Reviewer
+          </button>
+        )}
+        {isAdmin && (
+          <button
+            onClick={() => navigate('/admin')}
+            className="text-sm font-subheading text-primary-foreground hover:text-primary-foreground/80 transition-colors flex items-center gap-1.5"
+          >
+            <Shield className="w-4 h-4" />
+            Admin
           </button>
         )}
         {isAppNav && onAskGpt && (

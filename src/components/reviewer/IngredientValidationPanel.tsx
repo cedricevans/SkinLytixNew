@@ -1,151 +1,267 @@
-import { useState } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Checkbox } from '@/components/ui/checkbox';
-import { 
-  CheckCircle2, 
-  XCircle, 
-  FlaskConical, 
-  Bot,
-  ExternalLink,
-  AlertTriangle,
-  Loader2
-} from 'lucide-react';
+import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Loader2, ChevronLeft, ChevronRight } from 'lucide-react';
+import { OEWObservationPanel } from '@/components/reviewer/OEWObservationPanel';
+import { OEWEvidencePanel } from '@/components/reviewer/OEWEvidencePanel';
+import { OEWWritingPanel } from '@/components/reviewer/OEWWritingPanel';
+import { ConfidenceLevelSelector } from '@/components/reviewer/ConfidenceLevelSelector';
+import { VerdictSelector } from '@/components/reviewer/VerdictSelector';
+import { CorrectionInput } from '@/components/reviewer/CorrectionInput';
+import { InternalNotesPanel } from '@/components/reviewer/InternalNotesPanel';
+
+// Import Citation type from CitationForm to match the component's expected interface
+import type { Citation } from '@/components/reviewer/CitationForm';
+
+interface ValidationData {
+  ingredientId: string;
+  validationId?: string;
+  observations: {
+    ingredientName: string;
+    aiClaimSummary: string;
+    aiRoleClassification: string;
+    aiSafetyLevel: string;
+    aiExplanation: string;
+    pubchemCid?: string;
+    molecularWeight?: number;
+  };
+  citations: Citation[];
+  publicExplanation: string;
+  confidenceLevel: 'High' | 'Moderate' | 'Limited' | '';
+  verdict: 'confirm' | 'correct' | 'escalate' | '';
+  correction?: string;
+  escalationReason?: string;
+  internalNotes?: string;
+  moderatorReviewStatus: 'pending' | 'approved' | 'rejected';
+}
 
 interface IngredientValidationPanelProps {
-  analysisId: string;
+  ingredientId: string;
   ingredientName: string;
+  analysisId?: string;
   pubchemCid?: string | null;
   molecularWeight?: number | null;
   aiRole?: string;
+  aiSafetyLevel?: string;
   aiExplanation?: string;
-  existingValidation?: {
-    pubchem_data_correct: boolean | null;
-    ai_explanation_accurate: boolean | null;
-    corrected_role: string | null;
-    corrected_safety_level: string | null;
-    correction_notes: string | null;
-    reference_sources: string[];
-    validation_status: string;
-  } | null;
-  institution: string;
+  aiClaimSummary?: string;
   onValidationComplete: () => void;
 }
 
-const INGREDIENT_ROLES = [
-  'humectant',
-  'emollient',
-  'surfactant',
-  'preservative',
-  'antioxidant',
-  'fragrance',
-  'colorant',
-  'emulsifier',
-  'thickener',
-  'pH adjuster',
-  'solvent',
-  'active ingredient',
-  'other'
-];
-
-const SAFETY_LEVELS = [
-  { value: 'safe', label: 'Safe', color: 'bg-green-500/10 text-green-600' },
-  { value: 'caution', label: 'Caution', color: 'bg-amber-500/10 text-amber-600' },
-  { value: 'avoid', label: 'Avoid', color: 'bg-red-500/10 text-red-600' }
-];
-
-const REFERENCE_SOURCES = [
-  'PubChem',
-  'CIR (Cosmetic Ingredient Review)',
-  'EWG Skin Deep',
-  'Paula\'s Choice Dictionary',
-  'Academic Textbook',
-  'Peer-Reviewed Paper',
-  'Other'
-];
-
 export function IngredientValidationPanel({
-  analysisId,
+  ingredientId,
   ingredientName,
+  analysisId,
   pubchemCid,
   molecularWeight,
   aiRole,
+  aiSafetyLevel,
   aiExplanation,
-  existingValidation,
-  institution,
+  aiClaimSummary,
   onValidationComplete
 }: IngredientValidationPanelProps) {
   const { toast } = useToast();
-  const [saving, setSaving] = useState(false);
-  
-  // Form state
-  const [pubchemCorrect, setPubchemCorrect] = useState<boolean | null>(existingValidation?.pubchem_data_correct ?? null);
-  const [aiAccurate, setAiAccurate] = useState<boolean | null>(existingValidation?.ai_explanation_accurate ?? null);
-  const [correctedRole, setCorrectedRole] = useState(existingValidation?.corrected_role || '');
-  const [safetyLevel, setSafetyLevel] = useState(existingValidation?.corrected_safety_level || '');
-  const [notes, setNotes] = useState(existingValidation?.correction_notes || '');
-  const [selectedSources, setSelectedSources] = useState<string[]>(
-    existingValidation?.reference_sources || []
-  );
+  const [currentStep, setCurrentStep] = useState(1);
+  const [loading, setLoading] = useState(false);
+  const [formData, setFormData] = useState<ValidationData>({
+    ingredientId,
+    observations: {
+      ingredientName,
+      aiClaimSummary: aiClaimSummary || '',
+      aiRoleClassification: aiRole || '',
+      aiSafetyLevel: aiSafetyLevel || '',
+      aiExplanation: aiExplanation || '',
+      pubchemCid,
+      molecularWeight
+    },
+    citations: [],
+    publicExplanation: '',
+    confidenceLevel: '',
+    verdict: '',
+    moderatorReviewStatus: 'pending'
+  });
 
-  const toggleSource = (source: string) => {
-    setSelectedSources(prev => 
-      prev.includes(source) 
-        ? prev.filter(s => s !== source)
-        : [...prev, source]
-    );
+  // Load existing validation if editing
+  useEffect(() => {
+    const loadExistingValidation = async () => {
+      try {
+        const { data, error } = await (supabase as any)
+          .from('ingredient_validations')
+          .select('*')
+          .eq('ingredient_id', ingredientId)
+          .eq('analysis_id', analysisId || null)
+          .single();
+
+        if (data) {
+          const citationData = await (supabase as any)
+            .from('ingredient_validation_citations')
+            .select('*')
+            .eq('validation_id', data.id);
+
+          setFormData(prev => ({
+            ...prev,
+            validationId: data.id,
+            publicExplanation: data.public_explanation || '',
+            confidenceLevel: data.confidence_level || '',
+            verdict: data.verdict || '',
+            correction: data.correction,
+            escalationReason: data.escalation_reason,
+            internalNotes: data.internal_notes || '',
+            citations: (citationData.data || []).map((c: any) => ({
+              type: c.citation_type as any,
+              title: c.title,
+              authors: c.authors,
+              journal_name: c.journal,
+              publication_year: c.year,
+              doi_or_pmid: c.doi_or_pmid,
+              source_url: c.source_url
+            }))
+          }));
+        }
+      } catch (error) {
+        console.error('Error loading existing validation:', error);
+      }
+    };
+
+    if (ingredientId && analysisId) {
+      loadExistingValidation();
+    }
+  }, [ingredientId, analysisId]);
+
+  // Validation helpers
+  const canProceedFromStep = (step: number): boolean => {
+    switch (step) {
+      case 1: // Observation (always can proceed)
+        return true;
+      case 2: // Evidence (requires ≥1 citation)
+        return formData.citations.length > 0;
+      case 3: // Writing (requires 150-300 words)
+        const wordCount = formData.publicExplanation.trim().split(/\s+/).length;
+        return wordCount >= 150 && wordCount <= 300;
+      case 4: // Confidence (requires selection)
+        return formData.confidenceLevel !== '';
+      case 5: // Verdict (requires selection)
+        return formData.verdict !== '';
+      case 6: // Notes (optional, can always save)
+        return true;
+      default:
+        return false;
+    }
+  };
+
+  const handleRemoveCitation = (index: number) => {
+    setFormData(prev => ({
+      ...prev,
+      citations: prev.citations.filter((_, i) => i !== index)
+    }));
   };
 
   const handleSave = async () => {
-    if (pubchemCorrect === null || aiAccurate === null) {
-      toast({
-        title: "Incomplete validation",
-        description: "Please verify both PubChem data and AI explanation accuracy.",
-        variant: "destructive"
-      });
+    // Validate all required fields
+    if (formData.citations.length === 0) {
+      toast({ title: "Missing evidence", description: "Add at least one citation.", variant: "destructive" });
+      return;
+    }
+    const wordCount = formData.publicExplanation.trim().split(/\s+/).length;
+    if (wordCount < 150 || wordCount > 300) {
+      toast({ title: "Invalid word count", description: "Explanation must be 150-300 words.", variant: "destructive" });
+      return;
+    }
+    if (formData.confidenceLevel === '') {
+      toast({ title: "Missing confidence", description: "Select confidence level.", variant: "destructive" });
+      return;
+    }
+    if (formData.verdict === '') {
+      toast({ title: "Missing verdict", description: "Select a verdict.", variant: "destructive" });
       return;
     }
 
-    setSaving(true);
+    setLoading(true);
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Not authenticated');
 
-      const validationData = {
-        analysis_id: analysisId,
-        ingredient_name: ingredientName,
+      // Insert/update ingredient_validations using any to bypass type checking
+      const validationRecord = {
+        ingredient_id: formData.ingredientId,
+        analysis_id: analysisId || null,
         validator_id: user.id,
-        validator_institution: institution,
-        pubchem_data_correct: pubchemCorrect,
-        pubchem_cid_verified: pubchemCid || null,
-        molecular_weight_correct: pubchemCorrect,
-        ai_explanation_accurate: aiAccurate,
-        ai_role_classification_correct: aiAccurate && !correctedRole,
-        corrected_role: correctedRole || null,
-        corrected_safety_level: safetyLevel || null,
-        correction_notes: notes || null,
-        reference_sources: selectedSources,
-        validation_status: (!pubchemCorrect || !aiAccurate) ? 'needs_correction' : 'validated'
+        ingredient_name: ingredientName,
+        ai_claim_summary: formData.observations.aiClaimSummary,
+        public_explanation: formData.publicExplanation,
+        confidence_level: formData.confidenceLevel,
+        verdict: formData.verdict,
+        correction: formData.correction,
+        escalation_reason: formData.escalationReason,
+        internal_notes: formData.internalNotes,
+        is_escalated: formData.verdict === 'escalate',
+        moderator_review_status: formData.moderatorReviewStatus,
+        updated_at: new Date().toISOString()
       };
 
-      const { error } = await supabase
-        .from('ingredient_validations')
-        .upsert(validationData, {
-          onConflict: 'analysis_id,ingredient_name,validator_id'
-        });
+      let validationId = formData.validationId;
+      if (validationId) {
+        const { error } = await (supabase as any)
+          .from('ingredient_validations')
+          .update(validationRecord)
+          .eq('id', validationId);
+        if (error) throw error;
+      } else {
+        const { data, error } = await (supabase as any)
+          .from('ingredient_validations')
+          .insert([validationRecord])
+          .select('id')
+          .single();
+        if (error) throw error;
+        validationId = data.id;
+      }
 
-      if (error) throw error;
+      // Delete old citations and insert new ones
+      if (validationId) {
+        await (supabase as any)
+          .from('ingredient_validation_citations')
+          .delete()
+          .eq('validation_id', validationId);
+
+        if (formData.citations.length > 0) {
+          const citationRecords = formData.citations.map(c => ({
+            validation_id: validationId,
+            citation_type: c.type,
+            title: c.title,
+            authors: c.authors,
+            journal: c.journal_name,
+            year: c.publication_year,
+            doi_or_pmid: c.doi_or_pmid,
+            source_url: c.source_url
+          }));
+
+          const { error } = await (supabase as any)
+            .from('ingredient_validation_citations')
+            .insert(citationRecords);
+          if (error) throw error;
+        }
+      }
 
       toast({
         title: "Validation saved!",
-        description: `${ingredientName} has been validated.`
+        description: `${ingredientName} has been validated successfully.`
       });
+
+      // Reset form
+      setCurrentStep(1);
+      setFormData(prev => ({
+        ...prev,
+        validationId,
+        publicExplanation: '',
+        confidenceLevel: '',
+        verdict: '',
+        correction: undefined,
+        escalationReason: undefined,
+        internalNotes: '',
+        citations: []
+      }));
 
       onValidationComplete();
     } catch (error: any) {
@@ -156,208 +272,164 @@ export function IngredientValidationPanel({
         variant: "destructive"
       });
     } finally {
-      setSaving(false);
+      setLoading(false);
+    }
+  };
+
+  // Step content rendering
+  const renderStep = () => {
+    switch (currentStep) {
+      case 1:
+        return (
+          <OEWObservationPanel
+            ingredientName={formData.observations.ingredientName}
+            aiClaimSummary={formData.observations.aiClaimSummary}
+            aiRoleClassification={formData.observations.aiRoleClassification}
+            aiSafetyLevel={formData.observations.aiSafetyLevel}
+            aiExplanation={formData.observations.aiExplanation}
+            pubchemCid={formData.observations.pubchemCid}
+            molecularWeight={formData.observations.molecularWeight}
+          />
+        );
+      case 2:
+        return (
+          <OEWEvidencePanel
+            citations={formData.citations}
+            onCitationsChange={(citations) => setFormData(prev => ({ ...prev, citations }))}
+            ingredientName={formData.observations.ingredientName}
+          />
+        );
+      case 3:
+        return (
+          <OEWWritingPanel
+            value={formData.publicExplanation}
+            onChange={(value) => setFormData(prev => ({ ...prev, publicExplanation: value }))}
+            ingredientName={formData.observations.ingredientName}
+          />
+        );
+      case 4:
+        return (
+          <ConfidenceLevelSelector
+            value={formData.confidenceLevel as any}
+            onChange={(value) => setFormData(prev => ({ ...prev, confidenceLevel: value as any }))}
+          />
+        );
+      case 5:
+        return (
+          <div className="space-y-6">
+            <VerdictSelector
+              value={formData.verdict as any}
+              onChange={(value) => setFormData(prev => ({ ...prev, verdict: value as any }))}
+            />
+            {formData.verdict === 'correct' && (
+              <CorrectionInput
+                value={formData.correction || ''}
+                onChange={(value) => setFormData(prev => ({ ...prev, correction: value }))}
+                isVisible={true}
+              />
+            )}
+            {formData.verdict === 'escalate' && (
+              <div className="p-4 bg-muted rounded-lg">
+                <label className="text-sm font-medium">Escalation Reason</label>
+                <textarea
+                  placeholder="Explain why this requires escalation..."
+                  value={formData.escalationReason || ''}
+                  onChange={(e) => setFormData(prev => ({ ...prev, escalationReason: e.target.value }))}
+                  className="w-full mt-2 p-3 border border-input rounded-md"
+                  rows={3}
+                />
+              </div>
+            )}
+          </div>
+        );
+      case 6:
+        return (
+          <InternalNotesPanel
+            value={formData.internalNotes || ''}
+            onChange={(value) => setFormData(prev => ({ ...prev, internalNotes: value }))}
+          />
+        );
+      default:
+        return null;
     }
   };
 
   return (
     <Card className="border-l-4 border-l-primary">
-      <CardHeader className="pb-3">
+      <CardHeader>
         <div className="flex items-center justify-between">
-          <CardTitle className="text-lg font-semibold uppercase tracking-wide">
-            {ingredientName}
+          <CardTitle>
+            Step {currentStep} of 6: {
+              currentStep === 1 ? 'Observation' :
+              currentStep === 2 ? 'Evidence' :
+              currentStep === 3 ? 'Writing' :
+              currentStep === 4 ? 'Confidence' :
+              currentStep === 5 ? 'Verdict' :
+              'Internal Notes'
+            }
           </CardTitle>
-          {existingValidation && (
-            <Badge variant="outline" className="bg-green-500/10 text-green-600">
-              <CheckCircle2 className="w-3 h-3 mr-1" />
-              Validated
-            </Badge>
-          )}
+          <div className="text-sm text-muted-foreground">
+            {Math.round((currentStep / 6) * 100)}% complete
+          </div>
         </div>
       </CardHeader>
       <CardContent className="space-y-6">
-        {/* PubChem Data Section */}
-        <div className="p-4 bg-muted/50 rounded-lg space-y-3">
-          <div className="flex items-center gap-2 text-sm font-medium">
-            <FlaskConical className="w-4 h-4 text-primary" />
-            PubChem Data
-          </div>
-          <div className="grid grid-cols-2 gap-4 text-sm">
-            <div>
-              <span className="text-muted-foreground">CID:</span>{' '}
-              <span className="font-mono">{pubchemCid || 'Not found'}</span>
-            </div>
-            <div>
-              <span className="text-muted-foreground">Mol. Weight:</span>{' '}
-              <span className="font-mono">
-                {molecularWeight ? `${molecularWeight} g/mol` : 'N/A'}
-              </span>
-            </div>
-          </div>
-          {pubchemCid && (
-            <a 
-              href={`https://pubchem.ncbi.nlm.nih.gov/compound/${pubchemCid}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-xs text-primary hover:underline inline-flex items-center gap-1"
-            >
-              View on PubChem <ExternalLink className="w-3 h-3" />
-            </a>
-          )}
-          <div className="flex gap-3 pt-2">
+        {renderStep()}
+
+        {/* Navigation */}
+        <div className="flex justify-between gap-3 pt-6 border-t">
+          <Button
+            variant="outline"
+            onClick={() => setCurrentStep(Math.max(1, currentStep - 1))}
+            disabled={currentStep === 1 || loading}
+          >
+            <ChevronLeft className="w-4 h-4 mr-2" />
+            Back
+          </Button>
+
+          {currentStep === 6 ? (
             <Button
-              variant={pubchemCorrect === true ? "default" : "outline"}
-              size="sm"
-              onClick={() => setPubchemCorrect(true)}
-              className={pubchemCorrect === true ? "bg-green-600 hover:bg-green-700" : ""}
+              onClick={handleSave}
+              disabled={loading}
+              className="ml-auto"
             >
-              <CheckCircle2 className="w-4 h-4 mr-1" />
-              Correct
+              {loading ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Saving...
+                </>
+              ) : (
+                'Save Validation'
+              )}
             </Button>
-            <Button
-              variant={pubchemCorrect === false ? "default" : "outline"}
-              size="sm"
-              onClick={() => setPubchemCorrect(false)}
-              className={pubchemCorrect === false ? "bg-red-600 hover:bg-red-700" : ""}
-            >
-              <XCircle className="w-4 h-4 mr-1" />
-              Incorrect
-            </Button>
-          </div>
-        </div>
-
-        {/* AI Explanation Section */}
-        <div className="p-4 bg-muted/50 rounded-lg space-y-3">
-          <div className="flex items-center gap-2 text-sm font-medium">
-            <Bot className="w-4 h-4 text-primary" />
-            AI Analysis
-          </div>
-          {aiRole && (
-            <div className="text-sm">
-              <span className="text-muted-foreground">Role:</span>{' '}
-              <Badge variant="secondary" className="ml-1">{aiRole}</Badge>
-            </div>
-          )}
-          {aiExplanation && (
-            <p className="text-sm text-muted-foreground italic">
-              "{aiExplanation}"
-            </p>
-          )}
-          <div className="flex gap-3 pt-2">
-            <Button
-              variant={aiAccurate === true ? "default" : "outline"}
-              size="sm"
-              onClick={() => setAiAccurate(true)}
-              className={aiAccurate === true ? "bg-green-600 hover:bg-green-700" : ""}
-            >
-              <CheckCircle2 className="w-4 h-4 mr-1" />
-              Accurate
-            </Button>
-            <Button
-              variant={aiAccurate === false ? "default" : "outline"}
-              size="sm"
-              onClick={() => setAiAccurate(false)}
-              className={aiAccurate === false ? "bg-red-600 hover:bg-red-700" : ""}
-            >
-              <XCircle className="w-4 h-4 mr-1" />
-              Needs Revision
-            </Button>
-          </div>
-        </div>
-
-        {/* Corrections Section */}
-        {(pubchemCorrect === false || aiAccurate === false) && (
-          <div className="p-4 border border-amber-500/30 bg-amber-500/5 rounded-lg space-y-4">
-            <div className="flex items-center gap-2 text-sm font-medium text-amber-600">
-              <AlertTriangle className="w-4 h-4" />
-              Corrections Required
-            </div>
-            
-            <div className="grid md:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label>Correct Role</Label>
-                <Select value={correctedRole} onValueChange={setCorrectedRole}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select role..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {INGREDIENT_ROLES.map(role => (
-                      <SelectItem key={role} value={role} className="capitalize">
-                        {role}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              
-              <div className="space-y-2">
-                <Label>Safety Level</Label>
-                <Select value={safetyLevel} onValueChange={setSafetyLevel}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select safety..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {SAFETY_LEVELS.map(level => (
-                      <SelectItem key={level.value} value={level.value}>
-                        <span className={`px-2 py-0.5 rounded ${level.color}`}>
-                          {level.label}
-                        </span>
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <Label>Correction Notes</Label>
-              <Textarea
-                placeholder="Explain what's incorrect and provide the correct information..."
-                value={notes}
-                onChange={(e) => setNotes(e.target.value)}
-                rows={3}
-              />
-            </div>
-          </div>
-        )}
-
-        {/* Reference Sources */}
-        <div className="space-y-3">
-          <Label className="text-sm">Reference Sources Used</Label>
-          <div className="flex flex-wrap gap-2">
-            {REFERENCE_SOURCES.map(source => (
-              <label 
-                key={source}
-                className="flex items-center gap-2 px-3 py-1.5 bg-muted rounded-full cursor-pointer hover:bg-muted/80 transition-colors"
-              >
-                <Checkbox
-                  checked={selectedSources.includes(source)}
-                  onCheckedChange={() => toggleSource(source)}
-                />
-                <span className="text-sm">{source}</span>
-              </label>
-            ))}
-          </div>
-        </div>
-
-        {/* Save Button */}
-        <Button 
-          onClick={handleSave} 
-          disabled={saving}
-          className="w-full"
-        >
-          {saving ? (
-            <>
-              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-              Saving...
-            </>
           ) : (
-            <>
-              <CheckCircle2 className="w-4 h-4 mr-2" />
-              Save Validation
-            </>
+            <Button
+              onClick={() => {
+                if (canProceedFromStep(currentStep)) {
+                  setCurrentStep(currentStep + 1);
+                } else {
+                  const messages = {
+                    1: 'Cannot proceed from observation step',
+                    2: 'Add at least one citation to proceed',
+                    3: 'Explanation must be 150-300 words',
+                    4: 'Select a confidence level',
+                    5: 'Select a verdict'
+                  };
+                  toast({
+                    title: "Cannot proceed",
+                    description: messages[currentStep as keyof typeof messages] || '',
+                    variant: "destructive"
+                  });
+                }
+              }}
+              disabled={loading}
+              className="ml-auto"
+            >
+              Next
+              <ChevronRight className="w-4 h-4 ml-2" />
+            </Button>
           )}
-        </Button>
+        </div>
       </CardContent>
     </Card>
   );

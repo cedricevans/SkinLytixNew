@@ -18,6 +18,7 @@ import {
 import { IngredientValidationPanel } from '@/components/reviewer/IngredientValidationPanel';
 import { IngredientSourcePanel } from '@/components/reviewer/IngredientSourcePanel';
 import { ValidationProgressBar } from '@/components/reviewer/ValidationProgressBar';
+import { ReviewerAccuracyCard } from '@/components/reviewer/ReviewerAccuracyCard';
 import AppShell from '@/components/AppShell';
 
 interface ProductAnalysis {
@@ -163,6 +164,8 @@ export default function StudentReviewer() {
     // Select first ingredient by default
     if (ingredients.length > 0) {
       setSelectedIngredient(ingredients[0]);
+      // Save to local storage
+      localStorage.setItem(`selectedIngredient_${product.id}`, ingredients[0]);
     }
 
     // Load existing validations
@@ -209,6 +212,7 @@ export default function StudentReviewer() {
   const handleValidationComplete = async () => {
     if (!selectedProduct || !userId) return;
 
+    // Reload validations from database
     const { data: validations } = await supabase
       .from('ingredient_validations')
       .select('*')
@@ -216,22 +220,27 @@ export default function StudentReviewer() {
       .eq('validator_id', userId);
 
     const validationMap = new Map<string, IngredientValidation>();
-    validations?.forEach(v => {
+    validations?.forEach((v: any) => {
       validationMap.set(v.ingredient_name, {
         ingredient_name: v.ingredient_name,
-        validation_status: v.validation_status || 'pending',
+        validation_status: v.validation_status || v.verdict || 'pending',
         pubchem_data_correct: v.pubchem_data_correct,
         ai_explanation_accurate: v.ai_explanation_accurate,
-        corrected_role: v.corrected_role,
+        corrected_role: v.corrected_role || v.correction,
         corrected_safety_level: v.corrected_safety_level,
-        correction_notes: v.correction_notes,
+        correction_notes: v.correction_notes || v.internal_notes,
         reference_sources: (v.reference_sources as string[]) || []
       });
     });
     setIngredientValidations(validationMap);
 
-    // Update stats
+    // Update stats (this will trigger ReviewerAccuracyCard to refetch via React Query)
     await loadProducts(userId);
+    
+    toast({
+      title: "Validation saved",
+      description: "Your validation has been recorded and stats updated."
+    });
   };
 
   const exitProductValidation = () => {
@@ -240,6 +249,7 @@ export default function StudentReviewer() {
     setIngredientValidations(new Map());
     setIngredientCache(new Map());
     setSelectedIngredient(null);
+    // Don't clear local storage - user may return to same product
   };
 
   const getValidationProgress = () => {
@@ -304,6 +314,13 @@ export default function StudentReviewer() {
             </div>
           </div>
 
+          {/* Reviewer accuracy card */}
+          {userId && (
+            <div className="mb-6">
+              <ReviewerAccuracyCard userId={userId} />
+            </div>
+          )}
+
           {/* Progress bar */}
           <ValidationProgressBar 
             validated={progress.validated}
@@ -326,7 +343,12 @@ export default function StudentReviewer() {
                     return (
                       <button
                         key={idx}
-                        onClick={() => setSelectedIngredient(ingredient)}
+                        onClick={() => {
+                          setSelectedIngredient(ingredient);
+                          if (selectedProduct) {
+                            localStorage.setItem(`selectedIngredient_${selectedProduct.id}`, ingredient);
+                          }
+                        }}
                         className={`w-full text-left px-3 py-2 rounded-md text-sm flex items-center justify-between transition-colors ${
                           selectedIngredient === ingredient 
                             ? 'bg-primary text-primary-foreground' 
@@ -352,12 +374,11 @@ export default function StudentReviewer() {
               {selectedIngredient ? (
                 <>
                   <IngredientValidationPanel
-                    analysisId={selectedProduct.id}
+                    ingredientId={selectedIngredient.toLowerCase()}
                     ingredientName={selectedIngredient}
+                    analysisId={selectedProduct.id}
                     pubchemCid={currentCache?.pubchem_cid}
                     molecularWeight={currentCache?.molecular_weight}
-                    existingValidation={currentValidation || null}
-                    institution={institution || 'SkinLytix'}
                     onValidationComplete={handleValidationComplete}
                   />
                   <IngredientSourcePanel
