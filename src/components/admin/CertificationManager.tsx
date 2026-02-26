@@ -118,12 +118,18 @@ export default function CertificationManager({ onStatsUpdate }: CertificationMan
 
       setSubmitting(true);
 
-      // Get user by email
-      const { data: { users }, error: listError } = await supabase.auth.admin.listUsers();
-      if (listError) throw listError;
+      const { data: { user: adminUser } } = await supabase.auth.getUser();
+      const adminId = adminUser?.id || null;
+      const adminEmail = adminUser?.email || '';
 
-      const user = users?.find((u: any) => u.email === formData.email);
-      if (!user) {
+      const { data: profile, error: profileError } = await supabase
+        .from('profiles')
+        .select('id, email')
+        .eq('email', formData.email)
+        .maybeSingle();
+
+      if (profileError) throw profileError;
+      if (!profile?.id) {
         toast({
           title: 'User Not Found',
           description: `No user found with email: ${formData.email}`,
@@ -145,6 +151,15 @@ export default function CertificationManager({ onStatsUpdate }: CertificationMan
 
         if (updateError) throw updateError;
 
+        await (supabase as any).from('audit_logs').insert({
+          action: 'update_certification',
+          admin_id: adminId,
+          admin_email: adminEmail,
+          target_user_id: profile.id,
+          target_user_email: profile.email,
+          details: { certification_id: editingId, institution: formData.institution, level: formData.level }
+        });
+
         toast({
           title: 'Success',
           description: 'Certification updated successfully',
@@ -154,12 +169,21 @@ export default function CertificationManager({ onStatsUpdate }: CertificationMan
         const { error: insertError } = await supabase
           .from('student_certifications')
           .insert({
-            user_id: user.id,
+            user_id: profile.id,
             institution: formData.institution,
             certification_level: formData.level
           } as any);
 
         if (insertError) throw insertError;
+
+        await (supabase as any).from('audit_logs').insert({
+          action: 'create_certification',
+          admin_id: adminId,
+          admin_email: adminEmail,
+          target_user_id: profile.id,
+          target_user_email: profile.email,
+          details: { institution: formData.institution, level: formData.level }
+        });
 
         toast({
           title: 'Success',
@@ -196,12 +220,27 @@ export default function CertificationManager({ onStatsUpdate }: CertificationMan
 
   const handleDeleteCertification = async (certId: string) => {
     try {
+      const { data: { user } } = await supabase.auth.getUser();
       const { error } = await supabase
         .from('student_certifications')
         .delete()
         .eq('id', certId);
 
       if (error) throw error;
+
+      if (user) {
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('email')
+          .eq('id', user.id)
+          .maybeSingle();
+        await (supabase as any).from('audit_logs').insert({
+          action: 'delete_certification',
+          admin_id: user.id,
+          admin_email: profile?.email || '',
+          details: { certification_id: certId }
+        });
+      }
 
       toast({
         title: 'Success',
@@ -253,8 +292,8 @@ export default function CertificationManager({ onStatsUpdate }: CertificationMan
   return (
     <Card>
       <CardHeader>
-        <div className="flex items-center justify-between">
-          <CardTitle>Student Certifications</CardTitle>
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <CardTitle className="break-words">Student Certifications</CardTitle>
           <Dialog open={openDialog} onOpenChange={(open) => {
             setOpenDialog(open);
             if (!open) {
@@ -263,7 +302,7 @@ export default function CertificationManager({ onStatsUpdate }: CertificationMan
             }
           }}>
             <DialogTrigger asChild>
-              <Button className="gap-2">
+              <Button className="gap-2 w-full sm:w-auto whitespace-nowrap">
                 <Plus className="h-4 w-4" />
                 Add Certification
               </Button>
@@ -340,8 +379,8 @@ export default function CertificationManager({ onStatsUpdate }: CertificationMan
           />
         </div>
 
-        <div className="border rounded-lg overflow-hidden">
-          <Table>
+        <div className="border rounded-lg overflow-x-auto">
+          <Table className="table-fixed w-full">
             <TableHeader>
               <TableRow>
                 <TableHead>Email</TableHead>
@@ -361,14 +400,18 @@ export default function CertificationManager({ onStatsUpdate }: CertificationMan
               ) : (
                 filteredCertifications.map((cert) => (
                   <TableRow key={cert.id}>
-                    <TableCell className="font-medium">{cert.user_email}</TableCell>
-                    <TableCell>{cert.institution}</TableCell>
+                    <TableCell className="font-medium break-words whitespace-normal max-w-[220px]">
+                      {cert.user_email}
+                    </TableCell>
+                    <TableCell className="break-words whitespace-normal max-w-[240px]">
+                      {cert.institution}
+                    </TableCell>
                     <TableCell>
-                      <Badge variant={getLevelBadgeVariant(cert.certification_level)}>
+                      <Badge variant={getLevelBadgeVariant(cert.certification_level)} className="whitespace-nowrap">
                         {cert.certification_level}
                       </Badge>
                     </TableCell>
-                    <TableCell className="text-sm text-gray-600">
+                    <TableCell className="text-sm text-gray-600 whitespace-normal">
                       {new Date(cert.created_at).toLocaleDateString()}
                     </TableCell>
                     <TableCell className="text-right space-x-2">

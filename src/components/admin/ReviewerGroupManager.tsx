@@ -40,11 +40,15 @@ export default function ReviewerGroupManager({ onStatsUpdate }: ReviewerGroupMan
   const [groups, setGroups] = useState<ReviewerGroup[]>([]);
   const [loading, setLoading] = useState(true);
   const [openDialog, setOpenDialog] = useState(false);
+  const [memberDialogOpen, setMemberDialogOpen] = useState(false);
+  const [selectedGroup, setSelectedGroup] = useState<ReviewerGroup | null>(null);
+  const [memberEmail, setMemberEmail] = useState('');
   const [formData, setFormData] = useState({
     name: '',
     description: ''
   });
   const [submitting, setSubmitting] = useState(false);
+  const [memberSubmitting, setMemberSubmitting] = useState(false);
   const [searchName, setSearchName] = useState('');
 
   useEffect(() => {
@@ -54,13 +58,27 @@ export default function ReviewerGroupManager({ onStatsUpdate }: ReviewerGroupMan
   const loadGroups = async () => {
     try {
       setLoading(true);
-      // Note: reviewer_groups table may not exist yet
-      // This is a placeholder for when the table is created
-      
-      // For now, show an empty state with instructions
-      setGroups([]);
+      const { data, error } = await (supabase as any)
+        .from('reviewer_groups')
+        .select('id, name, description, created_at, reviewer_group_members(count)')
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+
+      const mapped = (data || []).map((group: any) => ({
+        id: group.id,
+        name: group.name,
+        description: group.description,
+        created_at: group.created_at,
+        member_count: Array.isArray(group.reviewer_group_members)
+          ? Number(group.reviewer_group_members[0]?.count ?? 0)
+          : 0
+      }));
+
+      setGroups(mapped);
     } catch (error) {
       console.error('Error loading groups:', error);
+      setGroups([]);
     } finally {
       setLoading(false);
     }
@@ -68,13 +86,51 @@ export default function ReviewerGroupManager({ onStatsUpdate }: ReviewerGroupMan
 
   const handleAddGroup = async () => {
     try {
-      toast({
-        title: 'Coming Soon',
-        description: 'Reviewer groups feature will be available after database migration. Contact your administrator.',
-        variant: 'default',
+      if (!formData.name.trim()) {
+        toast({
+          title: 'Validation Error',
+          description: 'Group name is required',
+          variant: 'destructive',
+        });
+        return;
+      }
+
+      setSubmitting(true);
+      const { data: { user } } = await supabase.auth.getUser();
+
+      const { error } = await (supabase as any)
+        .from('reviewer_groups')
+        .insert({
+          name: formData.name.trim(),
+          description: formData.description?.trim() || null,
+          created_by: user?.id || null
+        });
+
+      if (error) throw error;
+
+      await (supabase as any).from('audit_logs').insert({
+        action: 'create_reviewer_group',
+        admin_id: user?.id || null,
+        admin_email: user?.email || '',
+        details: { name: formData.name.trim() }
       });
+
+      toast({
+        title: 'Success',
+        description: 'Reviewer group created',
+      });
+
+      setFormData({ name: '', description: '' });
+      setOpenDialog(false);
+      await loadGroups();
+      onStatsUpdate?.();
     } catch (error) {
       console.error('Error:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to create group',
+        variant: 'destructive',
+      });
     } finally {
       setSubmitting(false);
     }
@@ -82,10 +138,106 @@ export default function ReviewerGroupManager({ onStatsUpdate }: ReviewerGroupMan
 
   const handleDeleteGroup = async (groupId: string) => {
     try {
-      // Placeholder for when table exists
-      console.log('Delete group:', groupId);
+      const { data: { user } } = await supabase.auth.getUser();
+      const { error } = await (supabase as any)
+        .from('reviewer_groups')
+        .delete()
+        .eq('id', groupId);
+
+      if (error) throw error;
+
+      await (supabase as any).from('audit_logs').insert({
+        action: 'delete_reviewer_group',
+        admin_id: user?.id || null,
+        admin_email: user?.email || '',
+        details: { group_id: groupId }
+      });
+
+      toast({
+        title: 'Success',
+        description: 'Reviewer group deleted',
+      });
+
+      await loadGroups();
+      onStatsUpdate?.();
     } catch (error) {
       console.error('Error deleting group:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to delete group',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  const handleAddMember = async () => {
+    if (!selectedGroup) return;
+    if (!memberEmail.trim()) {
+      toast({
+        title: 'Validation Error',
+        description: 'Member email is required',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    try {
+      setMemberSubmitting(true);
+      const { data: { user } } = await supabase.auth.getUser();
+
+      const { data: profile, error: profileError } = await supabase
+        .from('profiles')
+        .select('id, email')
+        .eq('email', memberEmail.trim())
+        .maybeSingle();
+
+      if (profileError) throw profileError;
+      if (!profile?.id) {
+        toast({
+          title: 'User Not Found',
+          description: `No user found with email: ${memberEmail}`,
+          variant: 'destructive',
+        });
+        return;
+      }
+
+      const { error } = await (supabase as any)
+        .from('reviewer_group_members')
+        .insert({
+          group_id: selectedGroup.id,
+          user_id: profile.id,
+          added_by: user?.id || null
+        });
+
+      if (error) throw error;
+
+      await (supabase as any).from('audit_logs').insert({
+        action: 'add_reviewer_group_member',
+        admin_id: user?.id || null,
+        admin_email: user?.email || '',
+        target_user_id: profile.id,
+        target_user_email: profile.email,
+        details: { group_id: selectedGroup.id }
+      });
+
+      toast({
+        title: 'Success',
+        description: 'Member added to group',
+      });
+
+      setMemberEmail('');
+      setMemberDialogOpen(false);
+      setSelectedGroup(null);
+      await loadGroups();
+    } catch (error) {
+      console.error('Error adding member:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to add member',
+        variant: 'destructive',
+      });
+    } finally {
+      setMemberSubmitting(false);
     }
   };
 
@@ -222,6 +374,16 @@ export default function ReviewerGroupManager({ onStatsUpdate }: ReviewerGroupMan
                           <Button
                             variant="ghost"
                             size="sm"
+                            onClick={() => {
+                              setSelectedGroup(group);
+                              setMemberDialogOpen(true);
+                            }}
+                          >
+                            <Plus className="h-4 w-4 text-blue-600" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
                             onClick={() => handleDeleteGroup(group.id)}
                           >
                             <Trash2 className="h-4 w-4 text-red-600" />
@@ -235,6 +397,33 @@ export default function ReviewerGroupManager({ onStatsUpdate }: ReviewerGroupMan
             </div>
           </>
         )}
+
+        <Dialog open={memberDialogOpen} onOpenChange={setMemberDialogOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Add Group Member</DialogTitle>
+              <DialogDescription>
+                Add a reviewer to {selectedGroup?.name || 'this group'} by email.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4">
+              <Input
+                type="email"
+                placeholder="reviewer@example.com"
+                value={memberEmail}
+                onChange={(e) => setMemberEmail(e.target.value)}
+                disabled={memberSubmitting}
+              />
+              <Button
+                onClick={handleAddMember}
+                disabled={memberSubmitting}
+                className="w-full"
+              >
+                {memberSubmitting ? 'Adding...' : 'Add Member'}
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
       </CardContent>
     </Card>
   );

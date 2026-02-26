@@ -102,11 +102,15 @@ export default function AdminDashboard() {
         .from('student_certifications')
         .select('id', { count: 'estimated', head: true });
 
+      const { data: groupData } = await (supabase as any)
+        .from('reviewer_groups')
+        .select('id', { count: 'estimated', head: true });
+
       setStats({
         totalUsers: (moderatorData?.length || 0) + 1,
         moderators: moderatorData?.length || 0,
         certifiedReviewers: certData?.length || 0,
-        reviewerGroups: 0
+        reviewerGroups: groupData?.length || 0
       });
     } catch (error) {
       console.error('Stats error:', error);

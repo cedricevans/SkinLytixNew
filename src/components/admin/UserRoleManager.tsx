@@ -108,11 +108,20 @@ export default function UserRoleManager({ onStatsUpdate }: UserRoleManagerProps)
       }
 
       setSubmitting(true);
+      const { data: { user } } = await supabase.auth.getUser();
 
       // Call Edge Function to add role (service role bypasses RLS)
       await invokeFunction('add-user-role', {
         userEmail: formData.email,
         role: formData.role,
+      });
+
+      await (supabase as any).from('audit_logs').insert({
+        action: 'create_role',
+        admin_id: user?.id || null,
+        admin_email: user?.email || '',
+        target_user_email: formData.email,
+        details: { role: formData.role }
       });
 
       toast({
@@ -138,12 +147,20 @@ export default function UserRoleManager({ onStatsUpdate }: UserRoleManagerProps)
 
   const handleDeleteRole = async (roleId: string) => {
     try {
+      const { data: { user } } = await supabase.auth.getUser();
       const { error } = await supabase
         .from('user_roles')
         .delete()
         .eq('id', roleId);
 
       if (error) throw error;
+
+      await (supabase as any).from('audit_logs').insert({
+        action: 'delete_role',
+        admin_id: user?.id || null,
+        admin_email: user?.email || '',
+        details: { role_id: roleId }
+      });
 
       toast({
         title: 'Success',

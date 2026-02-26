@@ -115,6 +115,8 @@ export default function StudentReviewer() {
     Map<string, { validated: number; needsCorrection: number; inProgress: number; lastUpdated?: string | null; lastReviewer?: string | null }>
   >(new Map());
   const [selectedIngredient, setSelectedIngredient] = useState<string | null>(null);
+  const ingredientListRef = useRef<HTMLDivElement | null>(null);
+  const validationPanelRef = useRef<HTMLDivElement | null>(null);
   const [viewMode, setViewMode] = useState<ReviewListMode>('products');
   const [validationList, setValidationList] = useState<ValidationListItem[]>([]);
   const [validationListLoading, setValidationListLoading] = useState(false);
@@ -137,6 +139,15 @@ export default function StudentReviewer() {
     if (viewMode === 'products') return;
     loadValidationList(userId);
   }, [viewMode, userId]);
+
+  useEffect(() => {
+    if (!selectedProduct || !selectedIngredient) return;
+    if (window.innerWidth >= 1024) return;
+    const target = validationPanelRef.current;
+    if (target) {
+      target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  }, [selectedProduct, selectedIngredient]);
 
   const checkAccessAndLoad = async () => {
     try {
@@ -628,7 +639,7 @@ export default function StudentReviewer() {
               </Card>
 
               <Card>
-                <CardContent className="p-4">
+                <CardContent className="p-4" ref={ingredientListRef}>
                   <div className="flex items-center justify-between mb-3">
                     <h2 className="text-sm font-medium">Ingredients</h2>
                     <span className="text-xs text-muted-foreground">
@@ -682,7 +693,7 @@ export default function StudentReviewer() {
               </Card>
             </div>
 
-            <div className="lg:col-span-2 space-y-4">
+            <div className="lg:col-span-2 space-y-4" ref={validationPanelRef}>
               {selectedIngredient ? (
                 <>
                   <IngredientValidationPanel
@@ -696,6 +707,14 @@ export default function StudentReviewer() {
                     aiSafetyLevel={currentAi?.safetyLevel || undefined}
                     aiExplanation={currentAi?.explanation || undefined}
                     aiClaimSummary={currentAi?.claimSummary || undefined}
+                    onBackToList={() => {
+                      const target = ingredientListRef.current;
+                      if (target) {
+                        target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                      } else {
+                        window.scrollTo({ top: 0, behavior: 'smooth' });
+                      }
+                    }}
                     onValidationComplete={handleValidationComplete}
                   />
                   <IngredientSourcePanel

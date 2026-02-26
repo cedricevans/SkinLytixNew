@@ -47,6 +47,7 @@ interface IngredientValidationPanelProps {
   aiSafetyLevel?: string;
   aiExplanation?: string;
   aiClaimSummary?: string;
+  onBackToList?: () => void;
   onValidationComplete: () => void;
 }
 
@@ -60,6 +61,7 @@ export function IngredientValidationPanel({
   aiSafetyLevel,
   aiExplanation,
   aiClaimSummary,
+  onBackToList,
   onValidationComplete
 }: IngredientValidationPanelProps) {
   const { toast } = useToast();
@@ -532,6 +534,13 @@ export function IngredientValidationPanel({
 
   return (
     <Card className="border-l-4 border-l-primary">
+      {onBackToList && (
+        <div className="px-6 pt-4 sm:hidden">
+          <Button variant="outline" size="sm" onClick={onBackToList} className="w-full">
+            Back to Ingredients
+          </Button>
+        </div>
+      )}
       <CardHeader className="space-y-2">
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <CardTitle className="text-base sm:text-lg leading-snug break-words">

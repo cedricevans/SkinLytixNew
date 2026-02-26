@@ -44,10 +44,14 @@ export default function AuditLog() {
   const loadAuditLog = async () => {
     try {
       setLoading(true);
-      
-      // Note: audit_logs table does not exist yet
-      // This is a placeholder for when the table is created
-      setEntries([]);
+      const { data, error } = await (supabase as any)
+        .from('audit_logs')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(200);
+
+      if (error) throw error;
+      setEntries((data || []) as AuditLogEntry[]);
     } catch (error) {
       console.error('Error loading audit log:', error);
       setEntries([]);
