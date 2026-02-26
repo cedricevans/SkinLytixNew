@@ -50,8 +50,8 @@ const Navigation = ({
   const { hasAccess: hasReviewerAccess } = useReviewerAccess();
   const { toast } = useToast();
   const [userEmail, setUserEmail] = useState<string | null>(null);
+  const [isAdmin, setIsAdmin] = useState(false);
   const isAppNav = variant === "app";
-  const isAdmin = userEmail ? ADMIN_EMAILS.includes(userEmail) : false;
   const navigationItems = isAppNav ? appNavigationItems : marketingNavigationItems;
   const desktopNavigationItems = isAppNav
     ? appNavigationItems.filter((item) => item.label !== "Profile")
@@ -79,6 +79,7 @@ const Navigation = ({
       if (!user) {
         setUserInitials("SL");
         setUserEmail(null);
+        setIsAdmin(false);
         if (typeof window !== "undefined") {
           localStorage.removeItem("sl_user_initials");
         }
@@ -89,7 +90,22 @@ const Navigation = ({
       const initials = getInitials(name);
       const nextInitials = initials || "SL";
       setUserInitials(nextInitials);
-      setUserEmail(user.email || null);
+      const email = user.email || null;
+      setUserEmail(email);
+      const emailIsAdmin = email ? ADMIN_EMAILS.includes(email) : false;
+      setIsAdmin(emailIsAdmin);
+      try {
+        const { data: roles } = await supabase
+          .from('user_roles')
+          .select('role')
+          .eq('user_id', user.id)
+          .eq('role', 'admin')
+          .maybeSingle();
+        setIsAdmin(emailIsAdmin || !!roles);
+      } catch (e) {
+        console.error('Failed to load admin role', e);
+        setIsAdmin(emailIsAdmin);
+      }
       if (typeof window !== "undefined") {
         localStorage.setItem("sl_user_initials", nextInitials);
       }

@@ -53,8 +53,16 @@ export default function AdminDashboard() {
         return;
       }
 
-      // Check if user is in authorized admin list
-      if (!ADMIN_EMAILS.includes(authUser.email || '')) {
+      const emailIsAdmin = ADMIN_EMAILS.includes(authUser.email || '');
+      // Check role-based admin access (preferred) with email fallback
+      const { data: role } = await supabase
+        .from('user_roles')
+        .select('role')
+        .eq('user_id', authUser.id)
+        .eq('role', 'admin')
+        .maybeSingle();
+
+      if (!emailIsAdmin && !role) {
         setIsAuthorized(false);
         setLoading(false);
         return;
@@ -97,7 +105,7 @@ export default function AdminDashboard() {
 
   if (loading) {
     return (
-      <AppShell>
+      <AppShell showNavigation>
         <div className="flex items-center justify-center h-96">
           <div className="text-center">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
@@ -110,7 +118,7 @@ export default function AdminDashboard() {
 
   if (!isAuthorized) {
     return (
-      <AppShell>
+      <AppShell showNavigation>
         <div className="container mx-auto py-12">
           <div className="mb-6">
             <h1 className="text-3xl font-bold mb-2">Admin Dashboard</h1>
@@ -134,7 +142,7 @@ export default function AdminDashboard() {
   }
 
   return (
-    <AppShell>
+    <AppShell showNavigation>
       <div className="container mx-auto py-8">
         <div className="mb-6">
           <h1 className="text-3xl font-bold mb-2">Admin Dashboard</h1>
