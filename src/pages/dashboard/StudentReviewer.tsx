@@ -374,6 +374,7 @@ export default function StudentReviewer() {
               {selectedIngredient ? (
                 <>
                   <IngredientValidationPanel
+                    key={`${selectedProduct.id}-${selectedIngredient}`}
                     ingredientId={selectedIngredient.toLowerCase()}
                     ingredientName={selectedIngredient}
                     analysisId={selectedProduct.id}
@@ -382,6 +383,7 @@ export default function StudentReviewer() {
                     onValidationComplete={handleValidationComplete}
                   />
                   <IngredientSourcePanel
+                    key={`source-${selectedProduct.id}-${selectedIngredient}`}
                     ingredientName={selectedIngredient}
                     pubchemData={currentCache ? {
                       cid: currentCache.pubchem_cid,
