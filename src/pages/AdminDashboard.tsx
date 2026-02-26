@@ -15,6 +15,7 @@ import {
   Shield,
   Lock
 } from 'lucide-react';
+import invokeFunction from '@/lib/functions-client';
 import UserRoleManager from '@/components/admin/UserRoleManager';
 import CertificationManager from '@/components/admin/CertificationManager';
 import ReviewerGroupManager from '@/components/admin/ReviewerGroupManager';
@@ -61,6 +62,17 @@ export default function AdminDashboard() {
         .eq('user_id', authUser.id)
         .eq('role', 'admin')
         .maybeSingle();
+
+      if (emailIsAdmin && !role && authUser.email) {
+        try {
+          await invokeFunction('add-user-role', {
+            userEmail: authUser.email,
+            role: 'admin'
+          });
+        } catch (error) {
+          console.warn('Unable to auto-assign admin role:', error);
+        }
+      }
 
       if (!emailIsAdmin && !role) {
         setIsAuthorized(false);

@@ -1,45 +1,58 @@
-import { useState, useEffect } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import AppShell from '@/components/AppShell';
 import { Card, CardContent } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
-import { 
-  ClipboardList, 
-  CheckCircle2, 
+import { Button } from '@/components/ui/button';
+import {
   AlertTriangle,
-  Award, 
-  Home,
-  ArrowLeft,
-  FlaskConical
+  Award,
+  CheckCircle2,
+  ClipboardList,
+  FlaskConical,
+  Home
 } from 'lucide-react';
 import { IngredientValidationPanel } from '@/components/reviewer/IngredientValidationPanel';
 import { IngredientSourcePanel } from '@/components/reviewer/IngredientSourcePanel';
 import { ValidationProgressBar } from '@/components/reviewer/ValidationProgressBar';
-import { ReviewerAccuracyCard } from '@/components/reviewer/ReviewerAccuracyCard';
-import AppShell from '@/components/AppShell';
+import { fetchIngredientExplanations } from '@/lib/ingredient-explanations';
 
 interface ProductAnalysis {
   id: string;
   product_name: string;
-  brand: string | null;
-  category: string | null;
-  epiq_score: number | null;
+  brand?: string | null;
+  category?: string | null;
+  epiq_score?: number | null;
   ingredients_list: string;
-  analyzed_at: string;
+  analyzed_at?: string | null;
 }
 
 interface IngredientValidation {
   ingredient_name: string;
-  validation_status: string;
-  pubchem_data_correct: boolean | null;
-  ai_explanation_accurate: boolean | null;
-  corrected_role: string | null;
-  corrected_safety_level: string | null;
-  correction_notes: string | null;
-  reference_sources: string[];
+  validation_status: 'pending' | 'validated' | 'needs_correction';
+  pubchem_data_correct?: boolean | null;
+  ai_explanation_accurate?: boolean | null;
+  corrected_role?: string | null;
+  corrected_safety_level?: string | null;
+  correction_notes?: string | null;
+  verdict?: string | null;
+  confidence_level?: string | null;
+  public_explanation?: string | null;
+  internal_notes?: string | null;
+  citation_count?: number | null;
+  updated_at?: string | null;
+  validator_id?: string | null;
+  validator_email?: string | null;
+  reference_sources?: string[];
+}
+
+interface IngredientAiData {
+  role?: string | null;
+  safetyLevel?: string | null;
+  explanation?: string | null;
+  claimSummary?: string | null;
 }
 
 interface Stats {
@@ -57,7 +70,15 @@ interface ValidationListItem {
   validation_status: string | null;
   verdict: string | null;
   correction_notes: string | null;
+  confidence_level?: string | null;
+  public_explanation?: string | null;
+  internal_notes?: string | null;
+  citation_count?: number | null;
+  review_count?: number | null;
   updated_at: string | null;
+  validator_id?: string | null;
+  validator_email?: string | null;
+  moderator_review_status?: string | null;
   user_analyses?: {
     product_name?: string | null;
     brand?: string | null;
@@ -89,10 +110,23 @@ export default function StudentReviewer() {
   const [ingredientsList, setIngredientsList] = useState<string[]>([]);
   const [ingredientValidations, setIngredientValidations] = useState<Map<string, IngredientValidation>>(new Map());
   const [ingredientCache, setIngredientCache] = useState<Map<string, any>>(new Map());
+  const [ingredientAiData, setIngredientAiData] = useState<Map<string, IngredientAiData>>(new Map());
+  const [productValidationSummary, setProductValidationSummary] = useState<
+    Map<string, { validated: number; needsCorrection: number; inProgress: number; lastUpdated?: string | null; lastReviewer?: string | null }>
+  >(new Map());
   const [selectedIngredient, setSelectedIngredient] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<ReviewListMode>('products');
   const [validationList, setValidationList] = useState<ValidationListItem[]>([]);
   const [validationListLoading, setValidationListLoading] = useState(false);
+  const validationListLoadedRef = useRef(false);
+  // Polling interval for real-time updates
+  useEffect(() => {
+    if (!hasAccess || !userId) return;
+    const interval = setInterval(() => {
+      loadValidationList(userId);
+    }, 15000); // Poll every 15 seconds
+    return () => clearInterval(interval);
+  }, [hasAccess, userId]);
 
   useEffect(() => {
     checkAccessAndLoad();
@@ -181,24 +215,218 @@ export default function StudentReviewer() {
       ingredientsValidated: validated,
       flaggedForCorrection: flagged
     });
+
+    const analysisIds = (analyses || []).map(a => a.id).filter(Boolean);
+    if (analysisIds.length > 0) {
+      const { data: validations } = await (supabase as any)
+        .from('ingredient_validations')
+        .select('analysis_id, validator_id, updated_at, created_at, verdict, confidence_level, public_explanation, internal_notes, validation_status, ingredient_validation_citations(count)')
+        .in('analysis_id', analysisIds);
+
+      const validatorIds = (validations || []).map((row: any) => row.validator_id).filter(Boolean);
+      const emailMap = await fetchReviewerEmails(validatorIds);
+
+      const summaryMap = new Map<string, { validated: number; needsCorrection: number; inProgress: number; lastUpdated?: string | null; lastReviewer?: string | null }>();
+      (validations || []).forEach((row: any) => {
+        const analysisId = row.analysis_id;
+        if (!analysisId) return;
+        const existing = summaryMap.get(analysisId) || { validated: 0, needsCorrection: 0, inProgress: 0, lastUpdated: null, lastReviewer: null };
+        const status = mapValidationStatus(row);
+        if (status === 'validated') existing.validated += 1;
+        else if (status === 'needs_correction') existing.needsCorrection += 1;
+        else if (isInProgressRow(row)) existing.inProgress += 1;
+
+        const updatedAt = row.updated_at || row.created_at || null;
+        if (updatedAt) {
+          const currentTime = new Date(updatedAt).getTime();
+          const existingTime = existing.lastUpdated ? new Date(existing.lastUpdated).getTime() : 0;
+          if (currentTime >= existingTime) {
+            existing.lastUpdated = updatedAt;
+            existing.lastReviewer = emailMap.get(row.validator_id) || (row.validator_id ? shortId(row.validator_id) : null);
+          }
+        }
+
+        summaryMap.set(analysisId, existing);
+      });
+
+      setProductValidationSummary(summaryMap);
+    } else {
+      setProductValidationSummary(new Map());
+    }
   };
 
   const loadValidationList = async (uid: string) => {
-    setValidationListLoading(true);
+    const shouldShowLoading = !validationListLoadedRef.current;
+    if (shouldShowLoading) {
+      setValidationListLoading(true);
+    }
     try {
+      // Show all validations, not just current user's
       const { data, error } = await (supabase as any)
         .from('ingredient_validations')
-        .select('id, ingredient_name, analysis_id, validation_status, verdict, correction_notes, updated_at, user_analyses (product_name, brand)')
-        .eq('validator_id', uid)
+        .select('id, ingredient_name, analysis_id, validation_status, verdict, correction_notes, confidence_level, public_explanation, internal_notes, updated_at, validator_id, moderator_review_status, user_analyses:analysis_id (product_name, brand), ingredient_validation_citations(count)')
         .order('updated_at', { ascending: false });
-
       if (error) throw error;
-      setValidationList((data || []) as ValidationListItem[]);
+      const validatorIds = (data || []).map((row: any) => row.validator_id).filter(Boolean);
+      const emailMap = await fetchReviewerEmails(validatorIds);
+      // Map validator_email for display
+      const mapped = (data || []).map((v: any) => ({
+        ...v,
+        citation_count: Array.isArray(v.ingredient_validation_citations)
+          ? Number(v.ingredient_validation_citations[0]?.count ?? 0)
+          : 0,
+        validator_email: emailMap.get(v.validator_id) || null
+      }));
+      const deduped = new Map<string, ValidationListItem>();
+      mapped.forEach((item: ValidationListItem) => {
+        const key = `${item.analysis_id || 'none'}::${(item.ingredient_name || '').toLowerCase()}`;
+        if (!key) return;
+        const existing = deduped.get(key);
+        if (!existing) {
+          deduped.set(key, { ...item, review_count: 1 });
+          return;
+        }
+        const existingTime = existing.updated_at ? new Date(existing.updated_at).getTime() : 0;
+        const currentTime = item.updated_at ? new Date(item.updated_at).getTime() : 0;
+        const reviewCount = (existing.review_count || 1) + 1;
+        if (currentTime >= existingTime) {
+          deduped.set(key, { ...item, review_count: reviewCount });
+        } else {
+          deduped.set(key, { ...existing, review_count: reviewCount });
+        }
+      });
+      setValidationList(Array.from(deduped.values()));
+      validationListLoadedRef.current = true;
     } catch (error) {
       console.error('Error loading validation list:', error);
     } finally {
-      setValidationListLoading(false);
+      if (shouldShowLoading) {
+        setValidationListLoading(false);
+      }
     }
+  };
+
+  const normalizeIngredientName = (name: string) => name.trim().toLowerCase().replace(/\s+/g, ' ');
+
+  const buildClaimSummary = (explanation?: string | null, role?: string | null) => {
+    if (!explanation && !role) return '';
+    if (!explanation) return role ? `AI classifies this ingredient as ${role}.` : '';
+    const trimmed = explanation.trim();
+    const sentenceMatch = trimmed.match(/[^.!?]+[.!?]/);
+    const firstSentence = sentenceMatch ? sentenceMatch[0] : trimmed;
+    const maxLength = 180;
+    const summary = firstSentence.length > maxLength ? `${firstSentence.slice(0, maxLength - 1)}…` : firstSentence;
+    return role ? `${role}: ${summary}` : summary;
+  };
+
+  const getPipelineStage = (item: ValidationListItem) => {
+    if (item.verdict) return 'Verdict set';
+    if (item.confidence_level) return 'Confidence selected';
+    if (item.public_explanation) return 'Writing drafted';
+    if ((item.citation_count || 0) > 0) return 'Evidence added';
+    return 'Observation';
+  };
+
+  const getVerdictLabel = (verdict?: string | null) => {
+    if (!verdict) return '';
+    if (verdict === 'confirm') return 'Confirmed';
+    if (verdict === 'correct') return 'Correction Requested';
+    if (verdict === 'escalate') return 'Escalated';
+    return verdict;
+  };
+
+  const getModeratorLabel = (status?: string | null) => {
+    if (!status) return '';
+    if (status === 'pending') return 'Moderator Pending';
+    if (status === 'approved') return 'Moderator Approved';
+    if (status === 'rejected') return 'Moderator Rejected';
+    if (status === 'needs_revision') return 'Needs Revision';
+    return status;
+  };
+
+  const isInProgressRow = (row: any) => {
+    if (!row) return false;
+    const status = mapValidationStatus(row);
+    if (status !== 'pending') return false;
+    const citationCount = Array.isArray(row.ingredient_validation_citations)
+      ? Number(row.ingredient_validation_citations[0]?.count ?? 0)
+      : 0;
+    return Boolean(row.confidence_level || row.public_explanation || row.internal_notes || citationCount > 0);
+  };
+
+  const shortId = (value?: string | null) => {
+    if (!value) return '';
+    return `${value.slice(0, 6)}…${value.slice(-4)}`;
+  };
+
+  const fetchReviewerEmails = async (ids: string[]) => {
+    const uniqueIds = Array.from(new Set(ids.filter(Boolean)));
+    if (uniqueIds.length === 0) return new Map<string, string>();
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('id, email, display_name')
+      .in('id', uniqueIds);
+    if (error) {
+      console.warn('profiles lookup failed:', error);
+      return new Map<string, string>();
+    }
+    const map = new Map<string, string>();
+    data?.forEach((row: any) => {
+      map.set(row.id, row.email || row.display_name || row.id);
+    });
+    return map;
+  };
+
+  const buildValidationMap = (rows?: any[]) => {
+    const validationMap = new Map<string, IngredientValidation>();
+    rows?.forEach((row: any) => {
+      const key = normalizeIngredientName(row.ingredient_name || '');
+      if (!key) return;
+      const updatedAt = row.updated_at || row.created_at || null;
+      const currentTime = updatedAt ? new Date(updatedAt).getTime() : 0;
+      const existing = validationMap.get(key);
+      const existingTime = existing?.updated_at ? new Date(existing.updated_at).getTime() : 0;
+      if (existing && currentTime <= existingTime) return;
+
+      validationMap.set(key, {
+        ingredient_name: row.ingredient_name,
+        validation_status: mapValidationStatus(row),
+        pubchem_data_correct: row.pubchem_data_correct,
+        ai_explanation_accurate: row.ai_explanation_accurate,
+        corrected_role: row.corrected_role,
+        corrected_safety_level: row.corrected_safety_level,
+        correction_notes: row.correction_notes,
+        verdict: row.verdict,
+        confidence_level: row.confidence_level,
+        public_explanation: row.public_explanation,
+        internal_notes: row.internal_notes,
+        citation_count: Array.isArray(row.ingredient_validation_citations)
+          ? Number(row.ingredient_validation_citations[0]?.count ?? 0)
+          : 0,
+        updated_at: updatedAt,
+        validator_id: row.validator_id || null,
+        validator_email: row.validator_email || null,
+        reference_sources: (row.reference_sources as string[]) || []
+      });
+    });
+    return validationMap;
+  };
+
+  const getIngredientStage = (validation?: IngredientValidation) => {
+    if (!validation) return 'Not started';
+    if (validation.verdict) return 'Verdict set';
+    if (validation.confidence_level) return 'Confidence selected';
+    if (validation.public_explanation) return 'Writing drafted';
+    if ((validation.citation_count || 0) > 0) return 'Evidence added';
+    return 'Observation';
+  };
+
+  const getIngredientStatusLabel = (validation?: IngredientValidation) => {
+    if (!validation) return 'Not Started';
+    const status = mapValidationStatus(validation);
+    if (status === 'validated') return 'Verified';
+    if (status === 'needs_correction') return 'Needs Correction';
+    return 'In Progress';
   };
 
   const selectProduct = async (product: ProductAnalysis, initialIngredient?: string) => {
@@ -210,6 +438,11 @@ export default function StudentReviewer() {
       .map(i => i.trim())
       .filter(i => i.length > 0);
     setIngredientsList(ingredients);
+    const normalizedIngredients = ingredients.map(normalizeIngredientName);
+    const normalizedToOriginal = new Map<string, string>();
+    ingredients.forEach((ingredient, index) => {
+      normalizedToOriginal.set(normalizedIngredients[index], ingredient);
+    });
     
     // Select initial ingredient (if provided and found) otherwise first ingredient
     const initial = initialIngredient && ingredients.includes(initialIngredient) ? initialIngredient : ingredients[0];
@@ -218,71 +451,81 @@ export default function StudentReviewer() {
       localStorage.setItem(`selectedIngredient_${product.id}`, initial);
     }
 
-    // Load existing validations
-    if (userId) {
-      const { data: validations } = await supabase
-        .from('ingredient_validations')
-        .select('*')
-        .eq('analysis_id', product.id)
-        .eq('validator_id', userId);
+    // Load all existing validations for this product
+    const { data: validations } = await (supabase as any)
+      .from('ingredient_validations')
+      .select('id, ingredient_name, validation_status, verdict, confidence_level, public_explanation, internal_notes, correction_notes, updated_at, created_at, validator_id, ingredient_validation_citations(count), pubchem_data_correct, ai_explanation_accurate, corrected_role, corrected_safety_level, reference_sources')
+      .eq('analysis_id', product.id);
 
-      const validationMap = new Map<string, IngredientValidation>();
-      validations?.forEach(v => {
-        validationMap.set(v.ingredient_name, {
-          ingredient_name: v.ingredient_name,
-          validation_status: mapValidationStatus(v),
-          pubchem_data_correct: v.pubchem_data_correct,
-          ai_explanation_accurate: v.ai_explanation_accurate,
-          corrected_role: v.corrected_role,
-          corrected_safety_level: v.corrected_safety_level,
-          correction_notes: v.correction_notes,
-          reference_sources: (v.reference_sources as string[]) || []
-        });
+    const validatorIds = (validations || []).map((row: any) => row.validator_id).filter(Boolean);
+    const emailMap = await fetchReviewerEmails(validatorIds);
+    const rowsWithEmail = (validations || []).map((row: any) => ({
+      ...row,
+      validator_email: emailMap.get(row.validator_id) || null
+    }));
+    setIngredientValidations(buildValidationMap(rowsWithEmail));
+
+    // Load ingredient cache
+    const { data: cacheData } = await supabase
+      .from('ingredient_cache')
+      .select('*')
+      .in('ingredient_name', ingredients.map(normalizeIngredientName));
+
+    const cacheMap = new Map<string, any>();
+    cacheData?.forEach(c => {
+      cacheMap.set(normalizeIngredientName(c.ingredient_name), {
+        pubchem_cid: c.pubchem_cid,
+        molecular_weight: c.molecular_weight,
+        properties: c.properties_json
       });
-      setIngredientValidations(validationMap);
+    });
+    setIngredientCache(cacheMap);
 
-      // Load ingredient cache
-      const { data: cacheData } = await supabase
-        .from('ingredient_cache')
-        .select('*')
-        .in('ingredient_name', ingredients.map(i => i.toLowerCase()));
-
-      const cacheMap = new Map<string, any>();
-      cacheData?.forEach(c => {
-        cacheMap.set(c.ingredient_name.toLowerCase(), {
-          pubchem_cid: c.pubchem_cid,
-          molecular_weight: c.molecular_weight,
-          properties: c.properties_json
+    // Load AI explanations for ingredients via edge function (DB tables not present)
+    const aiMap = new Map<string, IngredientAiData>();
+    try {
+      if (normalizedIngredients.length > 0) {
+        const explanationResults = await fetchIngredientExplanations(
+          normalizedIngredients.map(normalizedName => ({
+            name: normalizedToOriginal.get(normalizedName) || normalizedName
+          }))
+        );
+        explanationResults.forEach(result => {
+          const normalizedName = normalizeIngredientName(result.name || '');
+          if (!normalizedName) return;
+          const role = result.role ?? null;
+          const explanation = result.explanation ?? null;
+          const claimSummary = buildClaimSummary(explanation, role);
+          aiMap.set(normalizedName, {
+            role,
+            explanation,
+            safetyLevel: null,
+            claimSummary
+          });
         });
-      });
-      setIngredientCache(cacheMap);
+      }
+    } catch (error) {
+      console.warn('AI explain-ingredients failed:', error);
     }
+    setIngredientAiData(aiMap);
   };
 
   const handleValidationComplete = async () => {
     if (!selectedProduct || !userId) return;
 
     // Reload validations from database
-    const { data: validations } = await supabase
+    const { data: validations } = await (supabase as any)
       .from('ingredient_validations')
-      .select('*')
-      .eq('analysis_id', selectedProduct.id)
-      .eq('validator_id', userId);
+      .select('id, ingredient_name, validation_status, verdict, confidence_level, public_explanation, internal_notes, correction_notes, updated_at, created_at, validator_id, ingredient_validation_citations(count), pubchem_data_correct, ai_explanation_accurate, corrected_role, corrected_safety_level, reference_sources')
+      .eq('analysis_id', selectedProduct.id);
 
-    const validationMap = new Map<string, IngredientValidation>();
-    validations?.forEach((v: any) => {
-      validationMap.set(v.ingredient_name, {
-        ingredient_name: v.ingredient_name,
-        validation_status: mapValidationStatus(v),
-        pubchem_data_correct: v.pubchem_data_correct,
-        ai_explanation_accurate: v.ai_explanation_accurate,
-        corrected_role: v.corrected_role,
-        corrected_safety_level: v.corrected_safety_level,
-        correction_notes: v.correction_notes || v.internal_notes,
-        reference_sources: (v.reference_sources as string[]) || []
-      });
-    });
-    setIngredientValidations(validationMap);
+    const validatorIds = (validations || []).map((row: any) => row.validator_id).filter(Boolean);
+    const emailMap = await fetchReviewerEmails(validatorIds);
+    const rowsWithEmail = (validations || []).map((row: any) => ({
+      ...row,
+      validator_email: emailMap.get(row.validator_id) || null
+    }));
+    setIngredientValidations(buildValidationMap(rowsWithEmail));
 
     // Update stats (this will trigger ReviewerAccuracyCard to refetch via React Query)
     await loadProducts(userId);
@@ -301,6 +544,7 @@ export default function StudentReviewer() {
     setIngredientsList([]);
     setIngredientValidations(new Map());
     setIngredientCache(new Map());
+    setIngredientAiData(new Map());
     setSelectedIngredient(null);
     // Don't clear local storage - user may return to same product
   };
@@ -318,7 +562,7 @@ export default function StudentReviewer() {
   };
 
   const getIngredientStatus = (ingredient: string): 'pending' | 'validated' | 'needs_correction' => {
-    const validation = ingredientValidations.get(ingredient);
+    const validation = ingredientValidations.get(normalizeIngredientName(ingredient));
     if (!validation) return 'pending';
     return validation.validation_status as 'pending' | 'validated' | 'needs_correction';
   };
@@ -342,93 +586,102 @@ export default function StudentReviewer() {
     );
   }
 
-  if (!hasAccess) {
-    return null;
-  }
-
-  // Ingredient validation view
   if (selectedProduct) {
     const progress = getValidationProgress();
-    const currentCache = selectedIngredient ? ingredientCache.get(selectedIngredient.toLowerCase()) : null;
-    const currentValidation = selectedIngredient ? ingredientValidations.get(selectedIngredient) : null;
-    
+    const normalizedSelectedIngredient = selectedIngredient
+      ? normalizeIngredientName(selectedIngredient)
+      : '';
+    const currentCache = selectedIngredient
+      ? ingredientCache.get(normalizedSelectedIngredient)
+      : null;
+    const currentAi = selectedIngredient
+      ? ingredientAiData.get(normalizedSelectedIngredient)
+      : null;
+
     return (
       <AppShell showNavigation showBottomNav contentClassName="px-[5px] lg:px-4 py-8">
-        <div className="container max-w-6xl mx-auto">
-          {/* Header with back button */}
-          <div className="flex items-center gap-4 mb-6">
-            <Button variant="ghost" size="icon" onClick={exitProductValidation}>
-              <ArrowLeft className="w-5 h-5" />
-            </Button>
-            <div className="flex-1">
-              <h1 className="text-2xl font-bold">{selectedProduct.product_name}</h1>
-              <div className="flex items-center gap-2 mt-1">
-                {selectedProduct.brand && (
-                  <Badge variant="secondary">{selectedProduct.brand}</Badge>
-                )}
-                {selectedProduct.category && (
-                  <Badge variant="outline">{selectedProduct.category}</Badge>
-                )}
-              </div>
+        <div className="container max-w-7xl mx-auto space-y-6">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <h1 className="text-2xl font-semibold">
+                {selectedProduct.product_name || 'Selected Product'}
+              </h1>
+              <p className="text-sm text-muted-foreground">
+                {selectedProduct.brand ? `${selectedProduct.brand} • ` : ''}Ingredient Validation
+              </p>
             </div>
+            <Button variant="ghost" onClick={exitProductValidation}>
+              Back to Products
+            </Button>
           </div>
 
-          {/* Reviewer accuracy card */}
-          {userId && (
-            <div className="mb-6">
-              <ReviewerAccuracyCard userId={userId} />
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div className="space-y-4">
+              <Card>
+                <CardContent className="p-4">
+                  <ValidationProgressBar
+                    total={progress.total}
+                    validated={progress.validated}
+                    needsCorrection={progress.needsCorrection}
+                  />
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardContent className="p-4">
+                  <div className="flex items-center justify-between mb-3">
+                    <h2 className="text-sm font-medium">Ingredients</h2>
+                    <span className="text-xs text-muted-foreground">
+                      {ingredientsList.length} total
+                    </span>
+                  </div>
+                  <div className="space-y-2">
+                    {ingredientsList.map(ingredient => {
+                      const validation = ingredientValidations.get(normalizeIngredientName(ingredient));
+                      const status = getIngredientStatus(ingredient);
+                      const isSelected = selectedIngredient === ingredient;
+                      const statusLabel = getIngredientStatusLabel(validation);
+                      const stageLabel = getIngredientStage(validation);
+                      const updatedLabel = validation?.updated_at ? formatReviewDate(validation.updated_at) : '';
+                      const reviewerLabel = validation?.validator_email || (validation?.validator_id ? shortId(validation.validator_id) : '');
+                      return (
+                        <button
+                          key={ingredient}
+                          onClick={() => setSelectedIngredient(ingredient)}
+                          className={`w-full flex items-center justify-between rounded-lg border px-3 py-2 text-left transition-colors ${
+                            isSelected ? 'border-primary bg-primary/5' : 'border-border hover:bg-muted/50'
+                          }`}
+                        >
+                          <div className="flex-1">
+                            <div className="flex items-center justify-between gap-3">
+                              <span className="text-sm font-medium">{ingredient}</span>
+                              <Badge
+                                variant={
+                                  status === 'validated'
+                                    ? 'secondary'
+                                    : status === 'needs_correction'
+                                      ? 'destructive'
+                                      : 'outline'
+                                }
+                                className="text-[10px]"
+                              >
+                                {statusLabel}
+                              </Badge>
+                            </div>
+                            <div className="mt-2 flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">
+                              <span>Stage: {stageLabel}</span>
+                              {reviewerLabel && <span>Last updated by {reviewerLabel}</span>}
+                              {updatedLabel && <span>{updatedLabel}</span>}
+                            </div>
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </CardContent>
+              </Card>
             </div>
-          )}
 
-          {/* Progress bar */}
-          <ValidationProgressBar 
-            validated={progress.validated}
-            needsCorrection={progress.needsCorrection}
-            total={progress.total}
-          />
-
-          {/* Two-column layout: ingredient list + validation panel */}
-          <div className="grid lg:grid-cols-3 gap-6 mt-6">
-            {/* Ingredient list */}
-            <Card className="lg:col-span-1">
-              <CardContent className="p-4">
-                <h3 className="font-medium mb-3 flex items-center gap-2">
-                  <FlaskConical className="w-4 h-4" />
-                  Ingredients ({ingredientsList.length})
-                </h3>
-                <div className="space-y-1 max-h-[60vh] overflow-y-auto">
-                  {ingredientsList.map((ingredient, idx) => {
-                    const status = getIngredientStatus(ingredient);
-                    return (
-                      <button
-                        key={idx}
-                        onClick={() => {
-                          setSelectedIngredient(ingredient);
-                          if (selectedProduct) {
-                            localStorage.setItem(`selectedIngredient_${selectedProduct.id}`, ingredient);
-                          }
-                        }}
-                        className={`w-full text-left px-3 py-2 rounded-md text-sm flex items-center justify-between transition-colors ${
-                          selectedIngredient === ingredient 
-                            ? 'bg-primary text-primary-foreground' 
-                            : 'hover:bg-muted'
-                        }`}
-                      >
-                        <span className="truncate">{ingredient}</span>
-                        {status === 'validated' && (
-                          <CheckCircle2 className={`w-4 h-4 flex-shrink-0 ${selectedIngredient === ingredient ? 'text-primary-foreground' : 'text-green-600'}`} />
-                        )}
-                        {status === 'needs_correction' && (
-                          <AlertTriangle className={`w-4 h-4 flex-shrink-0 ${selectedIngredient === ingredient ? 'text-primary-foreground' : 'text-amber-600'}`} />
-                        )}
-                      </button>
-                    );
-                  })}
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Validation panel for selected ingredient */}
             <div className="lg:col-span-2 space-y-4">
               {selectedIngredient ? (
                 <>
@@ -439,6 +692,10 @@ export default function StudentReviewer() {
                     analysisId={selectedProduct.id}
                     pubchemCid={currentCache?.pubchem_cid}
                     molecularWeight={currentCache?.molecular_weight}
+                    aiRole={currentAi?.role || undefined}
+                    aiSafetyLevel={currentAi?.safetyLevel || undefined}
+                    aiExplanation={currentAi?.explanation || undefined}
+                    aiClaimSummary={currentAi?.claimSummary || undefined}
                     onValidationComplete={handleValidationComplete}
                   />
                   <IngredientSourcePanel
@@ -450,6 +707,11 @@ export default function StudentReviewer() {
                       molecularFormula: currentCache.properties?.molecular_formula,
                       iupacName: currentCache.properties?.iupac_name,
                       synonyms: currentCache.properties?.synonyms
+                    } : null}
+                    aiData={currentAi ? {
+                      role: currentAi.role || undefined,
+                      explanation: currentAi.explanation || undefined,
+                      safetyLevel: currentAi.safetyLevel || undefined
                     } : null}
                   />
                 </>
@@ -554,6 +816,8 @@ export default function StudentReviewer() {
                   <div className="space-y-2">
                     {products.map(product => {
                       const ingredientCount = product.ingredients_list.split(',').filter(i => i.trim()).length;
+                      const summary = productValidationSummary.get(product.id);
+                      const summaryDate = summary?.lastUpdated ? formatReviewDate(summary.lastUpdated) : '';
                       return (
                         <button
                           key={product.id}
@@ -569,6 +833,29 @@ export default function StudentReviewer() {
                               {product.epiq_score && (
                                 <Badge variant="secondary" className="text-xs">
                                   EpiQ: {product.epiq_score}
+                                </Badge>
+                              )}
+                            </div>
+                            <div className="flex flex-wrap items-center gap-2 mt-2 text-xs text-muted-foreground">
+                              {summary ? (
+                                <>
+                                  <Badge variant="outline" className="text-[10px]">
+                                    Verified: {summary.validated}
+                                  </Badge>
+                                  <Badge variant="outline" className="text-[10px]">
+                                    Needs Correction: {summary.needsCorrection}
+                                  </Badge>
+                                  <Badge variant="outline" className="text-[10px]">
+                                    In Progress: {summary.inProgress}
+                                  </Badge>
+                                  {summary.lastReviewer && (
+                                    <span>Last updated by {summary.lastReviewer}</span>
+                                  )}
+                                  {summaryDate && <span>{summaryDate}</span>}
+                                </>
+                              ) : (
+                                <Badge variant="outline" className="text-[10px]">
+                                  No reviews yet
                                 </Badge>
                               )}
                             </div>
@@ -613,6 +900,9 @@ export default function StudentReviewer() {
                         {filtered.map(v => {
                           const status = mapValidationStatus(v);
                           const product = products.find(p => p.id === v.analysis_id) || null;
+                          const pipelineStage = getPipelineStage(v);
+                          const verdictLabel = getVerdictLabel(v.verdict);
+                          const moderatorLabel = getModeratorLabel(v.moderator_review_status);
                           return (
                             <button
                               key={v.id}
@@ -635,6 +925,33 @@ export default function StudentReviewer() {
                                     </Badge>
                                   )}
                                 </div>
+                                <div className="flex flex-wrap items-center gap-2 mt-2 text-xs text-muted-foreground">
+                                  {pipelineStage && (
+                                    <Badge variant="outline" className="text-[10px]">
+                                      Stage: {pipelineStage}
+                                    </Badge>
+                                  )}
+                                  {v.review_count && v.review_count > 1 && (
+                                    <Badge variant="outline" className="text-[10px]">
+                                      Reviews: {v.review_count}
+                                    </Badge>
+                                  )}
+                                  {verdictLabel && (
+                                    <Badge variant="secondary" className="text-[10px]">
+                                      {verdictLabel}
+                                    </Badge>
+                                  )}
+                                  {v.confidence_level && (
+                                    <Badge variant="outline" className="text-[10px]">
+                                      Confidence: {v.confidence_level}
+                                    </Badge>
+                                  )}
+                                  {moderatorLabel && (
+                                    <Badge variant="outline" className="text-[10px]">
+                                      {moderatorLabel}
+                                    </Badge>
+                                  )}
+                                </div>
                               </div>
                               <div className="flex items-center gap-3">
                                 <Badge variant={status === 'validated' ? 'secondary' : 'destructive'}>
@@ -642,6 +959,10 @@ export default function StudentReviewer() {
                                 </Badge>
                                 <span className="text-xs text-muted-foreground">
                                   {formatReviewDate(v.updated_at)}
+                                </span>
+                                {/* Status indicator for who last updated */}
+                                <span className="text-xs text-blue-600">
+                                  {v.validator_email ? `Updated by ${v.validator_email}` : ''}
                                 </span>
                               </div>
                             </button>

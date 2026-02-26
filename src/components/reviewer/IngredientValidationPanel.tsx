@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
@@ -65,6 +65,8 @@ export function IngredientValidationPanel({
   const { toast } = useToast();
   const [currentStep, setCurrentStep] = useState(1);
   const [loading, setLoading] = useState(false);
+  const draftSavingRef = useRef(false);
+  const lastDraftHashRef = useRef<string>('');
   const [formData, setFormData] = useState<ValidationData>({
     ingredientId,
     observations: {
@@ -82,6 +84,33 @@ export function IngredientValidationPanel({
     verdict: '',
     moderatorReviewStatus: 'pending'
   });
+
+  // Keep observation data in sync with latest ingredient/AI context
+  useEffect(() => {
+    setFormData(prev => ({
+      ...prev,
+      ingredientId,
+      observations: {
+        ...prev.observations,
+        ingredientName,
+        aiClaimSummary: aiClaimSummary || prev.observations.aiClaimSummary || '',
+        aiRoleClassification: aiRole || prev.observations.aiRoleClassification || '',
+        aiSafetyLevel: aiSafetyLevel || prev.observations.aiSafetyLevel || '',
+        aiExplanation: aiExplanation || prev.observations.aiExplanation || '',
+        pubchemCid: pubchemCid || undefined,
+        molecularWeight: molecularWeight || undefined
+      }
+    }));
+  }, [
+    ingredientId,
+    ingredientName,
+    aiClaimSummary,
+    aiRole,
+    aiSafetyLevel,
+    aiExplanation,
+    pubchemCid,
+    molecularWeight
+  ]);
 
   // Load existing validation if editing
   useEffect(() => {
@@ -108,6 +137,10 @@ export function IngredientValidationPanel({
 
           setFormData(prev => ({
             ...prev,
+            observations: {
+              ...prev.observations,
+              aiClaimSummary: data.ai_claim_summary || prev.observations.aiClaimSummary
+            },
             validationId: data.id,
             publicExplanation: data.public_explanation || '',
             confidenceLevel: data.confidence_level || '',
@@ -135,6 +168,130 @@ export function IngredientValidationPanel({
       loadExistingValidation();
     }
   }, [ingredientId, analysisId]);
+
+  const hasDraftContent = () => {
+    return (
+      formData.citations.length > 0 ||
+      formData.publicExplanation.trim().length > 0 ||
+      formData.confidenceLevel !== '' ||
+      formData.verdict !== '' ||
+      Boolean(formData.correction?.trim()) ||
+      Boolean(formData.escalationReason?.trim()) ||
+      Boolean(formData.internalNotes?.trim())
+    );
+  };
+
+  const buildDraftHash = () =>
+    JSON.stringify({
+      ingredientId,
+      analysisId,
+      aiClaimSummary: formData.observations.aiClaimSummary,
+      publicExplanation: formData.publicExplanation,
+      confidenceLevel: formData.confidenceLevel,
+      verdict: formData.verdict,
+      correction: formData.correction,
+      escalationReason: formData.escalationReason,
+      internalNotes: formData.internalNotes,
+      citations: formData.citations
+    });
+
+  const saveDraft = async () => {
+    if (!analysisId || !ingredientId || !ingredientName) return;
+    if (loading) return;
+    if (!hasDraftContent()) return;
+    const draftHash = buildDraftHash();
+    if (draftHash === lastDraftHashRef.current) return;
+    if (draftSavingRef.current) return;
+
+    draftSavingRef.current = true;
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const validationStatus =
+        formData.verdict === 'confirm'
+          ? 'validated'
+          : formData.verdict === 'correct' || formData.verdict === 'escalate'
+            ? 'needs_correction'
+            : 'pending';
+
+      const validationRecord = {
+        ingredient_name: ingredientName,
+        analysis_id: analysisId,
+        validator_id: user.id,
+        ai_claim_summary: formData.observations.aiClaimSummary || null,
+        public_explanation: formData.publicExplanation || null,
+        confidence_level: formData.confidenceLevel || null,
+        verdict: formData.verdict || null,
+        correction_notes: formData.correction || null,
+        escalation_reason: formData.escalationReason || null,
+        internal_notes: formData.internalNotes || null,
+        is_escalated: formData.verdict === 'escalate',
+        moderator_review_status: formData.moderatorReviewStatus,
+        validation_status: validationStatus,
+        updated_at: new Date().toISOString()
+      };
+
+      let validationId = formData.validationId;
+      if (validationId) {
+        const { error } = await (supabase as any)
+          .from('ingredient_validations')
+          .update(validationRecord)
+          .eq('id', validationId)
+          .eq('validator_id', user.id);
+        if (error) throw error;
+      } else {
+        const { data, error } = await (supabase as any)
+          .from('ingredient_validations')
+          .insert([validationRecord])
+          .select('id')
+          .single();
+        if (error) throw error;
+        validationId = data.id;
+        setFormData(prev => ({ ...prev, validationId }));
+      }
+
+      if (validationId) {
+        await (supabase as any)
+          .from('ingredient_validation_citations')
+          .delete()
+          .eq('validation_id', validationId);
+
+        if (formData.citations.length > 0) {
+          const citationRecords = formData.citations.map(c => ({
+            validation_id: validationId,
+            citation_type: c.type,
+            title: c.title,
+            authors: c.authors,
+            journal_name: c.journal_name,
+            publication_year: c.publication_year,
+            doi_or_pmid: c.doi_or_pmid,
+            source_url: c.source_url
+          }));
+
+          const { error } = await (supabase as any)
+            .from('ingredient_validation_citations')
+            .insert(citationRecords);
+          if (error) throw error;
+        }
+      }
+
+      lastDraftHashRef.current = draftHash;
+    } catch (error) {
+      console.warn('Draft autosave failed:', error);
+    } finally {
+      draftSavingRef.current = false;
+    }
+  };
+
+  useEffect(() => {
+    if (!analysisId || !ingredientId) return;
+    if (!hasDraftContent()) return;
+    const timer = setTimeout(() => {
+      void saveDraft();
+    }, 1000);
+    return () => clearTimeout(timer);
+  }, [analysisId, ingredientId, ingredientName, formData]);
 
   // Validation helpers
   const canProceedFromStep = (step: number): boolean => {
@@ -423,8 +580,9 @@ export function IngredientValidationPanel({
             </Button>
           ) : (
             <Button
-              onClick={() => {
+              onClick={async () => {
                 if (canProceedFromStep(currentStep)) {
+                  await saveDraft();
                   setCurrentStep(currentStep + 1);
                 } else {
                   const messages = {
