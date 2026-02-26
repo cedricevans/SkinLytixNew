@@ -259,8 +259,8 @@ export default function UserRoleManager({ onStatsUpdate }: UserRoleManagerProps)
           />
         </div>
 
-        <div className="border rounded-lg overflow-hidden">
-          <Table>
+        <div className="border rounded-lg overflow-x-auto">
+          <Table className="table-fixed w-full">
             <TableHeader>
               <TableRow>
                 <TableHead>Email</TableHead>
@@ -279,13 +279,15 @@ export default function UserRoleManager({ onStatsUpdate }: UserRoleManagerProps)
               ) : (
                 filteredRoles.map((role) => (
                   <TableRow key={role.id}>
-                    <TableCell className="font-medium">{role.user_email}</TableCell>
+                    <TableCell className="font-medium break-words whitespace-normal max-w-[220px]">
+                      {role.user_email}
+                    </TableCell>
                     <TableCell>
-                      <Badge variant={getRoleBadgeVariant(role.role)}>
+                      <Badge variant={getRoleBadgeVariant(role.role)} className="whitespace-nowrap">
                         {role.role}
                       </Badge>
                     </TableCell>
-                    <TableCell className="text-sm text-gray-600">
+                    <TableCell className="text-sm text-gray-600 whitespace-normal">
                       {new Date(role.created_at).toLocaleDateString()}
                     </TableCell>
                     <TableCell className="text-right">

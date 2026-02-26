@@ -56,7 +56,9 @@ export function OEWObservationPanel({
           <p className="text-xs text-muted-foreground uppercase tracking-wide font-medium mb-1">
             Ingredient Being Validated
           </p>
-          <h2 className="text-3xl font-bold text-foreground">{ingredientName}</h2>
+          <h2 className="text-3xl font-bold text-foreground break-words leading-tight">
+            {ingredientName}
+          </h2>
         </div>
 
         {/* AI Claim Summary */}
@@ -66,7 +68,7 @@ export function OEWObservationPanel({
             <p className="font-medium text-sm">AI Claim Summary</p>
           </div>
           <div className="p-4 bg-muted/50 rounded-lg border border-muted">
-            <p className="text-sm leading-relaxed">
+            <p className="text-sm leading-relaxed break-words">
               {aiClaimSummary || 'No claim summary available'}
             </p>
           </div>
@@ -122,7 +124,7 @@ export function OEWObservationPanel({
               <p className="font-medium text-sm">Full AI Explanation</p>
             </div>
             <div className="p-4 bg-muted/30 rounded-lg border border-muted/50 space-y-3">
-              <p className="text-sm leading-relaxed whitespace-pre-wrap">
+              <p className="text-sm leading-relaxed whitespace-pre-wrap break-words">
                 {aiExplanation}
               </p>
               <div className="text-xs text-muted-foreground flex items-center gap-2 pt-3 border-t border-muted/50">
@@ -143,7 +145,7 @@ export function OEWObservationPanel({
               {pubchemCid && (
                 <div>
                   <span className="text-muted-foreground">CID:</span>
-                  <p className="font-mono text-xs mt-1">{pubchemCid}</p>
+                  <p className="font-mono text-xs mt-1 break-all">{pubchemCid}</p>
                 </div>
               )}
               {molecularWeight && (

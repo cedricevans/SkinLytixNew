@@ -532,9 +532,9 @@ export function IngredientValidationPanel({
 
   return (
     <Card className="border-l-4 border-l-primary">
-      <CardHeader>
-        <div className="flex items-center justify-between">
-          <CardTitle>
+      <CardHeader className="space-y-2">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+          <CardTitle className="text-base sm:text-lg leading-snug break-words">
             Step {currentStep} of 6: {
               currentStep === 1 ? 'Observation' :
               currentStep === 2 ? 'Evidence' :
@@ -544,7 +544,7 @@ export function IngredientValidationPanel({
               'Internal Notes'
             }
           </CardTitle>
-          <div className="text-sm text-muted-foreground">
+          <div className="text-sm text-muted-foreground shrink-0">
             {Math.round((currentStep / 6) * 100)}% complete
           </div>
         </div>

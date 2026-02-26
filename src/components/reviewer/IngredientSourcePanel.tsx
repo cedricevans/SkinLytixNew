@@ -68,7 +68,7 @@ export function IngredientSourcePanel({
                 <div className="space-y-2">
                   <div className="flex items-center justify-between">
                     <span className="text-xs text-muted-foreground">CID</span>
-                    <span className="font-mono text-sm">{pubchemData.cid || 'N/A'}</span>
+                    <span className="font-mono text-sm break-all">{pubchemData.cid || 'N/A'}</span>
                   </div>
                   <div className="flex items-center justify-between">
                     <span className="text-xs text-muted-foreground">Molecular Weight</span>
@@ -78,7 +78,7 @@ export function IngredientSourcePanel({
                   </div>
                   <div className="flex items-center justify-between">
                     <span className="text-xs text-muted-foreground">Formula</span>
-                    <span className="font-mono text-sm">
+                    <span className="font-mono text-sm break-all">
                       {pubchemData.molecularFormula || 'N/A'}
                     </span>
                   </div>
@@ -160,7 +160,7 @@ export function IngredientSourcePanel({
                 {aiData.explanation && (
                   <div className="space-y-1">
                     <span className="text-xs text-muted-foreground">AI Explanation</span>
-                    <p className="text-sm bg-muted/50 p-3 rounded-lg italic">
+                    <p className="text-sm bg-muted/50 p-3 rounded-lg italic break-words">
                       "{aiData.explanation}"
                     </p>
                   </div>

@@ -648,13 +648,13 @@ export default function StudentReviewer() {
                         <button
                           key={ingredient}
                           onClick={() => setSelectedIngredient(ingredient)}
-                          className={`w-full flex items-center justify-between rounded-lg border px-3 py-2 text-left transition-colors ${
+                          className={`w-full flex items-start justify-between gap-3 rounded-lg border px-3 py-2 text-left transition-colors ${
                             isSelected ? 'border-primary bg-primary/5' : 'border-border hover:bg-muted/50'
                           }`}
                         >
-                          <div className="flex-1">
-                            <div className="flex items-center justify-between gap-3">
-                              <span className="text-sm font-medium">{ingredient}</span>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                              <span className="text-sm font-medium break-words">{ingredient}</span>
                               <Badge
                                 variant={
                                   status === 'validated'
@@ -663,15 +663,15 @@ export default function StudentReviewer() {
                                       ? 'destructive'
                                       : 'outline'
                                 }
-                                className="text-[10px]"
+                                className="text-[10px] shrink-0"
                               >
                                 {statusLabel}
                               </Badge>
                             </div>
                             <div className="mt-2 flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">
-                              <span>Stage: {stageLabel}</span>
-                              {reviewerLabel && <span>Last updated by {reviewerLabel}</span>}
-                              {updatedLabel && <span>{updatedLabel}</span>}
+                              <span className="break-words">Stage: {stageLabel}</span>
+                              {reviewerLabel && <span className="break-words">Last updated by {reviewerLabel}</span>}
+                              {updatedLabel && <span className="break-words">{updatedLabel}</span>}
                             </div>
                           </div>
                         </button>
@@ -822,13 +822,13 @@ export default function StudentReviewer() {
                         <button
                           key={product.id}
                           onClick={() => selectProduct(product)}
-                          className="w-full flex items-center justify-between p-4 rounded-lg border border-border hover:bg-muted/50 transition-colors text-left"
+                          className="w-full flex flex-col gap-3 p-4 rounded-lg border border-border hover:bg-muted/50 transition-colors text-left sm:flex-row sm:items-center sm:justify-between"
                         >
-                          <div className="flex-1">
-                            <p className="font-medium">{product.product_name}</p>
-                            <div className="flex items-center gap-2 mt-1">
+                          <div className="flex-1 min-w-0">
+                            <p className="font-medium break-words">{product.product_name}</p>
+                            <div className="flex flex-wrap items-center gap-2 mt-1">
                               {product.brand && (
-                                <span className="text-sm text-muted-foreground">{product.brand}</span>
+                                <span className="text-sm text-muted-foreground break-words">{product.brand}</span>
                               )}
                               {product.epiq_score && (
                                 <Badge variant="secondary" className="text-xs">
@@ -911,13 +911,15 @@ export default function StudentReviewer() {
                                   selectProduct(product, v.ingredient_name);
                                 }
                               }}
-                              className="w-full flex items-center justify-between p-4 rounded-lg border border-border hover:bg-muted/50 transition-colors text-left"
+                              className="w-full flex flex-col gap-3 p-4 rounded-lg border border-border hover:bg-muted/50 transition-colors text-left sm:flex-row sm:items-center sm:justify-between"
                             >
-                              <div className="flex-1">
-                                <p className="font-medium">{v.ingredient_name}</p>
-                                <div className="flex items-center gap-2 mt-1">
+                              <div className="flex-1 min-w-0">
+                                <p className="font-medium break-words">{v.ingredient_name}</p>
+                                <div className="flex flex-wrap items-center gap-2 mt-1">
                                   {v.user_analyses?.product_name && (
-                                    <span className="text-sm text-muted-foreground">{v.user_analyses.product_name}</span>
+                                    <span className="text-sm text-muted-foreground break-words">
+                                      {v.user_analyses.product_name}
+                                    </span>
                                   )}
                                   {v.user_analyses?.brand && (
                                     <Badge variant="outline" className="text-xs">
@@ -953,7 +955,7 @@ export default function StudentReviewer() {
                                   )}
                                 </div>
                               </div>
-                              <div className="flex items-center gap-3">
+                              <div className="flex flex-wrap items-center gap-3 sm:justify-end">
                                 <Badge variant={status === 'validated' ? 'secondary' : 'destructive'}>
                                   {status === 'validated' ? 'Reviewed' : 'Needs Correction'}
                                 </Badge>
