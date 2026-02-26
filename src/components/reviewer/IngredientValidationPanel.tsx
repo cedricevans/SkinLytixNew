@@ -87,12 +87,18 @@ export function IngredientValidationPanel({
   useEffect(() => {
     const loadExistingValidation = async () => {
       try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return;
+
         const { data, error } = await (supabase as any)
           .from('ingredient_validations')
           .select('*')
-          .eq('ingredient_id', ingredientId)
+          .eq('ingredient_name', ingredientName)
           .eq('analysis_id', analysisId || null)
-          .single();
+          .eq('validator_id', user.id)
+          .maybeSingle();
+
+        if (error) throw error;
 
         if (data) {
           const citationData = await (supabase as any)
@@ -106,15 +112,15 @@ export function IngredientValidationPanel({
             publicExplanation: data.public_explanation || '',
             confidenceLevel: data.confidence_level || '',
             verdict: data.verdict || '',
-            correction: data.correction,
+            correction: data.correction_notes,
             escalationReason: data.escalation_reason,
             internalNotes: data.internal_notes || '',
             citations: (citationData.data || []).map((c: any) => ({
               type: c.citation_type as any,
               title: c.title,
               authors: c.authors,
-              journal_name: c.journal,
-              publication_year: c.year,
+              journal_name: c.journal_name,
+              publication_year: c.publication_year,
               doi_or_pmid: c.doi_or_pmid,
               source_url: c.source_url
             }))
@@ -178,26 +184,38 @@ export function IngredientValidationPanel({
       return;
     }
 
+    if (!analysisId) {
+      toast({ title: "Missing analysis", description: "Select a product before saving.", variant: "destructive" });
+      return;
+    }
+
     setLoading(true);
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Not authenticated');
 
       // Insert/update ingredient_validations using any to bypass type checking
+      const validationStatus =
+        formData.verdict === 'confirm'
+          ? 'validated'
+          : formData.verdict === 'correct' || formData.verdict === 'escalate'
+            ? 'needs_correction'
+            : 'pending';
+
       const validationRecord = {
-        ingredient_id: formData.ingredientId,
-        analysis_id: analysisId || null,
-        validator_id: user.id,
         ingredient_name: ingredientName,
+        analysis_id: analysisId,
+        validator_id: user.id,
         ai_claim_summary: formData.observations.aiClaimSummary,
         public_explanation: formData.publicExplanation,
         confidence_level: formData.confidenceLevel,
         verdict: formData.verdict,
-        correction: formData.correction,
+        correction_notes: formData.correction,
         escalation_reason: formData.escalationReason,
         internal_notes: formData.internalNotes,
         is_escalated: formData.verdict === 'escalate',
         moderator_review_status: formData.moderatorReviewStatus,
+        validation_status: validationStatus,
         updated_at: new Date().toISOString()
       };
 
@@ -206,7 +224,8 @@ export function IngredientValidationPanel({
         const { error } = await (supabase as any)
           .from('ingredient_validations')
           .update(validationRecord)
-          .eq('id', validationId);
+          .eq('id', validationId)
+          .eq('validator_id', user.id);
         if (error) throw error;
       } else {
         const { data, error } = await (supabase as any)
@@ -231,8 +250,8 @@ export function IngredientValidationPanel({
             citation_type: c.type,
             title: c.title,
             authors: c.authors,
-            journal: c.journal_name,
-            year: c.publication_year,
+            journal_name: c.journal_name,
+            publication_year: c.publication_year,
             doi_or_pmid: c.doi_or_pmid,
             source_url: c.source_url
           }));

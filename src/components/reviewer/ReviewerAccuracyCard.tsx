@@ -35,10 +35,10 @@ export function ReviewerAccuracyCard({ userId }: ReviewerAccuracyCardProps) {
           .from('reviewer_stats')
           .select('*')
           .eq('user_id', userId)
-          .single();
+          .maybeSingle();
 
         if (result.error) throw result.error;
-        return result.data as ReviewerStats;
+        return (result.data || null) as ReviewerStats | null;
       } catch (err) {
         throw err;
       }

@@ -29,6 +29,7 @@ import {
 } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { Trash2, Plus } from 'lucide-react';
+import invokeFunction from '@/lib/functions-client';
 
 interface UserRole {
   id: string;
@@ -108,59 +109,11 @@ export default function UserRoleManager({ onStatsUpdate }: UserRoleManagerProps)
 
       setSubmitting(true);
 
-      // Get user by email from profiles table
-      const { data: profilesData, error: profileError } = await supabase
-        .from('profiles')
-        .select('id')
-        .eq('email', formData.email);
-
-      if (profileError) {
-        console.error('Profile query error:', profileError);
-        toast({
-          title: 'Database Error',
-          description: `Error looking up user: ${profileError.message}`,
-          variant: 'destructive',
-        });
-        setSubmitting(false);
-        return;
-      }
-
-      if (!profilesData || profilesData.length === 0) {
-        toast({
-          title: 'User Not Found',
-          description: `No user found with email: ${formData.email}`,
-          variant: 'destructive',
-        });
-        setSubmitting(false);
-        return;
-      }
-
-      const profileData = profilesData[0];
-
-      // Call Edge Function to add role (bypasses RLS)
-      const response = await fetch('/functions/add-user-role', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`,
-        },
-        body: JSON.stringify({
-          userEmail: formData.email,
-          role: formData.role,
-        }),
+      // Call Edge Function to add role (service role bypasses RLS)
+      await invokeFunction('add-user-role', {
+        userEmail: formData.email,
+        role: formData.role,
       });
-
-      const result = await response.json();
-
-      if (!response.ok) {
-        toast({
-          title: 'Error',
-          description: result.error || 'Failed to add role',
-          variant: 'destructive',
-        });
-        setSubmitting(false);
-        return;
-      }
 
       toast({
         title: 'Success',

@@ -3,34 +3,17 @@
 -- Date: February 21, 2026
 
 -- 1. Add new columns to ingredient_validations
-ALTER TABLE public.ingredient_validations ADD COLUMN IF NOT EXISTS (
-  -- OEW Framework: Observation
-  ai_claim_summary TEXT,
-  
-  -- OEW Framework: Evidence & Citations (references now in separate table)
-  -- reference_sources JSONB already exists
-  
-  -- OEW Framework: Writing
-  public_explanation TEXT,
-  
-  -- Confidence & Verdict
-  confidence_level TEXT CHECK (confidence_level IN ('High', 'Moderate', 'Limited')),
-  verdict TEXT CHECK (verdict IN ('confirm', 'correct', 'escalate')),
-  
-  -- Corrections (if verdict = 'correct')
-  -- corrected_role, corrected_safety_level, correction_notes already exist
-  
-  -- Internal Review
-  internal_notes TEXT,
-  
-  -- Escalation tracking (if verdict = 'escalate')
-  is_escalated BOOLEAN DEFAULT false,
-  escalation_reason TEXT,
-  moderator_review_status TEXT DEFAULT 'pending' CHECK (moderator_review_status IN ('pending', 'approved', 'rejected', 'needs_revision')),
-  
-  -- Timestamps
-  updated_at TIMESTAMPTZ DEFAULT NOW()
-);
+-- NOTE: Postgres does not allow ADD COLUMN IF NOT EXISTS with a column list.
+-- Use one statement per column to keep the migration idempotent.
+ALTER TABLE public.ingredient_validations ADD COLUMN IF NOT EXISTS ai_claim_summary TEXT;
+ALTER TABLE public.ingredient_validations ADD COLUMN IF NOT EXISTS public_explanation TEXT;
+ALTER TABLE public.ingredient_validations ADD COLUMN IF NOT EXISTS confidence_level TEXT CHECK (confidence_level IN ('High', 'Moderate', 'Limited'));
+ALTER TABLE public.ingredient_validations ADD COLUMN IF NOT EXISTS verdict TEXT CHECK (verdict IN ('confirm', 'correct', 'escalate'));
+ALTER TABLE public.ingredient_validations ADD COLUMN IF NOT EXISTS internal_notes TEXT;
+ALTER TABLE public.ingredient_validations ADD COLUMN IF NOT EXISTS is_escalated BOOLEAN DEFAULT false;
+ALTER TABLE public.ingredient_validations ADD COLUMN IF NOT EXISTS escalation_reason TEXT;
+ALTER TABLE public.ingredient_validations ADD COLUMN IF NOT EXISTS moderator_review_status TEXT DEFAULT 'pending' CHECK (moderator_review_status IN ('pending', 'approved', 'rejected', 'needs_revision'));
+ALTER TABLE public.ingredient_validations ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFAULT NOW();
 
 -- 2. Create ingredient_validation_citations table (join table for many-to-many citations)
 CREATE TABLE IF NOT EXISTS public.ingredient_validation_citations (

@@ -48,6 +48,29 @@ interface Stats {
   flaggedForCorrection: number;
 }
 
+type ReviewListMode = 'products' | 'validated' | 'flagged';
+
+interface ValidationListItem {
+  id: string;
+  ingredient_name: string;
+  analysis_id: string | null;
+  validation_status: string | null;
+  verdict: string | null;
+  correction_notes: string | null;
+  updated_at: string | null;
+  user_analyses?: {
+    product_name?: string | null;
+    brand?: string | null;
+  } | null;
+}
+
+const mapValidationStatus = (record: any): 'pending' | 'validated' | 'needs_correction' => {
+  if (record?.validation_status) return record.validation_status;
+  if (record?.verdict === 'confirm') return 'validated';
+  if (record?.verdict === 'correct' || record?.verdict === 'escalate') return 'needs_correction';
+  return 'pending';
+};
+
 export default function StudentReviewer() {
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -67,10 +90,19 @@ export default function StudentReviewer() {
   const [ingredientValidations, setIngredientValidations] = useState<Map<string, IngredientValidation>>(new Map());
   const [ingredientCache, setIngredientCache] = useState<Map<string, any>>(new Map());
   const [selectedIngredient, setSelectedIngredient] = useState<string | null>(null);
+  const [viewMode, setViewMode] = useState<ReviewListMode>('products');
+  const [validationList, setValidationList] = useState<ValidationListItem[]>([]);
+  const [validationListLoading, setValidationListLoading] = useState(false);
 
   useEffect(() => {
     checkAccessAndLoad();
   }, []);
+
+  useEffect(() => {
+    if (!userId) return;
+    if (viewMode === 'products') return;
+    loadValidationList(userId);
+  }, [viewMode, userId]);
 
   const checkAccessAndLoad = async () => {
     try {
@@ -151,7 +183,25 @@ export default function StudentReviewer() {
     });
   };
 
-  const selectProduct = async (product: ProductAnalysis) => {
+  const loadValidationList = async (uid: string) => {
+    setValidationListLoading(true);
+    try {
+      const { data, error } = await (supabase as any)
+        .from('ingredient_validations')
+        .select('id, ingredient_name, analysis_id, validation_status, verdict, correction_notes, updated_at, user_analyses (product_name, brand)')
+        .eq('validator_id', uid)
+        .order('updated_at', { ascending: false });
+
+      if (error) throw error;
+      setValidationList((data || []) as ValidationListItem[]);
+    } catch (error) {
+      console.error('Error loading validation list:', error);
+    } finally {
+      setValidationListLoading(false);
+    }
+  };
+
+  const selectProduct = async (product: ProductAnalysis, initialIngredient?: string) => {
     setSelectedProduct(product);
     
     // Parse ingredients
@@ -161,11 +211,11 @@ export default function StudentReviewer() {
       .filter(i => i.length > 0);
     setIngredientsList(ingredients);
     
-    // Select first ingredient by default
-    if (ingredients.length > 0) {
-      setSelectedIngredient(ingredients[0]);
-      // Save to local storage
-      localStorage.setItem(`selectedIngredient_${product.id}`, ingredients[0]);
+    // Select initial ingredient (if provided and found) otherwise first ingredient
+    const initial = initialIngredient && ingredients.includes(initialIngredient) ? initialIngredient : ingredients[0];
+    if (initial) {
+      setSelectedIngredient(initial);
+      localStorage.setItem(`selectedIngredient_${product.id}`, initial);
     }
 
     // Load existing validations
@@ -180,7 +230,7 @@ export default function StudentReviewer() {
       validations?.forEach(v => {
         validationMap.set(v.ingredient_name, {
           ingredient_name: v.ingredient_name,
-          validation_status: v.validation_status || 'pending',
+          validation_status: mapValidationStatus(v),
           pubchem_data_correct: v.pubchem_data_correct,
           ai_explanation_accurate: v.ai_explanation_accurate,
           corrected_role: v.corrected_role,
@@ -223,10 +273,10 @@ export default function StudentReviewer() {
     validations?.forEach((v: any) => {
       validationMap.set(v.ingredient_name, {
         ingredient_name: v.ingredient_name,
-        validation_status: v.validation_status || v.verdict || 'pending',
+        validation_status: mapValidationStatus(v),
         pubchem_data_correct: v.pubchem_data_correct,
         ai_explanation_accurate: v.ai_explanation_accurate,
-        corrected_role: v.corrected_role || v.correction,
+        corrected_role: v.corrected_role,
         corrected_safety_level: v.corrected_safety_level,
         correction_notes: v.correction_notes || v.internal_notes,
         reference_sources: (v.reference_sources as string[]) || []
@@ -236,6 +286,9 @@ export default function StudentReviewer() {
 
     // Update stats (this will trigger ReviewerAccuracyCard to refetch via React Query)
     await loadProducts(userId);
+    if (viewMode !== 'products') {
+      await loadValidationList(userId);
+    }
     
     toast({
       title: "Validation saved",
@@ -268,6 +321,12 @@ export default function StudentReviewer() {
     const validation = ingredientValidations.get(ingredient);
     if (!validation) return 'pending';
     return validation.validation_status as 'pending' | 'validated' | 'needs_correction';
+  };
+
+  const formatReviewDate = (dateString?: string | null) => {
+    if (!dateString) return '';
+    const date = new Date(dateString);
+    return date.toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
   };
 
   if (loading) {
@@ -427,7 +486,10 @@ export default function StudentReviewer() {
 
         {/* Stats Cards */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
-          <Card>
+          <Card
+            className={`cursor-pointer transition-colors ${viewMode === 'products' ? 'ring-2 ring-primary' : 'hover:bg-muted/30'}`}
+            onClick={() => setViewMode('products')}
+          >
             <CardContent className="pt-6">
               <div className="flex items-center gap-3">
                 <div className="p-2 bg-primary/10 rounded-lg">
@@ -440,7 +502,10 @@ export default function StudentReviewer() {
               </div>
             </CardContent>
           </Card>
-          <Card>
+          <Card
+            className={`cursor-pointer transition-colors ${viewMode === 'validated' ? 'ring-2 ring-primary' : 'hover:bg-muted/30'}`}
+            onClick={() => setViewMode('validated')}
+          >
             <CardContent className="pt-6">
               <div className="flex items-center gap-3">
                 <div className="p-2 bg-green-500/10 rounded-lg">
@@ -453,7 +518,10 @@ export default function StudentReviewer() {
               </div>
             </CardContent>
           </Card>
-          <Card>
+          <Card
+            className={`cursor-pointer transition-colors ${viewMode === 'flagged' ? 'ring-2 ring-primary' : 'hover:bg-muted/30'}`}
+            onClick={() => setViewMode('flagged')}
+          >
             <CardContent className="pt-6">
               <div className="flex items-center gap-3">
                 <div className="p-2 bg-amber-500/10 rounded-lg">
@@ -468,48 +536,122 @@ export default function StudentReviewer() {
           </Card>
         </div>
 
-        {/* Products List */}
+        {/* Products or Validation List */}
         <Card>
           <CardContent className="p-6">
-            <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
-              <FlaskConical className="w-5 h-5" />
-              Select a Product to Validate
-            </h2>
-            
-            {products.length === 0 ? (
-              <p className="text-muted-foreground text-center py-8">
-                No products available for validation yet.
-              </p>
+            {viewMode === 'products' ? (
+              <>
+                <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                  <FlaskConical className="w-5 h-5" />
+                  Select a Product to Validate
+                </h2>
+
+                {products.length === 0 ? (
+                  <p className="text-muted-foreground text-center py-8">
+                    No products available for validation yet.
+                  </p>
+                ) : (
+                  <div className="space-y-2">
+                    {products.map(product => {
+                      const ingredientCount = product.ingredients_list.split(',').filter(i => i.trim()).length;
+                      return (
+                        <button
+                          key={product.id}
+                          onClick={() => selectProduct(product)}
+                          className="w-full flex items-center justify-between p-4 rounded-lg border border-border hover:bg-muted/50 transition-colors text-left"
+                        >
+                          <div className="flex-1">
+                            <p className="font-medium">{product.product_name}</p>
+                            <div className="flex items-center gap-2 mt-1">
+                              {product.brand && (
+                                <span className="text-sm text-muted-foreground">{product.brand}</span>
+                              )}
+                              {product.epiq_score && (
+                                <Badge variant="secondary" className="text-xs">
+                                  EpiQ: {product.epiq_score}
+                                </Badge>
+                              )}
+                            </div>
+                          </div>
+                          <Badge variant="outline" className="ml-4">
+                            {ingredientCount} ingredients
+                          </Badge>
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+              </>
             ) : (
-              <div className="space-y-2">
-                {products.map(product => {
-                  const ingredientCount = product.ingredients_list.split(',').filter(i => i.trim()).length;
-                  return (
-                    <button
-                      key={product.id}
-                      onClick={() => selectProduct(product)}
-                      className="w-full flex items-center justify-between p-4 rounded-lg border border-border hover:bg-muted/50 transition-colors text-left"
-                    >
-                      <div className="flex-1">
-                        <p className="font-medium">{product.product_name}</p>
-                        <div className="flex items-center gap-2 mt-1">
-                          {product.brand && (
-                            <span className="text-sm text-muted-foreground">{product.brand}</span>
-                          )}
-                          {product.epiq_score && (
-                            <Badge variant="secondary" className="text-xs">
-                              EpiQ: {product.epiq_score}
-                            </Badge>
-                          )}
-                        </div>
+              <>
+                <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                  <FlaskConical className="w-5 h-5" />
+                  {viewMode === 'validated' ? 'Validated Ingredients' : 'Flagged for Correction'}
+                </h2>
+
+                {validationListLoading ? (
+                  <p className="text-muted-foreground text-center py-8">
+                    Loading validations...
+                  </p>
+                ) : (
+                  (() => {
+                    const filtered = validationList.filter(v => {
+                      const status = mapValidationStatus(v);
+                      return viewMode === 'validated' ? status === 'validated' : status === 'needs_correction';
+                    });
+
+                    if (filtered.length === 0) {
+                      return (
+                        <p className="text-muted-foreground text-center py-8">
+                          No items found yet.
+                        </p>
+                      );
+                    }
+
+                    return (
+                      <div className="space-y-2">
+                        {filtered.map(v => {
+                          const status = mapValidationStatus(v);
+                          const product = products.find(p => p.id === v.analysis_id) || null;
+                          return (
+                            <button
+                              key={v.id}
+                              onClick={() => {
+                                if (product) {
+                                  selectProduct(product, v.ingredient_name);
+                                }
+                              }}
+                              className="w-full flex items-center justify-between p-4 rounded-lg border border-border hover:bg-muted/50 transition-colors text-left"
+                            >
+                              <div className="flex-1">
+                                <p className="font-medium">{v.ingredient_name}</p>
+                                <div className="flex items-center gap-2 mt-1">
+                                  {v.user_analyses?.product_name && (
+                                    <span className="text-sm text-muted-foreground">{v.user_analyses.product_name}</span>
+                                  )}
+                                  {v.user_analyses?.brand && (
+                                    <Badge variant="outline" className="text-xs">
+                                      {v.user_analyses.brand}
+                                    </Badge>
+                                  )}
+                                </div>
+                              </div>
+                              <div className="flex items-center gap-3">
+                                <Badge variant={status === 'validated' ? 'secondary' : 'destructive'}>
+                                  {status === 'validated' ? 'Reviewed' : 'Needs Correction'}
+                                </Badge>
+                                <span className="text-xs text-muted-foreground">
+                                  {formatReviewDate(v.updated_at)}
+                                </span>
+                              </div>
+                            </button>
+                          );
+                        })}
                       </div>
-                      <Badge variant="outline" className="ml-4">
-                        {ingredientCount} ingredients
-                      </Badge>
-                    </button>
-                  );
-                })}
-              </div>
+                    );
+                  })()
+                )}
+              </>
             )}
           </CardContent>
         </Card>
