@@ -23,7 +23,6 @@ import AuditLog from '@/components/admin/AuditLog';
 
 // Authorized admin emails
 const ADMIN_EMAILS = [
-  'alicia@xiosolutionsllc.com',
   'cedric.evans@gmail.com',
   'pte295@gmail.com'
 ];
