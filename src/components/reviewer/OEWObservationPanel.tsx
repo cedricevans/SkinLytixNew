@@ -1,5 +1,9 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
 import { 
   Eye, 
   Bot,
@@ -14,6 +18,13 @@ interface OEWObservationPanelProps {
   aiExplanation?: string;
   pubchemCid?: string | null;
   molecularWeight?: number | null;
+  showAiApproval?: boolean;
+  aiApprovalChecked?: boolean;
+  aiApprovalSummary?: string;
+  onToggleAiApproval?: (checked: boolean) => void;
+  onAiApprovalSummaryChange?: (value: string) => void;
+  onApproveAi?: () => void;
+  aiApprovalLoading?: boolean;
 }
 
 export function OEWObservationPanel({
@@ -23,7 +34,14 @@ export function OEWObservationPanel({
   aiSafetyLevel,
   aiExplanation,
   pubchemCid,
-  molecularWeight
+  molecularWeight,
+  showAiApproval,
+  aiApprovalChecked,
+  aiApprovalSummary,
+  onToggleAiApproval,
+  onAiApprovalSummaryChange,
+  onApproveAi,
+  aiApprovalLoading
 }: OEWObservationPanelProps) {
   const getSafetyLevelColor = (level?: string) => {
     switch (level?.toLowerCase()) {
@@ -135,6 +153,54 @@ export function OEWObservationPanel({
           </div>
         )}
 
+        {showAiApproval && (
+          <div className="p-4 bg-green-500/5 border border-green-500/20 rounded-lg space-y-3">
+            <div className="flex items-start gap-3">
+              <Checkbox
+                id="ai-approval"
+                checked={Boolean(aiApprovalChecked)}
+                onCheckedChange={(checked) => onToggleAiApproval?.(checked === true)}
+              />
+              <div className="space-y-1">
+                <Label htmlFor="ai-approval" className="text-sm font-medium">
+                  I agree with the AI explanation
+                </Label>
+                <p className="text-xs text-muted-foreground">
+                  If you agree, add a short reviewer summary to validate and skip the remaining steps.
+                </p>
+              </div>
+            </div>
+
+            {aiApprovalChecked && (
+              <div className="space-y-2">
+                <Label htmlFor="ai-approval-summary" className="text-sm font-medium">
+                  Reviewer Summary *
+                </Label>
+                <Textarea
+                  id="ai-approval-summary"
+                  value={aiApprovalSummary || ''}
+                  onChange={(e) => onAiApprovalSummaryChange?.(e.target.value)}
+                  placeholder="Summarize why the AI explanation is accurate and safe for consumers."
+                  rows={4}
+                  className="text-sm leading-relaxed"
+                />
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                  <p className="text-xs text-muted-foreground">
+                    Summary is required to approve and validate.
+                  </p>
+                  <Button
+                    size="sm"
+                    onClick={onApproveAi}
+                    disabled={aiApprovalLoading || !aiApprovalSummary?.trim()}
+                  >
+                    {aiApprovalLoading ? 'Saving...' : 'Approve & Validate'}
+                  </Button>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
         {/* PubChem Data Context */}
         {(pubchemCid || molecularWeight) && (
           <div className="space-y-3 pt-2 border-t border-muted">
@@ -159,16 +225,18 @@ export function OEWObservationPanel({
         )}
 
         {/* Instructions for Next Step */}
-        <div className="p-4 bg-blue-500/5 border border-blue-500/20 rounded-lg">
-          <p className="text-sm text-blue-600 font-medium flex items-center gap-2">
-            <AlertCircle className="w-4 h-4 flex-shrink-0" />
-            Next Step: Find Evidence
-          </p>
-          <p className="text-xs text-blue-600/80 mt-2">
-            Search for at least 1 peer-reviewed source (PubMed, journal article, CIR monograph, etc.) 
-            that either confirms or contradicts this AI claim.
-          </p>
-        </div>
+        {!aiApprovalChecked && (
+          <div className="p-4 bg-blue-500/5 border border-blue-500/20 rounded-lg">
+            <p className="text-sm text-blue-600 font-medium flex items-center gap-2">
+              <AlertCircle className="w-4 h-4 flex-shrink-0" />
+              Next Step: Find Evidence
+            </p>
+            <p className="text-xs text-blue-600/80 mt-2">
+              Search for at least 1 peer-reviewed source (PubMed, journal article, CIR monograph, etc.) 
+              that either confirms or contradicts this AI claim.
+            </p>
+          </div>
+        )}
       </CardContent>
     </Card>
   );

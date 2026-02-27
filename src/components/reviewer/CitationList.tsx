@@ -40,7 +40,7 @@ export function CitationList({
       <div className="p-4 bg-muted/30 rounded-lg border border-dashed border-muted text-center">
         <AlertCircle className="w-5 h-5 text-muted-foreground mx-auto mb-2" />
         <p className="text-sm text-muted-foreground">
-          No citations added yet. Add at least 1 peer-reviewed source.
+          No citations added yet. Add a peer-reviewed source.
         </p>
       </div>
     );
@@ -138,7 +138,6 @@ export function CitationList({
       {/* Summary */}
       <div className="p-3 bg-green-500/5 border border-green-500/20 rounded-lg text-sm text-green-600">
         ✓ {citations.length} citation{citations.length !== 1 ? 's' : ''} added
-        {citations.length >= 2 && " (exceeds minimum requirement)"}
       </div>
     </div>
   );

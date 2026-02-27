@@ -297,7 +297,7 @@ export function CitationForm({
 
           {/* Required note */}
           <p className="text-xs text-muted-foreground text-center pt-2">
-            * Minimum 1 peer-reviewed citation required
+            * 1+ peer-reviewed citation required
           </p>
         </form>
       </CardContent>

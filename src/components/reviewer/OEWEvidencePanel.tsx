@@ -30,7 +30,7 @@ export function OEWEvidencePanel({
     onCitationsChange(citations.filter((_, i) => i !== index));
   };
 
-  const hasMininumCitations = citations.length >= 1;
+  const hasRequiredCitations = citations.length >= 1;
 
   return (
     <Card className="border-l-4 border-l-primary">
@@ -42,7 +42,7 @@ export function OEWEvidencePanel({
           </div>
           <Badge 
             variant="outline"
-            className={hasMininumCitations ? 'bg-green-500/10 text-green-600 border-green-500/20' : 'bg-amber-500/10 text-amber-600 border-amber-500/20'}
+            className={hasRequiredCitations ? 'bg-green-500/10 text-green-600 border-green-500/20' : 'bg-amber-500/10 text-amber-600 border-amber-500/20'}
           >
             {citations.length} / 1 citations
           </Badge>
@@ -57,10 +57,10 @@ export function OEWEvidencePanel({
         <div className="p-4 bg-blue-500/5 border border-blue-500/20 rounded-lg space-y-2">
           <p className="text-sm font-medium text-blue-600 flex items-center gap-2">
             <AlertCircle className="w-4 h-4" />
-            Minimum Requirements
+            Evidence Requirements
           </p>
           <ul className="text-xs text-blue-600/80 space-y-1 ml-6 list-disc">
-            <li>At least 1 peer-reviewed source (required)</li>
+            <li>1+ peer-reviewed source (required)</li>
             <li>Can be: PubMed article, journal article with DOI, CIR monograph, clinical study, or textbook</li>
             <li>Must include DOI (10.xxxx) or PubMed ID (PMID:xxxxx)</li>
             <li>Must include direct URL to source</li>

@@ -86,7 +86,7 @@ export function ConfidenceLevelSelector({
             </p>
             <p className="text-xs mt-2">
               You found {evidenceCount} citation{evidenceCount !== 1 ? 's' : ''}. 
-              {evidenceCount === 1 && ' This is the minimum. Consider finding more for higher confidence.'}
+              {evidenceCount === 1 && ' Consider finding more for higher confidence.'}
               {evidenceCount >= 2 && ' Multiple sources strengthen your confidence level.'}
             </p>
           </div>

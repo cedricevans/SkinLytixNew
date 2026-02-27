@@ -67,6 +67,7 @@ export function IngredientValidationPanel({
   const { toast } = useToast();
   const [currentStep, setCurrentStep] = useState(1);
   const [loading, setLoading] = useState(false);
+  const [aiApprovalActive, setAiApprovalActive] = useState(false);
   const draftSavingRef = useRef(false);
   const lastDraftHashRef = useRef<string>('');
   const [formData, setFormData] = useState<ValidationData>({
@@ -113,6 +114,10 @@ export function IngredientValidationPanel({
     pubchemCid,
     molecularWeight
   ]);
+
+  useEffect(() => {
+    setAiApprovalActive(false);
+  }, [ingredientId, analysisId]);
 
   // Load existing validation if editing
   useEffect(() => {
@@ -302,9 +307,8 @@ export function IngredientValidationPanel({
         return true;
       case 2: // Evidence (requires ≥1 citation)
         return formData.citations.length > 0;
-      case 3: // Writing (requires 150-300 words)
-        const wordCount = formData.publicExplanation.trim().split(/\s+/).length;
-        return wordCount >= 150 && wordCount <= 300;
+      case 3: // Writing (requires some content)
+        return formData.publicExplanation.trim().length > 0;
       case 4: // Confidence (requires selection)
         return formData.confidenceLevel !== '';
       case 5: // Verdict (requires selection)
@@ -323,22 +327,35 @@ export function IngredientValidationPanel({
     }));
   };
 
-  const handleSave = async () => {
+  const handleSave = async (options?: {
+    overrides?: Partial<ValidationData>;
+    allowMissingCitations?: boolean;
+    allowEmptyExplanation?: boolean;
+    aiApprove?: boolean;
+  }) => {
+    const mergedData: ValidationData = {
+      ...formData,
+      ...options?.overrides,
+      observations: {
+        ...formData.observations,
+        ...options?.overrides?.observations
+      }
+    };
+
     // Validate all required fields
-    if (formData.citations.length === 0) {
+    if (!options?.allowMissingCitations && mergedData.citations.length === 0) {
       toast({ title: "Missing evidence", description: "Add at least one citation.", variant: "destructive" });
       return;
     }
-    const wordCount = formData.publicExplanation.trim().split(/\s+/).length;
-    if (wordCount < 150 || wordCount > 300) {
-      toast({ title: "Invalid word count", description: "Explanation must be 150-300 words.", variant: "destructive" });
+    if (!options?.allowEmptyExplanation && mergedData.publicExplanation.trim().length === 0) {
+      toast({ title: "Missing explanation", description: "Add a public explanation before saving.", variant: "destructive" });
       return;
     }
-    if (formData.confidenceLevel === '') {
+    if (mergedData.confidenceLevel === '') {
       toast({ title: "Missing confidence", description: "Select confidence level.", variant: "destructive" });
       return;
     }
-    if (formData.verdict === '') {
+    if (mergedData.verdict === '') {
       toast({ title: "Missing verdict", description: "Select a verdict.", variant: "destructive" });
       return;
     }
@@ -355,9 +372,9 @@ export function IngredientValidationPanel({
 
       // Insert/update ingredient_validations using any to bypass type checking
       const validationStatus =
-        formData.verdict === 'confirm'
+        mergedData.verdict === 'confirm'
           ? 'validated'
-          : formData.verdict === 'correct' || formData.verdict === 'escalate'
+          : mergedData.verdict === 'correct' || mergedData.verdict === 'escalate'
             ? 'needs_correction'
             : 'pending';
 
@@ -365,20 +382,21 @@ export function IngredientValidationPanel({
         ingredient_name: ingredientName,
         analysis_id: analysisId,
         validator_id: user.id,
-        ai_claim_summary: formData.observations.aiClaimSummary,
-        public_explanation: formData.publicExplanation,
-        confidence_level: formData.confidenceLevel,
-        verdict: formData.verdict,
-        correction_notes: formData.correction,
-        escalation_reason: formData.escalationReason,
-        internal_notes: formData.internalNotes,
-        is_escalated: formData.verdict === 'escalate',
-        moderator_review_status: formData.moderatorReviewStatus,
+        ai_claim_summary: mergedData.observations.aiClaimSummary,
+        public_explanation: mergedData.publicExplanation,
+        confidence_level: mergedData.confidenceLevel,
+        verdict: mergedData.verdict,
+        correction_notes: mergedData.correction,
+        escalation_reason: mergedData.escalationReason,
+        internal_notes: mergedData.internalNotes,
+        is_escalated: mergedData.verdict === 'escalate',
+        moderator_review_status: mergedData.moderatorReviewStatus,
         validation_status: validationStatus,
-        updated_at: new Date().toISOString()
+        updated_at: new Date().toISOString(),
+        ...(options?.aiApprove ? { ai_explanation_accurate: true } : {})
       };
 
-      let validationId = formData.validationId;
+      let validationId = mergedData.validationId;
       if (validationId) {
         const { error } = await (supabase as any)
           .from('ingredient_validations')
@@ -403,8 +421,8 @@ export function IngredientValidationPanel({
           .delete()
           .eq('validation_id', validationId);
 
-        if (formData.citations.length > 0) {
-          const citationRecords = formData.citations.map(c => ({
+        if (mergedData.citations.length > 0) {
+          const citationRecords = mergedData.citations.map(c => ({
             validation_id: validationId,
             citation_type: c.type,
             title: c.title,
@@ -454,6 +472,28 @@ export function IngredientValidationPanel({
     }
   };
 
+  const handleAiApprove = async () => {
+    const summary = formData.publicExplanation.trim();
+    if (!summary) {
+      toast({
+        title: "Summary required",
+        description: "Add a brief reviewer summary before approving the AI explanation.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    await handleSave({
+      overrides: {
+        publicExplanation: summary,
+        confidenceLevel: 'High',
+        verdict: 'confirm'
+      },
+      allowMissingCitations: true,
+      aiApprove: true
+    });
+  };
+
   // Step content rendering
   const renderStep = () => {
     switch (currentStep) {
@@ -467,6 +507,18 @@ export function IngredientValidationPanel({
             aiExplanation={formData.observations.aiExplanation}
             pubchemCid={formData.observations.pubchemCid}
             molecularWeight={formData.observations.molecularWeight}
+            showAiApproval={
+              Boolean(
+                formData.observations.aiExplanation?.trim() ||
+                formData.observations.aiClaimSummary?.trim()
+              )
+            }
+            aiApprovalChecked={aiApprovalActive}
+            aiApprovalSummary={formData.publicExplanation}
+            onToggleAiApproval={(checked) => setAiApprovalActive(checked)}
+            onAiApprovalSummaryChange={(value) => setFormData(prev => ({ ...prev, publicExplanation: value }))}
+            onApproveAi={handleAiApprove}
+            aiApprovalLoading={loading}
           />
         );
       case 2:
@@ -597,7 +649,7 @@ export function IngredientValidationPanel({
                   const messages = {
                     1: 'Cannot proceed from observation step',
                     2: 'Add at least one citation to proceed',
-                    3: 'Explanation must be 150-300 words',
+                    3: 'Add a public explanation to proceed',
                     4: 'Select a confidence level',
                     5: 'Select a verdict'
                   };
