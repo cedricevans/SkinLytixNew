@@ -93,7 +93,7 @@ export default function AuditLog() {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Admin Action Audit Log</CardTitle>
+        <CardTitle className="break-words">Admin Action Audit Log</CardTitle>
       </CardHeader>
 
       <CardContent>
@@ -132,8 +132,8 @@ export default function AuditLog() {
             </p>
           </div>
         ) : (
-          <div className="border rounded-lg overflow-hidden">
-            <Table>
+          <div className="border rounded-lg overflow-x-auto">
+            <Table className="min-w-[840px]">
               <TableHeader>
                 <TableRow>
                   <TableHead>Time</TableHead>
@@ -156,14 +156,31 @@ export default function AuditLog() {
                       <TableCell className="text-sm text-gray-600 whitespace-nowrap">
                         {new Date(entry.created_at).toLocaleString()}
                       </TableCell>
-                      <TableCell className="font-medium text-sm">{entry.admin_email}</TableCell>
+                      <TableCell
+                        className="font-medium text-sm max-w-[180px] truncate"
+                        title={entry.admin_email}
+                      >
+                        {entry.admin_email}
+                      </TableCell>
                       <TableCell>
-                        <Badge variant={getActionBadgeVariant(entry.action)}>
+                        <Badge
+                          variant={getActionBadgeVariant(entry.action)}
+                          className="max-w-[140px] truncate"
+                          title={entry.action}
+                        >
                           {entry.action}
                         </Badge>
                       </TableCell>
-                      <TableCell className="text-sm">{entry.target_user || '—'}</TableCell>
-                      <TableCell className="text-sm text-gray-600 max-w-xs truncate">
+                      <TableCell
+                        className="text-sm max-w-[180px] truncate"
+                        title={entry.target_user || '—'}
+                      >
+                        {entry.target_user || '—'}
+                      </TableCell>
+                      <TableCell
+                        className="text-sm text-gray-600 max-w-[240px] truncate"
+                        title={entry.details ? JSON.stringify(entry.details) : '—'}
+                      >
                         {entry.details ? JSON.stringify(entry.details) : '—'}
                       </TableCell>
                     </TableRow>

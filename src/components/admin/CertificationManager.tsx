@@ -375,12 +375,12 @@ export default function CertificationManager({ onStatsUpdate }: CertificationMan
             placeholder="Search by email..."
             value={searchEmail}
             onChange={(e) => setSearchEmail(e.target.value)}
-            className="max-w-sm"
+            className="w-full sm:max-w-sm"
           />
         </div>
 
         <div className="border rounded-lg overflow-x-auto">
-          <Table className="table-fixed w-full">
+          <Table className="table-fixed w-full min-w-[720px]">
             <TableHeader>
               <TableRow>
                 <TableHead>Email</TableHead>

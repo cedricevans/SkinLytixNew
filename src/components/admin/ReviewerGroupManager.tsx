@@ -261,11 +261,11 @@ export default function ReviewerGroupManager({ onStatsUpdate }: ReviewerGroupMan
   return (
     <Card>
       <CardHeader>
-        <div className="flex items-center justify-between">
-          <CardTitle>Reviewer Groups</CardTitle>
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <CardTitle className="break-words">Reviewer Groups</CardTitle>
           <Dialog open={openDialog} onOpenChange={setOpenDialog}>
             <DialogTrigger asChild>
-              <Button className="gap-2">
+              <Button className="gap-2 w-full sm:w-auto whitespace-nowrap">
                 <Plus className="h-4 w-4" />
                 Create Group
               </Button>
@@ -335,12 +335,12 @@ export default function ReviewerGroupManager({ onStatsUpdate }: ReviewerGroupMan
                 placeholder="Search by group name..."
                 value={searchName}
                 onChange={(e) => setSearchName(e.target.value)}
-                className="max-w-sm"
+                className="w-full sm:max-w-sm"
               />
             </div>
 
-            <div className="border rounded-lg overflow-hidden">
-              <Table>
+            <div className="border rounded-lg overflow-x-auto">
+              <Table className="min-w-[720px]">
                 <TableHeader>
                   <TableRow>
                     <TableHead>Name</TableHead>
@@ -360,8 +360,12 @@ export default function ReviewerGroupManager({ onStatsUpdate }: ReviewerGroupMan
                   ) : (
                     filteredGroups.map((group) => (
                       <TableRow key={group.id}>
-                        <TableCell className="font-medium">{group.name}</TableCell>
-                        <TableCell>{group.description || '—'}</TableCell>
+                        <TableCell className="font-medium break-words whitespace-normal max-w-[220px]">
+                          {group.name}
+                        </TableCell>
+                        <TableCell className="break-words whitespace-normal max-w-[260px]">
+                          {group.description || '—'}
+                        </TableCell>
                         <TableCell>
                           <Badge variant="outline">
                             {group.member_count || 0} members

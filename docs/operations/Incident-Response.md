@@ -1,7 +1,7 @@
-# Incident Response Guide
+# Incident Response Plan
 
 **Document Version:** 1.0  
-**Last Updated:** November 11, 2025  
+**Last Updated:** February 28, 2026  
 **Owner:** Engineering & Operations Team  
 **Status:** Active
 

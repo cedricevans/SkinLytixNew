@@ -168,12 +168,12 @@ export default function AdminDashboard() {
         <Alert className="mb-6 border-blue-200 bg-blue-50">
           <Shield className="h-4 w-4" />
           <AlertDescription>
-            <div className="flex items-center justify-between">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
               <div>
                 <h3 className="font-semibold mb-1">Administrator Access</h3>
                 <p className="text-sm">You have full access to system administration controls.</p>
               </div>
-              <Badge variant="secondary" className="ml-4">
+              <Badge variant="secondary" className="sm:ml-4 break-words">
                 {user?.email}
               </Badge>
             </div>
@@ -181,7 +181,7 @@ export default function AdminDashboard() {
         </Alert>
 
         {/* Statistics Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
           <Card>
             <CardHeader className="pb-2">
               <CardTitle className="text-sm font-medium text-gray-600">Total Users</CardTitle>
@@ -225,7 +225,7 @@ export default function AdminDashboard() {
 
         {/* Management Tabs */}
         <Tabs defaultValue="users" className="w-full">
-          <TabsList className="grid w-full grid-cols-4">
+          <TabsList className="grid w-full grid-cols-2 sm:grid-cols-4 gap-2 h-auto">
             <TabsTrigger value="users" className="flex items-center gap-2">
               <Users className="h-4 w-4" />
               <span className="hidden sm:inline">Users & Roles</span>

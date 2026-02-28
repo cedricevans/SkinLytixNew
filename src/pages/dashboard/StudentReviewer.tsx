@@ -59,6 +59,7 @@ interface Stats {
   productsToValidate: number;
   ingredientsValidated: number;
   flaggedForCorrection: number;
+  totalValidated: number;
 }
 
 type ReviewListMode = 'products' | 'validated' | 'flagged';
@@ -103,7 +104,7 @@ export default function StudentReviewer() {
   
   // Products list
   const [products, setProducts] = useState<ProductAnalysis[]>([]);
-  const [stats, setStats] = useState<Stats>({ productsToValidate: 0, ingredientsValidated: 0, flaggedForCorrection: 0 });
+  const [stats, setStats] = useState<Stats>({ productsToValidate: 0, ingredientsValidated: 0, flaggedForCorrection: 0, totalValidated: 0 });
   
   // Selected product for validation
   const [selectedProduct, setSelectedProduct] = useState<ProductAnalysis | null>(null);
@@ -221,10 +222,17 @@ export default function StudentReviewer() {
     const validated = validations?.filter(v => v.validation_status === 'validated').length || 0;
     const flagged = validations?.filter(v => v.validation_status === 'needs_correction').length || 0;
 
+    // Total validated across all reviewers (for context in the UI)
+    const { count: totalValidatedCount } = await supabase
+      .from('ingredient_validations')
+      .select('id', { count: 'exact', head: true })
+      .eq('validation_status', 'validated');
+
     setStats({
       productsToValidate: analyses?.length || 0,
       ingredientsValidated: validated,
-      flaggedForCorrection: flagged
+      flaggedForCorrection: flagged,
+      totalValidated: totalValidatedCount ?? 0
     });
 
     const analysisIds = (analyses || []).map(a => a.id).filter(Boolean);
@@ -621,7 +629,7 @@ export default function StudentReviewer() {
                 {selectedProduct.brand ? `${selectedProduct.brand} • ` : ''}Ingredient Validation
               </p>
             </div>
-            <Button variant="ghost" onClick={exitProductValidation}>
+            <Button variant="ghost" onClick={exitProductValidation} className="w-full sm:w-auto">
               Back to Products
             </Button>
           </div>
@@ -659,7 +667,7 @@ export default function StudentReviewer() {
                         <button
                           key={ingredient}
                           onClick={() => setSelectedIngredient(ingredient)}
-                          className={`w-full flex items-start justify-between gap-3 rounded-lg border px-3 py-2 text-left transition-colors ${
+                          className={`w-full flex flex-col gap-3 rounded-lg border px-3 py-2 text-left transition-colors sm:flex-row sm:items-start sm:justify-between ${
                             isSelected ? 'border-primary bg-primary/5' : 'border-border hover:bg-muted/50'
                           }`}
                         >
@@ -751,7 +759,7 @@ export default function StudentReviewer() {
     <AppShell showNavigation showBottomNav contentClassName="px-[5px] lg:px-4 py-8">
       <div className="container max-w-6xl mx-auto">
         {/* Header */}
-        <div className="flex items-center justify-between mb-8">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-8">
           <div>
             <h1 className="text-3xl font-bold mb-2">Ingredient Validation Dashboard</h1>
             <p className="text-muted-foreground flex items-center gap-2">
@@ -759,14 +767,14 @@ export default function StudentReviewer() {
               {institution} • Student Reviewer
             </p>
           </div>
-          <Button variant="ghost" onClick={() => navigate('/home')}>
+          <Button variant="ghost" onClick={() => navigate('/home')} className="w-full sm:w-auto">
             <Home className="w-4 h-4 mr-2" />
             Back to Home
           </Button>
         </div>
 
         {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-8">
           <Card
             className={`cursor-pointer transition-colors ${viewMode === 'products' ? 'ring-2 ring-primary' : 'hover:bg-muted/30'}`}
             onClick={() => setViewMode('products')}
@@ -794,7 +802,10 @@ export default function StudentReviewer() {
                 </div>
                 <div>
                   <p className="text-2xl font-bold">{stats.ingredientsValidated}</p>
-                  <p className="text-sm text-muted-foreground">Ingredients Validated</p>
+                  <p className="text-sm font-medium text-foreground">You verified</p>
+                  <p className="text-[11px] uppercase tracking-[0.15em] text-muted-foreground">
+                    Total validated: {stats.totalValidated}
+                  </p>
                 </div>
               </div>
             </CardContent>
@@ -879,7 +890,7 @@ export default function StudentReviewer() {
                               )}
                             </div>
                           </div>
-                          <Badge variant="outline" className="ml-4">
+                          <Badge variant="outline" className="self-start sm:self-center sm:ml-4">
                             {ingredientCount} ingredients
                           </Badge>
                         </button>

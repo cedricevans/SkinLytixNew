@@ -210,11 +210,11 @@ export default function UserRoleManager({ onStatsUpdate }: UserRoleManagerProps)
   return (
     <Card>
       <CardHeader>
-        <div className="flex items-center justify-between">
-          <CardTitle>User Roles Management</CardTitle>
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <CardTitle className="break-words">User Roles Management</CardTitle>
           <Dialog open={openDialog} onOpenChange={setOpenDialog}>
             <DialogTrigger asChild>
-              <Button className="gap-2">
+              <Button className="gap-2 w-full sm:w-auto whitespace-nowrap">
                 <Plus className="h-4 w-4" />
                 Add Role
               </Button>
@@ -272,12 +272,12 @@ export default function UserRoleManager({ onStatsUpdate }: UserRoleManagerProps)
             placeholder="Search by email..."
             value={searchEmail}
             onChange={(e) => setSearchEmail(e.target.value)}
-            className="max-w-sm"
+            className="w-full sm:max-w-sm"
           />
         </div>
 
         <div className="border rounded-lg overflow-x-auto">
-          <Table className="table-fixed w-full">
+          <Table className="table-fixed w-full min-w-[640px]">
             <TableHeader>
               <TableRow>
                 <TableHead>Email</TableHead>

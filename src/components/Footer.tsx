@@ -84,6 +84,7 @@ const FooterLinks = () => (
         { label: "About Us", href: "/about" },
         { label: "How It Works", href: "/how-it-works" },
         { label: "FAQ", href: "/faq" },
+        { label: "Support", href: "mailto:support@skinlytix.com" },
         { label: "Connect", href: "/connect" },
       ].map((link) => (
         <li key={link.label}>
