@@ -417,6 +417,12 @@ const Analysis = () => {
   const getIngredientId = (name: string) => {
     return `ingredient-${name.replace(/\s+/g, '-')}`;
   };
+  const isExpertValidatedIngredient = (ingredient: any) => {
+    if (!ingredient || typeof ingredient !== "object") return false;
+    if (ingredient.reviewed === true) return true;
+    if (typeof ingredient.reviewed_at === "string" && ingredient.reviewed_at.trim()) return true;
+    return false;
+  };
   const getIngredientKey = (name: string) => name.trim().toLowerCase();
   const isEmptyIngredientDetail = (value?: string) =>
     !value || /no detailed information available/i.test(value);
@@ -1092,6 +1098,7 @@ const Analysis = () => {
                       details: item.benefit,
                       role: item.role,
                       risk: item.risk_score,
+                      reviewed: false,
                     })),
                     ...safe
                       .filter((ing: any) => !beneficial.some((b: any) => b.name === getIngredientName(ing)))
@@ -1101,6 +1108,7 @@ const Analysis = () => {
                         details: typeof ingredient === "object" ? ingredient.explanation : undefined,
                         role: typeof ingredient === "object" ? ingredient.role : undefined,
                         risk: typeof ingredient === "object" ? ingredient.risk_score : undefined,
+                        reviewed: isExpertValidatedIngredient(ingredient),
                       })),
                   ];
 
@@ -1117,6 +1125,11 @@ const Analysis = () => {
                             <div className="flex items-center gap-2">
                               <Badge className={item.label === "Targeted" ? "bg-success/30 text-success-foreground border border-success/40" : "bg-secondary/80"}>{item.label}</Badge>
                               <span className="font-medium">{item.name}</span>
+                              {item.reviewed && (
+                                <Badge variant="outline" className="border-emerald-500/40 text-emerald-700 dark:text-emerald-300 whitespace-nowrap">
+                                  Expert Validated
+                                </Badge>
+                              )}
                             </div>
                             <div className="flex items-center gap-2 text-xs text-muted-foreground">
                               {item.role && <span className="hidden sm:inline">Role: {item.role}</span>}
@@ -1175,6 +1188,11 @@ const Analysis = () => {
                             <div className="flex items-center gap-2">
                               <Badge variant="destructive">Concern</Badge>
                               <span className="font-medium">{item.name}</span>
+                              {isExpertValidatedIngredient(item) && (
+                                <Badge variant="outline" className="border-emerald-500/40 text-emerald-700 dark:text-emerald-300 whitespace-nowrap">
+                                  Expert Validated
+                                </Badge>
+                              )}
                             </div>
                             {item.risk_score !== undefined && item.risk_score !== null && (
                               <span className="text-xs text-muted-foreground">Risk {item.risk_score}</span>
@@ -1243,6 +1261,11 @@ const Analysis = () => {
                               <div className="flex items-center gap-2">
                                 <Badge variant="outline" className="border-amber-300 text-amber-700 whitespace-nowrap">Needs Data</Badge>
                                 <span className="font-medium">{name}</span>
+                                {isExpertValidatedIngredient(ingredient) && (
+                                  <Badge variant="outline" className="border-emerald-500/40 text-emerald-700 dark:text-emerald-300 whitespace-nowrap">
+                                    Expert Validated
+                                  </Badge>
+                                )}
                               </div>
                               {role && <span className="text-xs text-muted-foreground">Role: {role}</span>}
                             </summary>
