@@ -50,6 +50,18 @@ interface AnalysisData {
       risk_score?: number;
     }>;
     concern_ingredients: Array<{ name: string; risk_score?: number; role?: string; explanation?: string; molecular_weight?: number; safety_profile?: string }>;
+      verification_summary?: {
+        baseline_score?: number;
+        validated_count?: number;
+        needs_correction_count?: number;
+        pending_count?: number;
+        worked_on_count?: number;
+        safe_count?: number;
+        concern_count?: number;
+        needs_more_data_count?: number;
+        total_ingredients?: number;
+        last_synced_at?: string;
+      };
       warnings?: string[];
       summary: string;
       routine_suggestions: string[];
@@ -349,6 +361,33 @@ const Analysis = () => {
   }, [id]);
 
   useEffect(() => {
+    if (!id) return;
+
+    const channel = supabase
+      .channel(`analysis-live-${id}`)
+      .on(
+        "postgres_changes",
+        { event: "UPDATE", schema: "public", table: "user_analyses", filter: `id=eq.${id}` },
+        () => {
+          fetchAnalysis({ silent: true });
+        }
+      )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "ingredient_validations", filter: `analysis_id=eq.${id}` },
+        () => {
+          fetchAnalysis({ silent: true });
+        }
+      );
+
+    channel.subscribe();
+
+    return () => {
+      void supabase.removeChannel(channel);
+    };
+  }, [id]);
+
+  useEffect(() => {
     setRefreshAttempts(0);
   }, [id]);
 
@@ -513,6 +552,32 @@ const Analysis = () => {
 
   const productMetadata = analysis.recommendations_json?.product_metadata as any;
   const productType = productMetadata?.product_type || 'face';
+  const verificationSummary = (analysis.recommendations_json?.verification_summary || {}) as Record<string, any>;
+  const parseCount = (value: unknown, fallback = 0) => {
+    if (typeof value === "number" && Number.isFinite(value)) return value;
+    if (typeof value === "string" && /^-?\d+$/.test(value.trim())) return Number(value);
+    return fallback;
+  };
+  const safeCount = parseCount(
+    verificationSummary.safe_count,
+    analysis.recommendations_json.safe_ingredients?.length || 0
+  );
+  const concernCount = parseCount(
+    verificationSummary.concern_count,
+    analysis.recommendations_json.problematic_ingredients?.length || 0
+  );
+  const needsMoreDataCount = parseCount(
+    verificationSummary.needs_more_data_count,
+    analysis.recommendations_json.concern_ingredients?.length || 0
+  );
+  const totalIngredientCount = parseCount(
+    verificationSummary.total_ingredients,
+    safeCount + concernCount + needsMoreDataCount
+  );
+  const validatedCount = parseCount(verificationSummary.validated_count, 0);
+  const pendingCount = parseCount(verificationSummary.pending_count, 0);
+  const needsCorrectionCount = parseCount(verificationSummary.needs_correction_count, 0);
+  const hasVerificationProgress = validatedCount > 0 || pendingCount > 0 || needsCorrectionCount > 0;
 
   const getScoreColor = (score: number) => {
     if (score >= 70) return "text-emerald-500 dark:text-emerald-400";
@@ -646,21 +711,18 @@ const Analysis = () => {
                 <span className="text-lg md:text-xl mb-1">🧪</span>
                 <span className="text-[10px] md:text-xs text-muted-foreground">Ingredients</span>
                 <span className="text-lg md:text-2xl lg:text-3xl font-bold">
-                  {(analysis.recommendations_json.safe_ingredients?.length || 0) +
-                   (analysis.recommendations_json.problematic_ingredients?.length || 0) +
-                   (analysis.recommendations_json.beneficial_ingredients?.length || 0) +
-                   ((analysis.recommendations_json as any).concern_ingredients?.length || 0)}
+                  {totalIngredientCount}
                 </span>
               </div>
               <div className="flex flex-col items-center justify-center p-2 md:p-3 bg-card rounded-lg shadow-md border border-border">
                 <span className="text-lg md:text-xl mb-1">✅</span>
                 <span className="text-[10px] md:text-xs text-muted-foreground">Safe</span>
-                <span className="text-lg md:text-2xl lg:text-3xl font-bold">{analysis.recommendations_json.safe_ingredients?.length || 0}</span>
+                <span className="text-lg md:text-2xl lg:text-3xl font-bold">{safeCount}</span>
               </div>
               <div className="flex flex-col items-center justify-center p-2 md:p-3 bg-card rounded-lg shadow-md border border-border">
                 <span className="text-lg md:text-xl mb-1">⚠️</span>
                 <span className="text-[10px] md:text-xs text-muted-foreground">Concerns</span>
-                <span className="text-lg md:text-2xl lg:text-3xl font-bold">{analysis.recommendations_json.problematic_ingredients?.length || 0}</span>
+                <span className="text-lg md:text-2xl lg:text-3xl font-bold">{concernCount}</span>
               </div>
             </div>
           </div>
@@ -685,10 +747,18 @@ const Analysis = () => {
             </p>
             <p>
               <span className="font-semibold text-foreground">Ingredient profile:</span>{" "}
-              {analysis.recommendations_json.safe_ingredients?.length || 0} safe,{" "}
-              {analysis.recommendations_json.problematic_ingredients?.length || 0} concerns,{" "}
-              {analysis.recommendations_json.concern_ingredients?.length || 0} unverified.
+              {safeCount} safe,{" "}
+              {concernCount} concerns,{" "}
+              {needsMoreDataCount} needs more data.
             </p>
+            {hasVerificationProgress && (
+              <p>
+                <span className="font-semibold text-foreground">Reviewer progress:</span>{" "}
+                {validatedCount} verified,{" "}
+                {needsCorrectionCount} needs correction,{" "}
+                {pendingCount} pending.
+              </p>
+            )}
             {analysis.recommendations_json.warnings?.length ? (
               <p>
                 <span className="font-semibold text-foreground">Personalized warnings:</span>{" "}
@@ -981,26 +1051,26 @@ const Analysis = () => {
             <TabsList className="w-full grid grid-cols-3 gap-2">
               <TabsTrigger value="safe" className="text-[11px] sm:text-sm whitespace-nowrap leading-none px-2">
                 <span className="sm:hidden">
-                  Safe ({analysis.recommendations_json.safe_ingredients?.length || 0})
+                  Safe ({safeCount})
                 </span>
                 <span className="hidden sm:inline">
-                  Safe ({analysis.recommendations_json.safe_ingredients?.length || 0})
+                  Safe ({safeCount})
                 </span>
               </TabsTrigger>
               <TabsTrigger value="concerns" className="text-[11px] sm:text-sm whitespace-nowrap leading-none px-2">
                 <span className="sm:hidden">
-                  Concerns ({analysis.recommendations_json.problematic_ingredients?.length || 0})
+                  Concerns ({concernCount})
                 </span>
                 <span className="hidden sm:inline">
-                  Concerns ({analysis.recommendations_json.problematic_ingredients?.length || 0})
+                  Concerns ({concernCount})
                 </span>
               </TabsTrigger>
               <TabsTrigger value="needs" className="text-[11px] sm:text-sm whitespace-nowrap leading-none px-2">
                 <span className="sm:hidden">
-                  Needs Data ({analysis.recommendations_json.concern_ingredients?.length || 0})
+                  Needs Data ({needsMoreDataCount})
                 </span>
                 <span className="hidden sm:inline">
-                  Needs More Data ({analysis.recommendations_json.concern_ingredients?.length || 0})
+                  Needs More Data ({needsMoreDataCount})
                 </span>
               </TabsTrigger>
             </TabsList>

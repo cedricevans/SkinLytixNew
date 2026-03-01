@@ -587,16 +587,32 @@ export function IngredientValidationPanel({
 
       onValidationComplete();
 
-      // Fire-and-forget reviewer update email for scan owner.
-      void invokeFunction('send-review-update-email', {
-        analysisId,
-        ingredientName,
-        validationStatus,
-        finalLabel: mergedData.correctedSafetyLevel,
-        verdict: mergedData.verdict
-      }).catch((emailError) => {
-        console.warn('review update email send failed:', emailError);
-      });
+      // Fire-and-forget reviewer update email for scan owner, but surface failures/skips.
+      void (async () => {
+        try {
+          const emailResult = await invokeFunction('send-review-update-email', {
+            analysisId,
+            ingredientName,
+            validationStatus,
+            finalLabel: mergedData.correctedSafetyLevel,
+            verdict: mergedData.verdict
+          });
+
+          if (emailResult?.skipped === 'owner_email_missing') {
+            toast({
+              title: "Email skipped",
+              description: "Scan owner email is missing, so no notification email was sent."
+            });
+          }
+        } catch (emailError: any) {
+          console.warn('review update email send failed:', emailError);
+          toast({
+            title: "Email send failed",
+            description: emailError?.message || "Could not send reviewer update email.",
+            variant: "destructive"
+          });
+        }
+      })();
     } catch (error: any) {
       console.error('Error saving validation:', error);
       toast({

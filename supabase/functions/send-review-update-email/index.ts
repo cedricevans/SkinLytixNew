@@ -104,8 +104,35 @@ serve(async (req) => {
       .eq("id", analysis.user_id)
       .maybeSingle();
 
-    const ownerEmail = ownerProfile?.email;
+    let ownerEmail = ownerProfile?.email?.trim();
+    let greetingName = ownerProfile?.display_name?.trim() || "there";
+
+    // Fallback: use Auth user email if profile email is empty.
     if (!ownerEmail) {
+      const { data: ownerAuthData } = await supabase.auth.admin.getUserById(analysis.user_id);
+      ownerEmail = ownerAuthData?.user?.email?.trim();
+      const authName =
+        ownerAuthData?.user?.user_metadata?.display_name ||
+        ownerAuthData?.user?.user_metadata?.full_name ||
+        ownerAuthData?.user?.user_metadata?.name;
+      if (!ownerProfile?.display_name && typeof authName === "string" && authName.trim()) {
+        greetingName = authName.trim();
+      }
+    }
+
+    if (!ownerEmail) {
+      await supabase.from("user_events").insert({
+        user_id: analysis.user_id,
+        event_name: "review_update_email_skipped",
+        event_category: "verification",
+        event_properties: {
+          analysis_id: analysisId,
+          ingredient_name: body.ingredientName || null,
+          skip_reason: "owner_email_missing",
+        },
+        page_url: `/analysis/${analysisId}`,
+      });
+
       return new Response(JSON.stringify({ ok: true, skipped: "owner_email_missing" }), {
         status: 200,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -116,7 +143,6 @@ serve(async (req) => {
     const statusText = normalizeLabel(body.finalLabel);
     const scoreText = typeof analysis.epiq_score === "number" ? String(analysis.epiq_score) : "Updated";
     const productName = analysis.product_name || "your product";
-    const greetingName = ownerProfile?.display_name || "there";
     const siteUrl = (Deno.env.get("SITE_URL") || Deno.env.get("PUBLIC_SITE_URL") || "").replace(/\/$/, "");
     const analysisPath = `/analysis/${analysisId}?reviewUpdate=1`;
     const reviewUrl = siteUrl ? `${siteUrl}${analysisPath}` : "";
