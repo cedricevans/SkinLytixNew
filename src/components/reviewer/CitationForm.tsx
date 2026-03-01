@@ -2,7 +2,6 @@ import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
 import { 
   Select, 
   SelectContent, 
@@ -13,46 +12,84 @@ import {
 import { Card, CardContent } from '@/components/ui/card';
 import { Plus, Loader2, AlertCircle } from 'lucide-react';
 
+export type CitationSourceType =
+  | 'pubmed'
+  | 'pubchem'
+  | 'cir'
+  | 'dermatology_textbook'
+  | 'request_source_type'
+  | 'other';
+
 export interface Citation {
-  type: 'peer_reviewed' | 'clinical_study' | 'systematic_review' | 'dermatology_textbook' | 'cir_monograph' | 'other';
+  type: CitationSourceType;
   title: string;
   authors: string;
   journal_name: string;
   publication_year: number | null;
-  doi_or_pmid: string;
+  source_id: string;
+  requested_source_type?: string;
   source_url: string;
 }
 
 interface CitationFormProps {
   onAddCitation: (citation: Citation) => void;
   isLoading?: boolean;
+  allowExtendedSourceTypes?: boolean;
 }
 
-const CITATION_TYPES = [
-  { value: 'peer_reviewed', label: 'Peer-Reviewed Journal Article' },
-  { value: 'clinical_study', label: 'Clinical Study' },
-  { value: 'systematic_review', label: 'Systematic Review / Meta-Analysis' },
+const BASE_SOURCE_TYPES: Array<{ value: CitationSourceType; label: string }> = [
+  { value: 'pubmed', label: 'PubMed' },
+  { value: 'pubchem', label: 'PubChem' },
+  { value: 'cir', label: 'CIR' },
+];
+
+const EXTENDED_SOURCE_TYPES: Array<{ value: CitationSourceType; label: string }> = [
   { value: 'dermatology_textbook', label: 'Dermatology Textbook' },
-  { value: 'cir_monograph', label: 'CIR Monograph' },
-  { value: 'other', label: 'Other Peer-Reviewed Source' }
+  { value: 'other', label: 'Other Approved Source' }
 ];
 
 export function CitationForm({
   onAddCitation,
-  isLoading = false
+  isLoading = false,
+  allowExtendedSourceTypes = false
 }: CitationFormProps) {
   const [formData, setFormData] = useState<Citation>({
-    type: 'peer_reviewed',
+    type: 'pubmed',
     title: '',
     authors: '',
     journal_name: '',
     publication_year: new Date().getFullYear(),
-    doi_or_pmid: '',
+    source_id: '',
+    requested_source_type: '',
     source_url: ''
   });
 
   const [errors, setErrors] = useState<Partial<Record<keyof Citation, string>>>({});
   const [submitting, setSubmitting] = useState(false);
+  const citationTypes = [
+    ...BASE_SOURCE_TYPES,
+    ...(allowExtendedSourceTypes ? EXTENDED_SOURCE_TYPES : []),
+    { value: 'request_source_type' as CitationSourceType, label: 'Request New Source Type' }
+  ];
+
+  const sourceIdLabel =
+    formData.type === 'pubmed'
+      ? 'PMID'
+      : formData.type === 'pubchem'
+        ? 'CID'
+        : formData.type === 'cir'
+          ? 'CIR ID'
+          : 'Source ID';
+
+  const requiresSourceId = formData.type === 'pubmed' || formData.type === 'pubchem' || formData.type === 'cir';
+  const sourceIdPlaceholder =
+    formData.type === 'pubmed'
+      ? 'e.g., 34567890'
+      : formData.type === 'pubchem'
+        ? 'e.g., 5793'
+        : formData.type === 'cir'
+          ? 'e.g., CIR-2024-001'
+          : 'Enter source identifier';
 
   const validateForm = (): boolean => {
     const newErrors: Partial<Record<keyof Citation, string>> = {};
@@ -66,15 +103,15 @@ export function CitationForm({
     if (!formData.journal_name.trim()) {
       newErrors.journal_name = 'Journal/Source name is required';
     }
-    if (!formData.doi_or_pmid.trim()) {
-      newErrors.doi_or_pmid = 'DOI or PubMed ID is required';
-    } else {
-      // Basic validation of DOI or PMID format
-      const isDOI = formData.doi_or_pmid.startsWith('10.');
-      const isPMID = formData.doi_or_pmid.startsWith('PMID:');
-      if (!isDOI && !isPMID) {
-        newErrors.doi_or_pmid = 'Format: "10.xxxx/xxx" (DOI) or "PMID:xxxxx" (PubMed ID)';
+    if (requiresSourceId) {
+      if (!formData.source_id.trim()) {
+        newErrors.source_id = `${sourceIdLabel} is required`;
+      } else if ((formData.type === 'pubmed' || formData.type === 'pubchem') && !/^\d+$/.test(formData.source_id.trim())) {
+        newErrors.source_id = `${sourceIdLabel} must be numeric`;
       }
+    }
+    if (formData.type === 'request_source_type' && !formData.requested_source_type?.trim()) {
+      newErrors.requested_source_type = 'Please enter the new source type you want approved';
     }
     if (!formData.source_url.trim()) {
       newErrors.source_url = 'URL to source is required';
@@ -103,12 +140,13 @@ export function CitationForm({
       
       // Reset form
       setFormData({
-        type: 'peer_reviewed',
+        type: 'pubmed',
         title: '',
         authors: '',
         journal_name: '',
         publication_year: new Date().getFullYear(),
-        doi_or_pmid: '',
+        source_id: '',
+        requested_source_type: '',
         source_url: ''
       });
       setErrors({});
@@ -139,7 +177,7 @@ export function CitationForm({
                 <SelectValue placeholder="Select type..." />
               </SelectTrigger>
               <SelectContent>
-                {CITATION_TYPES.map(type => (
+                {citationTypes.map(type => (
                   <SelectItem key={type.value} value={type.value}>
                     {type.label}
                   </SelectItem>
@@ -232,28 +270,57 @@ export function CitationForm({
             </div>
           </div>
 
-          {/* DOI or PubMed ID */}
-          <div className="space-y-2">
-            <Label htmlFor="doi-pmid" className="text-sm font-medium">
-              DOI or PubMed ID *
-            </Label>
-            <Input
-              id="doi-pmid"
-              placeholder="10.1111/jocd.13452 or PMID:34567890"
-              value={formData.doi_or_pmid}
-              onChange={(e) => setFormData(prev => ({ ...prev, doi_or_pmid: e.target.value }))}
-              className={errors.doi_or_pmid ? 'border-red-500 focus-visible:ring-red-500' : ''}
-            />
-            {errors.doi_or_pmid && (
-              <p className="text-xs text-red-500 flex items-center gap-1">
-                <AlertCircle className="w-3 h-3" />
-                {errors.doi_or_pmid}
+          {requiresSourceId && (
+            <div className="space-y-2">
+              <Label htmlFor="source-id" className="text-sm font-medium">
+                {sourceIdLabel} *
+              </Label>
+              <Input
+                id="source-id"
+                placeholder={sourceIdPlaceholder}
+                value={formData.source_id}
+                onChange={(e) => setFormData(prev => ({ ...prev, source_id: e.target.value }))}
+                className={errors.source_id ? 'border-red-500 focus-visible:ring-red-500' : ''}
+              />
+              {errors.source_id && (
+                <p className="text-xs text-red-500 flex items-center gap-1">
+                  <AlertCircle className="w-3 h-3" />
+                  {errors.source_id}
+                </p>
+              )}
+              <p className="text-xs text-muted-foreground">
+                {formData.type === 'pubmed'
+                  ? 'Use numeric PMID only.'
+                  : formData.type === 'pubchem'
+                    ? 'Use numeric PubChem CID only.'
+                    : 'Enter the official CIR identifier.'}
               </p>
-            )}
-            <p className="text-xs text-muted-foreground">
-              Use "10.xxxx/xxx" format for DOI or "PMID:xxxxx" for PubMed
-            </p>
-          </div>
+            </div>
+          )}
+
+          {formData.type === 'request_source_type' && (
+            <div className="space-y-2">
+              <Label htmlFor="requested-source-type" className="text-sm font-medium">
+                Requested Source Type *
+              </Label>
+              <Input
+                id="requested-source-type"
+                placeholder="e.g., EU SCCS Opinion"
+                value={formData.requested_source_type || ''}
+                onChange={(e) => setFormData(prev => ({ ...prev, requested_source_type: e.target.value }))}
+                className={errors.requested_source_type ? 'border-red-500 focus-visible:ring-red-500' : ''}
+              />
+              {errors.requested_source_type && (
+                <p className="text-xs text-red-500 flex items-center gap-1">
+                  <AlertCircle className="w-3 h-3" />
+                  {errors.requested_source_type}
+                </p>
+              )}
+              <p className="text-xs text-muted-foreground">
+                Tell admins which source type should be approved next.
+              </p>
+            </div>
+          )}
 
           {/* Source URL */}
           <div className="space-y-2">
@@ -297,7 +364,7 @@ export function CitationForm({
 
           {/* Required note */}
           <p className="text-xs text-muted-foreground text-center pt-2">
-            * 1+ peer-reviewed citation required
+            * 1+ validated source required
           </p>
         </form>
       </CardContent>

@@ -42,7 +42,7 @@ export function ValidationProgressBar({
             className="bg-amber-500/10 text-amber-600 border-amber-500/20"
           >
             <AlertTriangle className="w-3 h-3 mr-1" />
-            {needsCorrection} Needs Correction
+            {needsCorrection} In Progress
           </Badge>
         )}
         {remaining > 0 && (

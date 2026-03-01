@@ -14,20 +14,20 @@ interface CitationListProps {
 }
 
 const CITATION_TYPE_LABELS: Record<Citation['type'], string> = {
-  peer_reviewed: 'Peer-Reviewed Article',
-  clinical_study: 'Clinical Study',
-  systematic_review: 'Systematic Review',
+  pubmed: 'PubMed',
+  pubchem: 'PubChem',
+  cir: 'CIR',
   dermatology_textbook: 'Textbook',
-  cir_monograph: 'CIR Monograph',
+  request_source_type: 'Requested Source Type',
   other: 'Other Source'
 };
 
 const CITATION_TYPE_COLORS: Record<Citation['type'], string> = {
-  peer_reviewed: 'bg-blue-500/10 text-blue-600 border-blue-500/20',
-  clinical_study: 'bg-green-500/10 text-green-600 border-green-500/20',
-  systematic_review: 'bg-purple-500/10 text-purple-600 border-purple-500/20',
+  pubmed: 'bg-blue-500/10 text-blue-600 border-blue-500/20',
+  pubchem: 'bg-green-500/10 text-green-600 border-green-500/20',
+  cir: 'bg-indigo-500/10 text-indigo-600 border-indigo-500/20',
   dermatology_textbook: 'bg-amber-500/10 text-amber-600 border-amber-500/20',
-  cir_monograph: 'bg-indigo-500/10 text-indigo-600 border-indigo-500/20',
+  request_source_type: 'bg-rose-500/10 text-rose-600 border-rose-500/20',
   other: 'bg-muted text-muted-foreground border-muted'
 };
 
@@ -105,11 +105,18 @@ export function CitationList({
                     )}
                   </div>
 
-                  {/* DOI/PMID */}
+                  {/* Source ID */}
                   <div className="flex items-center gap-2 flex-wrap pt-2">
-                    <code className="text-xs bg-muted px-2 py-1 rounded font-mono">
-                      {citation.doi_or_pmid}
-                    </code>
+                    {citation.source_id && (
+                      <code className="text-xs bg-muted px-2 py-1 rounded font-mono">
+                        {citation.source_id}
+                      </code>
+                    )}
+                    {citation.requested_source_type && (
+                      <code className="text-xs bg-rose-50 text-rose-700 px-2 py-1 rounded border border-rose-200">
+                        Request: {citation.requested_source_type}
+                      </code>
+                    )}
                     {citation.source_url && (
                       <Button
                         variant="ghost"

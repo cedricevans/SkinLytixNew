@@ -44,7 +44,12 @@ type HomeCachePayload = {
   routineProducts: RoutineProduct[];
 };
 
-const HOME_CACHE_TTL_MS = 30 * 60 * 1000;
+type VerificationEvent = {
+  id: string;
+  event_name: string;
+  event_properties: any;
+  created_at: string;
+};
 
 const formatDate = (value?: string | null) => {
   if (!value) return "—";
@@ -71,8 +76,15 @@ const Home = () => {
     const loadData = async () => {
       try {
         const { data: { session } } = await supabase.auth.getSession();
-        const user = session?.user;
-        if (!user) return;
+        let user = session?.user ?? null;
+        if (!user) {
+          const { data: { user: resolvedUser } } = await supabase.auth.getUser();
+          user = resolvedUser ?? null;
+        }
+        if (!user) {
+          setIsLoading(false);
+          return;
+        }
 
         const cacheKey = `sl_home_cache_${user.id}`;
         let cached: HomeCachePayload | null = null;
@@ -84,8 +96,6 @@ const Home = () => {
             cached = null;
           }
         }
-        const isCacheFresh = cached && Date.now() - cached.timestamp < HOME_CACHE_TTL_MS;
-
         if (cached) {
           setRecentAnalyses(cached.recentAnalyses || []);
           setTotalAnalyses(cached.totalAnalyses || 0);
@@ -96,7 +106,45 @@ const Home = () => {
           setIsLoading(true);
         }
 
-        if (isCacheFresh) return;
+        const notificationCursorKey = `sl_verification_event_seen_${user.id}`;
+        const lastSeenEventAt = typeof window !== "undefined"
+          ? localStorage.getItem(notificationCursorKey)
+          : null;
+
+        const { data: verificationEvents } = await supabase
+          .from("user_events")
+          .select("id, event_name, event_properties, created_at")
+          .eq("user_id", user.id)
+          .in("event_name", ["ingredient_validated", "product_score_changed"])
+          .order("created_at", { ascending: false })
+          .limit(6);
+
+        const unseenEvents = (verificationEvents || []).filter((event: VerificationEvent) => {
+          if (!lastSeenEventAt) return true;
+          return new Date(event.created_at).getTime() > new Date(lastSeenEventAt).getTime();
+        });
+
+        unseenEvents
+          .slice()
+          .reverse()
+          .forEach((event: VerificationEvent) => {
+            if (event.event_name === "ingredient_validated") {
+              toast({
+                title: "Ingredient validated",
+                description: `${event.event_properties?.ingredient_name || "An ingredient"} was verified by a reviewer.`,
+              });
+              return;
+            }
+
+            toast({
+              title: "Product score updated",
+              description: `Your EpiQ score changed to ${event.event_properties?.new_score ?? "a new value"} after reviewer verification.`,
+            });
+          });
+
+        if (typeof window !== "undefined" && verificationEvents?.[0]?.created_at) {
+          localStorage.setItem(notificationCursorKey, verificationEvents[0].created_at);
+        }
 
         const [analysesRes, totalRes, favoritesRes, routineRes] = await Promise.all([
           supabase
@@ -120,6 +168,13 @@ const Home = () => {
             .select("id, product_price, category, user_analyses (product_name, epiq_score, product_price)")
             .eq("user_analyses.user_id", user.id),
         ]);
+
+        if (analysesRes.error) throw analysesRes.error;
+        if (totalRes.error) throw totalRes.error;
+        if (favoritesRes.error) throw favoritesRes.error;
+        if (routineRes.error) {
+          console.warn("Failed to load routine products for home dashboard:", routineRes.error);
+        }
 
         const nextRecentAnalyses = analysesRes.data || [];
         const nextTotal = totalRes.count ?? 0;
@@ -256,7 +311,7 @@ const Home = () => {
           <div className="grid gap-4">
             <Card className="bg-white/25 text-white p-4 rounded-2xl border border-white/40 shadow-lg">
               <p className="text-xs uppercase tracking-[0.4em] opacity-80">Hydration index</p>
-              <p className="text-2xl font-bold">{hydrationScore ? `${hydrationScore}/100` : "—"}</p>
+              <p className="text-2xl font-bold">{hydrationScore !== null ? `${hydrationScore}/100` : "—"}</p>
               <p className="text-xs text-white/80">Average EpiQ of recent scans</p>
             </Card>
             <Card className="bg-white/25 text-white p-4 rounded-2xl border border-white/40 shadow-lg">

@@ -21,8 +21,10 @@ interface OEWObservationPanelProps {
   showAiApproval?: boolean;
   aiApprovalChecked?: boolean;
   aiApprovalSummary?: string;
+  aiApprovalFinalLabel?: 'safe' | 'concern' | 'needs_more_data' | '';
   onToggleAiApproval?: (checked: boolean) => void;
   onAiApprovalSummaryChange?: (value: string) => void;
+  onAiApprovalFinalLabelChange?: (value: 'safe' | 'concern') => void;
   onApproveAi?: () => void;
   aiApprovalLoading?: boolean;
 }
@@ -38,8 +40,10 @@ export function OEWObservationPanel({
   showAiApproval,
   aiApprovalChecked,
   aiApprovalSummary,
+  aiApprovalFinalLabel,
   onToggleAiApproval,
   onAiApprovalSummaryChange,
+  onAiApprovalFinalLabelChange,
   onApproveAi,
   aiApprovalLoading
 }: OEWObservationPanelProps) {
@@ -184,14 +188,37 @@ export function OEWObservationPanel({
                   rows={4}
                   className="text-sm leading-relaxed"
                 />
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium">Final Decision *</Label>
+                  <div className="grid grid-cols-2 gap-2">
+                    <Button
+                      type="button"
+                      variant={aiApprovalFinalLabel === 'safe' ? 'default' : 'outline'}
+                      onClick={() => onAiApprovalFinalLabelChange?.('safe')}
+                    >
+                      Safe
+                    </Button>
+                    <Button
+                      type="button"
+                      variant={aiApprovalFinalLabel === 'concern' ? 'default' : 'outline'}
+                      onClick={() => onAiApprovalFinalLabelChange?.('concern')}
+                    >
+                      Concern
+                    </Button>
+                  </div>
+                </div>
                 <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
                   <p className="text-xs text-muted-foreground">
-                    Summary is required to approve and validate.
+                    Summary and Safe/Concern decision are required to approve and validate.
                   </p>
                   <Button
                     size="sm"
                     onClick={onApproveAi}
-                    disabled={aiApprovalLoading || !aiApprovalSummary?.trim()}
+                    disabled={
+                      aiApprovalLoading ||
+                      !aiApprovalSummary?.trim() ||
+                      (aiApprovalFinalLabel !== 'safe' && aiApprovalFinalLabel !== 'concern')
+                    }
                   >
                     {aiApprovalLoading ? 'Saving...' : 'Approve & Validate'}
                   </Button>

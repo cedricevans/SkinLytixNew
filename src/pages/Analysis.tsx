@@ -526,6 +526,12 @@ const Analysis = () => {
     return "Needs Attention";
   };
 
+  const getScoreContext = (score: number) => {
+    if (score >= 70) return "Strong compatibility range";
+    if (score >= 50) return "Good compatibility range";
+    return "Lower compatibility range";
+  };
+
   return (
     <TooltipProvider>
       {analysis?.recommendations_json?.ai_explanation?.professional_referral?.needed && (
@@ -675,6 +681,9 @@ const Analysis = () => {
               <span className="font-semibold text-foreground">EpiQ Score:</span> {analysis.epiq_score}/100 — {analysis.recommendations_json.summary}
             </p>
             <p>
+              <span className="font-semibold text-foreground">What this means:</span> {analysis.epiq_score} is a {getScoreContext(analysis.epiq_score)}. This is a compatibility index, not a school grade.
+            </p>
+            <p>
               <span className="font-semibold text-foreground">Ingredient profile:</span>{" "}
               {analysis.recommendations_json.safe_ingredients?.length || 0} safe,{" "}
               {analysis.recommendations_json.problematic_ingredients?.length || 0} concerns,{" "}
@@ -815,6 +824,9 @@ const Analysis = () => {
           )}
           <p className="mt-6 text-muted-foreground max-w-2xl mx-auto">
             {analysis.recommendations_json.summary}
+          </p>
+          <p className="mt-2 text-xs text-muted-foreground">
+            EpiQ is a 0-100 compatibility index for your skin profile, not a pass/fail grade.
           </p>
         </Card>
 

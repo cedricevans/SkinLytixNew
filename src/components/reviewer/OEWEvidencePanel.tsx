@@ -12,12 +12,14 @@ interface OEWEvidencePanelProps {
   citations: Citation[];
   onCitationsChange: (citations: Citation[]) => void;
   ingredientName: string;
+  allowExtendedSourceTypes?: boolean;
 }
 
 export function OEWEvidencePanel({
   citations,
   onCitationsChange,
-  ingredientName
+  ingredientName,
+  allowExtendedSourceTypes = false
 }: OEWEvidencePanelProps) {
   const [isAddingCitation, setIsAddingCitation] = useState(false);
 
@@ -48,7 +50,7 @@ export function OEWEvidencePanel({
           </Badge>
         </div>
         <p className="text-sm text-muted-foreground mt-1">
-          Find peer-reviewed sources that confirm or contradict the AI claim
+          Add validated sources that confirm or contradict the AI claim
         </p>
       </CardHeader>
 
@@ -60,9 +62,10 @@ export function OEWEvidencePanel({
             Evidence Requirements
           </p>
           <ul className="text-xs text-blue-600/80 space-y-1 ml-6 list-disc">
-            <li>1+ peer-reviewed source (required)</li>
-            <li>Can be: PubMed article, journal article with DOI, CIR monograph, clinical study, or textbook</li>
-            <li>Must include DOI (10.xxxx) or PubMed ID (PMID:xxxxx)</li>
+            <li>1+ validated source is required</li>
+            <li>Student flow supports: PubMed, PubChem, and CIR</li>
+            {allowExtendedSourceTypes && <li>Reviewer/admin flow can also include textbook and other approved sources</li>}
+            <li>Use Source ID format by type (PMID, CID, or CIR ID)</li>
             <li>Must include direct URL to source</li>
           </ul>
         </div>
@@ -73,6 +76,7 @@ export function OEWEvidencePanel({
           <CitationForm 
             onAddCitation={handleAddCitation}
             isLoading={isAddingCitation}
+            allowExtendedSourceTypes={allowExtendedSourceTypes}
           />
         </div>
 

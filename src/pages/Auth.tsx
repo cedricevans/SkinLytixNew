@@ -26,11 +26,12 @@ const Auth = () => {
 
   const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
+
     setIsLoading(true);
 
     try {
       const { error } = await supabase.auth.signUp({
-        email: signUpEmail,
+        email: signUpEmail.trim().toLowerCase(),
         password: signUpPassword,
         options: {
           data: {

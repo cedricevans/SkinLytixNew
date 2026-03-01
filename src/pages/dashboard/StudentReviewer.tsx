@@ -6,13 +6,25 @@ import AppShell from '@/components/AppShell';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import {
   AlertTriangle,
   Award,
   CheckCircle2,
   ClipboardList,
   FlaskConical,
-  Home
+  Home,
+  Pencil,
+  Trash2,
+  GitMerge
 } from 'lucide-react';
 import { IngredientValidationPanel } from '@/components/reviewer/IngredientValidationPanel';
 import { IngredientSourcePanel } from '@/components/reviewer/IngredientSourcePanel';
@@ -26,6 +38,7 @@ interface ProductAnalysis {
   category?: string | null;
   epiq_score?: number | null;
   ingredients_list: string;
+  recommendations_json?: any;
   analyzed_at?: string | null;
 }
 
@@ -44,6 +57,7 @@ interface IngredientValidation {
   citation_count?: number | null;
   updated_at?: string | null;
   validator_id?: string | null;
+  validator_role?: string | null;
   validator_email?: string | null;
   reference_sources?: string[];
 }
@@ -63,6 +77,8 @@ interface Stats {
 }
 
 type ReviewListMode = 'products' | 'validated' | 'flagged';
+type IngredientListFilter = 'all' | 'needs_review';
+type IngredientCategoryLabel = 'safe' | 'concern' | 'needs_more_data';
 
 interface ValidationListItem {
   id: string;
@@ -78,6 +94,7 @@ interface ValidationListItem {
   review_count?: number | null;
   updated_at: string | null;
   validator_id?: string | null;
+  validator_role?: string | null;
   validator_email?: string | null;
   moderator_review_status?: string | null;
   user_analyses?: {
@@ -99,6 +116,7 @@ export default function StudentReviewer() {
   
   const [loading, setLoading] = useState(true);
   const [hasAccess, setHasAccess] = useState(false);
+  const [isAdminReviewer, setIsAdminReviewer] = useState(false);
   const [institution, setInstitution] = useState<string | null>(null);
   const [userId, setUserId] = useState<string | null>(null);
   
@@ -110,26 +128,55 @@ export default function StudentReviewer() {
   const [selectedProduct, setSelectedProduct] = useState<ProductAnalysis | null>(null);
   const [ingredientsList, setIngredientsList] = useState<string[]>([]);
   const [ingredientValidations, setIngredientValidations] = useState<Map<string, IngredientValidation>>(new Map());
+  const [ingredientInitialLabels, setIngredientInitialLabels] = useState<Map<string, IngredientCategoryLabel>>(new Map());
   const [ingredientCache, setIngredientCache] = useState<Map<string, any>>(new Map());
   const [ingredientAiData, setIngredientAiData] = useState<Map<string, IngredientAiData>>(new Map());
   const [productValidationSummary, setProductValidationSummary] = useState<
     Map<string, { validated: number; needsCorrection: number; inProgress: number; lastUpdated?: string | null; lastReviewer?: string | null }>
   >(new Map());
   const [selectedIngredient, setSelectedIngredient] = useState<string | null>(null);
+  const [ingredientListFilter, setIngredientListFilter] = useState<IngredientListFilter>('needs_review');
+  const [renameDialogOpen, setRenameDialogOpen] = useState(false);
+  const [mergeDialogOpen, setMergeDialogOpen] = useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [newIngredientName, setNewIngredientName] = useState('');
+  const [mergeTargetIngredient, setMergeTargetIngredient] = useState('');
+  const [updatingIngredients, setUpdatingIngredients] = useState(false);
   const ingredientListRef = useRef<HTMLDivElement | null>(null);
   const validationPanelRef = useRef<HTMLDivElement | null>(null);
   const [viewMode, setViewMode] = useState<ReviewListMode>('products');
   const [validationList, setValidationList] = useState<ValidationListItem[]>([]);
   const [validationListLoading, setValidationListLoading] = useState(false);
   const validationListLoadedRef = useRef(false);
+  const scrollToValidationPanel = (behavior: ScrollBehavior = 'smooth') => {
+    if (window.innerWidth >= 1024) return;
+
+    const scroll = () => {
+      const target = validationPanelRef.current;
+      if (!target) return;
+
+      // Offset to keep the Step panel visible below the app header on mobile.
+      const mobileHeaderOffset = 84;
+      const top = window.scrollY + target.getBoundingClientRect().top - mobileHeaderOffset;
+      window.scrollTo({ top: Math.max(top, 0), behavior });
+    };
+
+    requestAnimationFrame(scroll);
+  };
+
+  const selectIngredientForReview = (ingredient: string) => {
+    setSelectedIngredient(ingredient);
+    scrollToValidationPanel('smooth');
+  };
+
   // Polling interval for real-time updates
   useEffect(() => {
     if (!hasAccess || !userId) return;
     const interval = setInterval(() => {
-      loadValidationList(userId);
+      loadValidationList(isAdminReviewer);
     }, 15000); // Poll every 15 seconds
     return () => clearInterval(interval);
-  }, [hasAccess, userId]);
+  }, [hasAccess, userId, isAdminReviewer]);
 
   useEffect(() => {
     checkAccessAndLoad();
@@ -138,17 +185,31 @@ export default function StudentReviewer() {
   useEffect(() => {
     if (!userId) return;
     if (viewMode === 'products') return;
-    loadValidationList(userId);
-  }, [viewMode, userId]);
+    loadValidationList(isAdminReviewer);
+  }, [viewMode, userId, isAdminReviewer]);
 
   useEffect(() => {
     if (!selectedProduct || !selectedIngredient) return;
-    if (window.innerWidth >= 1024) return;
-    const target = validationPanelRef.current;
-    if (target) {
-      target.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    }
+    scrollToValidationPanel('smooth');
   }, [selectedProduct, selectedIngredient]);
+
+  useEffect(() => {
+    if (!selectedIngredient) return;
+    setNewIngredientName(selectedIngredient);
+    setMergeTargetIngredient('');
+  }, [selectedIngredient]);
+
+  useEffect(() => {
+    if (!selectedProduct) return;
+    const visibleIngredients = getVisibleIngredients();
+    if (visibleIngredients.length === 0) {
+      setSelectedIngredient(null);
+      return;
+    }
+    if (!selectedIngredient || !visibleIngredients.includes(selectedIngredient)) {
+      setSelectedIngredient(visibleIngredients[0]);
+    }
+  }, [selectedProduct, selectedIngredient, ingredientListFilter, ingredientsList, ingredientValidations]);
 
   const checkAccessAndLoad = async () => {
     try {
@@ -169,6 +230,8 @@ export default function StudentReviewer() {
       const hasReviewerRole = roles?.some(r => 
         r.role === 'admin' || r.role === 'moderator'
       );
+      const isAdmin = roles?.some((r) => r.role === 'admin') ?? false;
+      setIsAdminReviewer(isAdmin);
 
       // Check for student certification
       const { data: certification } = await supabase
@@ -190,7 +253,7 @@ export default function StudentReviewer() {
       setHasAccess(true);
       setInstitution(certification?.institution || 'SkinLytix');
 
-      await loadProducts(user.id);
+      await loadProducts(user.id, isAdmin);
     } catch (error) {
       console.error('Error checking access:', error);
       toast({
@@ -203,11 +266,11 @@ export default function StudentReviewer() {
     }
   };
 
-  const loadProducts = async (uid: string) => {
+  const loadProducts = async (uid: string, viewerIsAdmin = isAdminReviewer) => {
     // Get recent analyses
     const { data: analyses } = await supabase
       .from('user_analyses')
-      .select('id, product_name, brand, category, epiq_score, ingredients_list, analyzed_at')
+      .select('id, product_name, brand, category, epiq_score, ingredients_list, recommendations_json, analyzed_at')
       .order('analyzed_at', { ascending: false })
       .limit(50);
 
@@ -243,7 +306,10 @@ export default function StudentReviewer() {
         .in('analysis_id', analysisIds);
 
       const validatorIds = (validations || []).map((row: any) => row.validator_id).filter(Boolean);
-      const emailMap = await fetchReviewerEmails(validatorIds);
+      const [roleLabelMap, emailMap] = await Promise.all([
+        fetchReviewerRoleLabels(validatorIds),
+        viewerIsAdmin ? fetchReviewerEmails(validatorIds) : Promise.resolve(new Map<string, string>())
+      ]);
 
       const summaryMap = new Map<string, { validated: number; needsCorrection: number; inProgress: number; lastUpdated?: string | null; lastReviewer?: string | null }>();
       (validations || []).forEach((row: any) => {
@@ -261,7 +327,7 @@ export default function StudentReviewer() {
           const existingTime = existing.lastUpdated ? new Date(existing.lastUpdated).getTime() : 0;
           if (currentTime >= existingTime) {
             existing.lastUpdated = updatedAt;
-            existing.lastReviewer = emailMap.get(row.validator_id) || (row.validator_id ? shortId(row.validator_id) : null);
+            existing.lastReviewer = getReviewerDisplayName(row.validator_id, roleLabelMap, emailMap, viewerIsAdmin);
           }
         }
 
@@ -274,7 +340,7 @@ export default function StudentReviewer() {
     }
   };
 
-  const loadValidationList = async (uid: string) => {
+  const loadValidationList = async (viewerIsAdmin = isAdminReviewer) => {
     const shouldShowLoading = !validationListLoadedRef.current;
     if (shouldShowLoading) {
       setValidationListLoading(true);
@@ -287,14 +353,18 @@ export default function StudentReviewer() {
         .order('updated_at', { ascending: false });
       if (error) throw error;
       const validatorIds = (data || []).map((row: any) => row.validator_id).filter(Boolean);
-      const emailMap = await fetchReviewerEmails(validatorIds);
-      // Map validator_email for display
+      const [roleLabelMap, emailMap] = await Promise.all([
+        fetchReviewerRoleLabels(validatorIds),
+        viewerIsAdmin ? fetchReviewerEmails(validatorIds) : Promise.resolve(new Map<string, string>())
+      ]);
+      // Map validator role for display
       const mapped = (data || []).map((v: any) => ({
         ...v,
         citation_count: Array.isArray(v.ingredient_validation_citations)
           ? Number(v.ingredient_validation_citations[0]?.count ?? 0)
           : 0,
-        validator_email: emailMap.get(v.validator_id) || null
+        validator_role: roleLabelMap.get(v.validator_id) || 'Reviewer',
+        validator_email: viewerIsAdmin ? (emailMap.get(v.validator_id) || null) : null
       }));
       const deduped = new Map<string, ValidationListItem>();
       mapped.forEach((item: ValidationListItem) => {
@@ -326,6 +396,43 @@ export default function StudentReviewer() {
   };
 
   const normalizeIngredientName = (name: string) => name.trim().toLowerCase().replace(/\s+/g, ' ');
+
+  const getRecommendationItemName = (item: any): string => {
+    if (!item) return '';
+    if (typeof item === 'string') return item;
+    if (typeof item === 'object' && typeof item.name === 'string') return item.name;
+    return '';
+  };
+
+  const buildIngredientInitialLabels = (recommendations: any): Map<string, IngredientCategoryLabel> => {
+    const labels = new Map<string, IngredientCategoryLabel>();
+    const safeItems = Array.isArray(recommendations?.safe_ingredients) ? recommendations.safe_ingredients : [];
+    const concernItems = Array.isArray(recommendations?.problematic_ingredients) ? recommendations.problematic_ingredients : [];
+    const needsDataItems = Array.isArray(recommendations?.concern_ingredients) ? recommendations.concern_ingredients : [];
+
+    safeItems.forEach((item: any) => {
+      const name = getRecommendationItemName(item);
+      const key = normalizeIngredientName(name);
+      if (!key) return;
+      labels.set(key, 'safe');
+    });
+
+    concernItems.forEach((item: any) => {
+      const name = getRecommendationItemName(item);
+      const key = normalizeIngredientName(name);
+      if (!key) return;
+      labels.set(key, 'concern');
+    });
+
+    needsDataItems.forEach((item: any) => {
+      const name = getRecommendationItemName(item);
+      const key = normalizeIngredientName(name);
+      if (!key) return;
+      labels.set(key, 'needs_more_data');
+    });
+
+    return labels;
+  };
 
   const buildClaimSummary = (explanation?: string | null, role?: string | null) => {
     if (!explanation && !role) return '';
@@ -373,27 +480,104 @@ export default function StudentReviewer() {
     return Boolean(row.confidence_level || row.public_explanation || row.internal_notes || citationCount > 0);
   };
 
-  const shortId = (value?: string | null) => {
-    if (!value) return '';
-    return `${value.slice(0, 6)}…${value.slice(-4)}`;
+  const fetchReviewerRoleLabels = async (ids: string[]) => {
+    const uniqueIds = Array.from(new Set(ids.filter(Boolean)));
+    if (uniqueIds.length === 0) return new Map<string, string>();
+
+    const [roleResult, certResult] = await Promise.all([
+      supabase
+        .from('user_roles')
+        .select('user_id, role')
+        .in('user_id', uniqueIds),
+      supabase
+        .from('student_certifications')
+        .select('user_id, certification_level')
+        .in('user_id', uniqueIds)
+    ]);
+
+    if (roleResult.error || certResult.error) {
+      console.warn('reviewer role lookup failed:', roleResult.error || certResult.error);
+      return new Map<string, string>();
+    }
+
+    const rolesByUser = new Map<string, Set<string>>();
+    roleResult.data?.forEach((row: any) => {
+      const existing = rolesByUser.get(row.user_id) || new Set<string>();
+      existing.add(String(row.role));
+      rolesByUser.set(row.user_id, existing);
+    });
+
+    const certByUser = new Map<string, string>();
+    certResult.data?.forEach((row: any) => {
+      certByUser.set(row.user_id, String(row.certification_level || 'associate'));
+    });
+
+    const map = new Map<string, string>();
+    uniqueIds.forEach((id) => {
+      const roleSet = rolesByUser.get(id) || new Set<string>();
+      if (roleSet.has('admin')) {
+        map.set(id, 'Admin Reviewer');
+        return;
+      }
+      if (roleSet.has('moderator')) {
+        map.set(id, 'Moderator Reviewer');
+        return;
+      }
+
+      const certLevel = certByUser.get(id);
+      if (certLevel === 'expert') {
+        map.set(id, 'Expert Reviewer');
+        return;
+      }
+      if (certLevel === 'specialist') {
+        map.set(id, 'Specialist Reviewer');
+        return;
+      }
+      if (certLevel === 'associate') {
+        map.set(id, 'Associate Reviewer');
+        return;
+      }
+      map.set(id, 'Reviewer');
+    });
+    return map;
   };
 
   const fetchReviewerEmails = async (ids: string[]) => {
     const uniqueIds = Array.from(new Set(ids.filter(Boolean)));
     if (uniqueIds.length === 0) return new Map<string, string>();
-    const { data, error } = await supabase
-      .from('profiles')
-      .select('id, email, display_name')
-      .in('id', uniqueIds);
+
+    const { data, error } = await (supabase as any).rpc('get_reviewer_emails', {
+      p_user_ids: uniqueIds
+    });
+
     if (error) {
-      console.warn('profiles lookup failed:', error);
+      console.warn('reviewer email lookup failed:', error);
       return new Map<string, string>();
     }
+
     const map = new Map<string, string>();
-    data?.forEach((row: any) => {
-      map.set(row.id, row.email || row.display_name || row.id);
+    (data || []).forEach((row: any) => {
+      const id = typeof row?.id === 'string' ? row.id : null;
+      const email = typeof row?.email === 'string' ? row.email : null;
+      if (!id || !email) return;
+      map.set(id, email);
     });
+
     return map;
+  };
+
+  const getReviewerDisplayName = (
+    validatorId: string | null | undefined,
+    roleLabelMap: Map<string, string>,
+    emailMap: Map<string, string>,
+    showEmail: boolean
+  ) => {
+    if (!validatorId) return 'Reviewer';
+    if (showEmail) {
+      const email = emailMap.get(validatorId);
+      if (email) return email;
+    }
+    return roleLabelMap.get(validatorId) || 'Reviewer';
   };
 
   const buildValidationMap = (rows?: any[]) => {
@@ -424,6 +608,7 @@ export default function StudentReviewer() {
           : 0,
         updated_at: updatedAt,
         validator_id: row.validator_id || null,
+        validator_role: row.validator_role || null,
         validator_email: row.validator_email || null,
         reference_sources: (row.reference_sources as string[]) || []
       });
@@ -440,16 +625,56 @@ export default function StudentReviewer() {
     return 'Observation';
   };
 
-  const getIngredientStatusLabel = (validation?: IngredientValidation) => {
-    if (!validation) return 'Not Started';
-    const status = mapValidationStatus(validation);
-    if (status === 'validated') return 'Verified';
-    if (status === 'needs_correction') return 'Needs Correction';
-    return 'In Progress';
+  const normalizeSafetyLabel = (value?: string | null) => {
+    const normalized = String(value || '').trim().toLowerCase();
+    if (['safe', 'low_risk', 'low risk'].includes(normalized)) return 'safe';
+    if (['concern', 'unsafe', 'caution', 'avoid', 'high_risk', 'high risk'].includes(normalized)) return 'concern';
+    if (['needs_more_data', 'needs more data', 'needs_data', 'unknown', 'unverified', 'pending'].includes(normalized)) {
+      return 'needs_more_data';
+    }
+    return '';
   };
 
-  const selectProduct = async (product: ProductAnalysis, initialIngredient?: string) => {
+  const getIngredientStatusLabel = (ingredientName?: string, validation?: IngredientValidation) => {
+    const correctedSafety = normalizeSafetyLabel(validation?.corrected_safety_level);
+    if (correctedSafety === 'safe') return 'Safe';
+    if (correctedSafety === 'concern') return 'Concern';
+    if (correctedSafety === 'needs_more_data') return 'Needs More Data';
+
+    if (validation) {
+      const status = mapValidationStatus(validation);
+      if (status === 'validated') return 'Safe';
+      if (status === 'needs_correction') return 'Concern';
+    }
+
+    const key = normalizeIngredientName(ingredientName || validation?.ingredient_name || '');
+    const initialLabel = key ? ingredientInitialLabels.get(key) : undefined;
+    if (initialLabel === 'safe') return 'Safe';
+    if (initialLabel === 'concern') return 'Concern';
+    if (initialLabel === 'needs_more_data') return 'Needs More Data';
+
+    return 'Needs More Data';
+  };
+
+  const getStatusBadgeClass = (statusLabel: string, hasValidation: boolean) => {
+    if (statusLabel === 'Safe') {
+      return hasValidation
+        ? 'bg-green-500/10 text-green-700 border-green-500/30'
+        : 'bg-green-500/15 text-green-800 border-green-500/35';
+    }
+    if (statusLabel === 'Concern') {
+      return hasValidation
+        ? 'bg-red-500/10 text-red-700 border-red-500/30'
+        : 'bg-red-500/15 text-red-800 border-red-500/35';
+    }
+    return hasValidation
+      ? 'bg-amber-500/10 text-amber-700 border-amber-500/30'
+      : 'bg-amber-500/15 text-amber-800 border-amber-500/35';
+  };
+
+  const selectProduct = async (product: ProductAnalysis, initialIngredient?: string, viewerIsAdmin = isAdminReviewer) => {
     setSelectedProduct(product);
+    setIngredientInitialLabels(buildIngredientInitialLabels(product.recommendations_json || {}));
     
     // Parse ingredients
     const ingredients = product.ingredients_list
@@ -477,12 +702,16 @@ export default function StudentReviewer() {
       .eq('analysis_id', product.id);
 
     const validatorIds = (validations || []).map((row: any) => row.validator_id).filter(Boolean);
-    const emailMap = await fetchReviewerEmails(validatorIds);
-    const rowsWithEmail = (validations || []).map((row: any) => ({
+    const [roleLabelMap, emailMap] = await Promise.all([
+      fetchReviewerRoleLabels(validatorIds),
+      viewerIsAdmin ? fetchReviewerEmails(validatorIds) : Promise.resolve(new Map<string, string>())
+    ]);
+    const rowsWithRole = (validations || []).map((row: any) => ({
       ...row,
-      validator_email: emailMap.get(row.validator_id) || null
+      validator_role: roleLabelMap.get(row.validator_id) || 'Reviewer',
+      validator_email: viewerIsAdmin ? (emailMap.get(row.validator_id) || null) : null
     }));
-    setIngredientValidations(buildValidationMap(rowsWithEmail));
+    setIngredientValidations(buildValidationMap(rowsWithRole));
 
     // Load ingredient cache
     const { data: cacheData } = await supabase
@@ -532,6 +761,17 @@ export default function StudentReviewer() {
   const handleValidationComplete = async () => {
     if (!selectedProduct || !userId) return;
 
+    const { data: refreshedAnalysis } = await (supabase as any)
+      .from('user_analyses')
+      .select('id, product_name, brand, category, epiq_score, ingredients_list, recommendations_json, analyzed_at')
+      .eq('id', selectedProduct.id)
+      .maybeSingle();
+
+    if (refreshedAnalysis) {
+      setSelectedProduct(refreshedAnalysis as ProductAnalysis);
+      setIngredientInitialLabels(buildIngredientInitialLabels((refreshedAnalysis as ProductAnalysis).recommendations_json || {}));
+    }
+
     // Reload validations from database
     const { data: validations } = await (supabase as any)
       .from('ingredient_validations')
@@ -539,17 +779,21 @@ export default function StudentReviewer() {
       .eq('analysis_id', selectedProduct.id);
 
     const validatorIds = (validations || []).map((row: any) => row.validator_id).filter(Boolean);
-    const emailMap = await fetchReviewerEmails(validatorIds);
-    const rowsWithEmail = (validations || []).map((row: any) => ({
+    const [roleLabelMap, emailMap] = await Promise.all([
+      fetchReviewerRoleLabels(validatorIds),
+      isAdminReviewer ? fetchReviewerEmails(validatorIds) : Promise.resolve(new Map<string, string>())
+    ]);
+    const rowsWithRole = (validations || []).map((row: any) => ({
       ...row,
-      validator_email: emailMap.get(row.validator_id) || null
+      validator_role: roleLabelMap.get(row.validator_id) || 'Reviewer',
+      validator_email: isAdminReviewer ? (emailMap.get(row.validator_id) || null) : null
     }));
-    setIngredientValidations(buildValidationMap(rowsWithEmail));
+    setIngredientValidations(buildValidationMap(rowsWithRole));
 
     // Update stats (this will trigger ReviewerAccuracyCard to refetch via React Query)
-    await loadProducts(userId);
+    await loadProducts(userId, isAdminReviewer);
     if (viewMode !== 'products') {
-      await loadValidationList(userId);
+      await loadValidationList(isAdminReviewer);
     }
     
     toast({
@@ -562,6 +806,7 @@ export default function StudentReviewer() {
     setSelectedProduct(null);
     setIngredientsList([]);
     setIngredientValidations(new Map());
+    setIngredientInitialLabels(new Map());
     setIngredientCache(new Map());
     setIngredientAiData(new Map());
     setSelectedIngredient(null);
@@ -580,16 +825,242 @@ export default function StudentReviewer() {
     return { validated, needsCorrection, total: ingredientsList.length };
   };
 
-  const getIngredientStatus = (ingredient: string): 'pending' | 'validated' | 'needs_correction' => {
-    const validation = ingredientValidations.get(normalizeIngredientName(ingredient));
-    if (!validation) return 'pending';
-    return validation.validation_status as 'pending' | 'validated' | 'needs_correction';
+  const getVisibleIngredients = () => {
+    if (ingredientListFilter === 'all') return ingredientsList;
+    return ingredientsList.filter((ingredient) => {
+      const validation = ingredientValidations.get(normalizeIngredientName(ingredient));
+      return getIngredientStatusLabel(ingredient, validation) === 'Needs More Data';
+    });
   };
 
   const formatReviewDate = (dateString?: string | null) => {
     if (!dateString) return '';
     const date = new Date(dateString);
     return date.toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+  };
+
+  const canModifyIngredientEntry = (ingredientName?: string | null) => {
+    if (!ingredientName) return true;
+    const existing = ingredientValidations.get(normalizeIngredientName(ingredientName));
+    if (!existing || existing.validation_status !== 'validated') return true;
+    if (isAdminReviewer) return true;
+    return Boolean(userId && existing.validator_id === userId);
+  };
+
+  const namesMatch = (left: string, right: string) =>
+    normalizeIngredientName(left) === normalizeIngredientName(right);
+
+  const dedupeByIngredientName = (items: any[]) => {
+    const seen = new Set<string>();
+    return items.filter((item) => {
+      const rawName = typeof item === 'string' ? item : item?.name;
+      if (!rawName) return true;
+      const key = normalizeIngredientName(String(rawName));
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+  };
+
+  const updateRecommendationIngredientArrays = (
+    source: any,
+    fromName: string,
+    toName?: string,
+    mode: 'rename' | 'merge' | 'delete' = 'rename'
+  ) => {
+    if (!source || typeof source !== 'object') return source;
+    const next = { ...source };
+    const keys = ['safe_ingredients', 'problematic_ingredients', 'beneficial_ingredients', 'concern_ingredients', 'ingredient_data'];
+
+    keys.forEach((key) => {
+      const current = (next as any)[key];
+      if (!Array.isArray(current)) return;
+      const mapped = current
+        .map((entry: any) => {
+          const entryName = typeof entry === 'string' ? entry : entry?.name;
+          if (!entryName || !namesMatch(String(entryName), fromName)) return entry;
+
+          if (mode === 'delete') return null;
+
+          if (typeof entry === 'string') {
+            return toName || entry;
+          }
+
+          return {
+            ...entry,
+            name: toName || entry.name
+          };
+        })
+        .filter(Boolean);
+      (next as any)[key] = dedupeByIngredientName(mapped);
+    });
+
+    return next;
+  };
+
+  const persistIngredientListChange = async (
+    operation: 'rename' | 'merge' | 'delete',
+    sourceIngredient: string,
+    targetIngredient?: string
+  ) => {
+    if (!selectedProduct || !userId) return;
+
+    const sourceNorm = normalizeIngredientName(sourceIngredient);
+    const currentIngredients = selectedProduct.ingredients_list
+      .split(',')
+      .map((entry) => entry.trim())
+      .filter(Boolean);
+
+    let updatedIngredients = currentIngredients.map((entry) => {
+      if (!namesMatch(entry, sourceIngredient)) return entry;
+      if (operation === 'delete') return '';
+      return targetIngredient || entry;
+    }).filter(Boolean);
+
+    updatedIngredients = dedupeByIngredientName(updatedIngredients) as string[];
+
+    const updatedRecommendations = updateRecommendationIngredientArrays(
+      selectedProduct.recommendations_json || {},
+      sourceIngredient,
+      targetIngredient,
+      operation
+    );
+
+    setUpdatingIngredients(true);
+    try {
+      const { error: updateError } = await (supabase as any)
+        .from('user_analyses')
+        .update({
+          ingredients_list: updatedIngredients.join(', '),
+          recommendations_json: updatedRecommendations
+        })
+        .eq('id', selectedProduct.id);
+
+      if (updateError) throw updateError;
+
+      const { data: validationRows } = await (supabase as any)
+        .from('ingredient_validations')
+        .select('id, ingredient_name')
+        .eq('analysis_id', selectedProduct.id);
+
+      const staleValidationIds = (validationRows || [])
+        .filter((row: any) => namesMatch(row.ingredient_name || '', sourceNorm))
+        .map((row: any) => row.id);
+
+      if (staleValidationIds.length > 0) {
+        const { error: deleteError } = await (supabase as any)
+          .from('ingredient_validations')
+          .delete()
+          .in('id', staleValidationIds);
+        if (deleteError) {
+          console.warn('Could not delete stale validations during ingredient correction:', deleteError);
+        }
+      }
+
+      const { data: refreshedProduct } = await (supabase as any)
+        .from('user_analyses')
+        .select('id, product_name, brand, category, epiq_score, ingredients_list, recommendations_json, analyzed_at')
+        .eq('id', selectedProduct.id)
+        .maybeSingle();
+
+      if (refreshedProduct) {
+        await selectProduct(
+          refreshedProduct as ProductAnalysis,
+          targetIngredient || updatedIngredients[0],
+          isAdminReviewer
+        );
+      }
+      await loadProducts(userId, isAdminReviewer);
+
+      toast({
+        title: 'Ingredient list updated',
+        description:
+          operation === 'rename'
+            ? `Renamed "${sourceIngredient}" to "${targetIngredient}".`
+            : operation === 'merge'
+              ? `Merged "${sourceIngredient}" into "${targetIngredient}".`
+              : `Removed "${sourceIngredient}" from the product scan.`
+      });
+    } catch (error: any) {
+      console.error('Failed to update ingredient list:', error);
+      toast({
+        title: 'Update failed',
+        description: error?.message || 'Could not update ingredient list.',
+        variant: 'destructive'
+      });
+    } finally {
+      setUpdatingIngredients(false);
+    }
+  };
+
+  const handleRenameIngredient = async () => {
+    if (!selectedIngredient) return;
+    if (!canModifyIngredientEntry(selectedIngredient)) {
+      toast({
+        title: 'Edit restricted',
+        description: 'Verified ingredients can only be edited by an admin or the original verifier.',
+        variant: 'destructive'
+      });
+      return;
+    }
+    const nextName = newIngredientName.trim();
+    if (!nextName) {
+      toast({ title: 'Name required', description: 'Enter a new ingredient name.', variant: 'destructive' });
+      return;
+    }
+    if (namesMatch(nextName, selectedIngredient)) {
+      setRenameDialogOpen(false);
+      return;
+    }
+    await persistIngredientListChange('rename', selectedIngredient, nextName);
+    setRenameDialogOpen(false);
+  };
+
+  const handleMergeIngredient = async () => {
+    if (!selectedIngredient || !mergeTargetIngredient) return;
+    if (!canModifyIngredientEntry(selectedIngredient) || !canModifyIngredientEntry(mergeTargetIngredient)) {
+      toast({
+        title: 'Edit restricted',
+        description: 'Verified ingredients can only be edited by an admin or the original verifier.',
+        variant: 'destructive'
+      });
+      return;
+    }
+    if (namesMatch(selectedIngredient, mergeTargetIngredient)) {
+      toast({ title: 'Invalid merge', description: 'Choose a different target ingredient.', variant: 'destructive' });
+      return;
+    }
+    await persistIngredientListChange('merge', selectedIngredient, mergeTargetIngredient);
+    setMergeDialogOpen(false);
+  };
+
+  const handleDeleteIngredient = async () => {
+    if (!selectedIngredient) return;
+    if (!canModifyIngredientEntry(selectedIngredient)) {
+      toast({
+        title: 'Edit restricted',
+        description: 'Verified ingredients can only be edited by an admin or the original verifier.',
+        variant: 'destructive'
+      });
+      return;
+    }
+    await persistIngredientListChange('delete', selectedIngredient);
+    setDeleteDialogOpen(false);
+  };
+
+  const openIngredientActionDialog = (ingredient: string, action: 'rename' | 'merge' | 'delete') => {
+    setSelectedIngredient(ingredient);
+    setNewIngredientName(ingredient);
+    setMergeTargetIngredient('');
+    if (action === 'rename') {
+      setRenameDialogOpen(true);
+      return;
+    }
+    if (action === 'merge') {
+      setMergeDialogOpen(true);
+      return;
+    }
+    setDeleteDialogOpen(true);
   };
 
   if (loading) {
@@ -607,6 +1078,7 @@ export default function StudentReviewer() {
 
   if (selectedProduct) {
     const progress = getValidationProgress();
+    const visibleIngredients = getVisibleIngredients();
     const normalizedSelectedIngredient = selectedIngredient
       ? normalizeIngredientName(selectedIngredient)
       : '';
@@ -651,49 +1123,154 @@ export default function StudentReviewer() {
                   <div className="flex items-center justify-between mb-3">
                     <h2 className="text-sm font-medium">Ingredients</h2>
                     <span className="text-xs text-muted-foreground">
-                      {ingredientsList.length} total
+                      {visibleIngredients.length}/{ingredientsList.length} shown
                     </span>
                   </div>
+                  <div className="mb-3 flex gap-2">
+                    <Button
+                      variant={ingredientListFilter === 'needs_review' ? 'default' : 'outline'}
+                      size="sm"
+                      onClick={() => setIngredientListFilter('needs_review')}
+                      disabled={updatingIngredients}
+                    >
+                      Needs Review
+                    </Button>
+                    <Button
+                      variant={ingredientListFilter === 'all' ? 'default' : 'outline'}
+                      size="sm"
+                      onClick={() => setIngredientListFilter('all')}
+                      disabled={updatingIngredients}
+                    >
+                      All
+                    </Button>
+                  </div>
+                  {selectedIngredient && (
+                    <div className="mb-3 grid grid-cols-1 sm:grid-cols-3 gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setRenameDialogOpen(true)}
+                        disabled={updatingIngredients || !canModifyIngredientEntry(selectedIngredient)}
+                      >
+                        <Pencil className="w-3.5 h-3.5 mr-1.5" />
+                        Rename
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setMergeDialogOpen(true)}
+                        disabled={updatingIngredients || ingredientsList.length < 2 || !canModifyIngredientEntry(selectedIngredient)}
+                      >
+                        <GitMerge className="w-3.5 h-3.5 mr-1.5" />
+                        Merge
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setDeleteDialogOpen(true)}
+                        disabled={updatingIngredients || !canModifyIngredientEntry(selectedIngredient)}
+                      >
+                        <Trash2 className="w-3.5 h-3.5 mr-1.5" />
+                        Delete
+                      </Button>
+                    </div>
+                  )}
                   <div className="space-y-2">
-                    {ingredientsList.map(ingredient => {
+                    {visibleIngredients.length === 0 ? (
+                      <p className="text-xs text-muted-foreground py-2">
+                        No ingredients currently need review for this product.
+                      </p>
+                    ) : visibleIngredients.map(ingredient => {
                       const validation = ingredientValidations.get(normalizeIngredientName(ingredient));
-                      const status = getIngredientStatus(ingredient);
                       const isSelected = selectedIngredient === ingredient;
-                      const statusLabel = getIngredientStatusLabel(validation);
+                      const statusLabel = getIngredientStatusLabel(ingredient, validation);
                       const stageLabel = getIngredientStage(validation);
                       const updatedLabel = validation?.updated_at ? formatReviewDate(validation.updated_at) : '';
-                      const reviewerLabel = validation?.validator_email || (validation?.validator_id ? shortId(validation.validator_id) : '');
+                      const workedOn = Boolean(
+                        validation &&
+                        (
+                          validation.verdict ||
+                          validation.confidence_level ||
+                          validation.public_explanation ||
+                          validation.internal_notes ||
+                          (validation.citation_count || 0) > 0
+                        )
+                      );
+                      const reviewerLabel = validation
+                        ? (isAdminReviewer
+                          ? (validation.validator_email || validation.validator_role || 'Reviewer')
+                          : (validation.validator_role || 'Reviewer'))
+                        : '';
+                      const sourceLabel = reviewerLabel
+                        ? `Last updated by ${reviewerLabel}`
+                        : 'Source: AI baseline';
+                      const canModify = canModifyIngredientEntry(ingredient);
                       return (
-                        <button
+                        <div
                           key={ingredient}
-                          onClick={() => setSelectedIngredient(ingredient)}
-                          className={`w-full flex flex-col gap-3 rounded-lg border px-3 py-2 text-left transition-colors sm:flex-row sm:items-start sm:justify-between ${
+                          className={`w-full flex flex-col gap-3 rounded-lg border px-3 py-2 text-left transition-colors ${
                             isSelected ? 'border-primary bg-primary/5' : 'border-border hover:bg-muted/50'
                           }`}
                         >
-                          <div className="flex-1 min-w-0">
+                          <button
+                            type="button"
+                            onClick={() => selectIngredientForReview(ingredient)}
+                            className="w-full text-left"
+                          >
                             <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                               <span className="text-sm font-medium break-words">{ingredient}</span>
                               <Badge
-                                variant={
-                                  status === 'validated'
-                                    ? 'secondary'
-                                    : status === 'needs_correction'
-                                      ? 'destructive'
-                                      : 'outline'
-                                }
-                                className="text-[10px] shrink-0"
+                                variant="outline"
+                                className={`text-[10px] shrink-0 ${getStatusBadgeClass(statusLabel, Boolean(validation))}`}
                               >
                                 {statusLabel}
                               </Badge>
                             </div>
                             <div className="mt-2 flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">
                               <span className="break-words">Stage: {stageLabel}</span>
-                              {reviewerLabel && <span className="break-words">Last updated by {reviewerLabel}</span>}
+                              {workedOn && statusLabel === 'Needs More Data' && (
+                                <Badge variant="outline" className="text-[10px] border-blue-400/40 text-blue-700">
+                                  Worked On
+                                </Badge>
+                              )}
+                              <span className="break-words">{sourceLabel}</span>
                               {updatedLabel && <span className="break-words">{updatedLabel}</span>}
                             </div>
+                          </button>
+
+                          <div className="flex justify-end gap-1.5">
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              title="Rename ingredient"
+                              onClick={() => openIngredientActionDialog(ingredient, 'rename')}
+                              disabled={updatingIngredients || !canModify}
+                            >
+                              <Pencil className="w-3.5 h-3.5" />
+                            </Button>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              title="Merge ingredient"
+                              onClick={() => openIngredientActionDialog(ingredient, 'merge')}
+                              disabled={updatingIngredients || ingredientsList.length < 2 || !canModify}
+                            >
+                              <GitMerge className="w-3.5 h-3.5" />
+                            </Button>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              title="Delete ingredient"
+                              onClick={() => openIngredientActionDialog(ingredient, 'delete')}
+                              disabled={updatingIngredients || !canModify}
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </Button>
                           </div>
-                        </button>
+                        </div>
                       );
                     })}
                   </div>
@@ -749,6 +1326,88 @@ export default function StudentReviewer() {
               )}
             </div>
           </div>
+
+          <Dialog open={renameDialogOpen} onOpenChange={setRenameDialogOpen}>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Rename Ingredient</DialogTitle>
+                <DialogDescription>
+                  Update the ingredient name in the product scan list. This will relaunch validation for the renamed item.
+                </DialogDescription>
+              </DialogHeader>
+              <div className="space-y-2">
+                <label className="text-sm font-medium">New ingredient name</label>
+                <Input
+                  value={newIngredientName}
+                  onChange={(event) => setNewIngredientName(event.target.value)}
+                  placeholder="Enter corrected ingredient name"
+                />
+              </div>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setRenameDialogOpen(false)}>
+                  Cancel
+                </Button>
+                <Button onClick={handleRenameIngredient} disabled={updatingIngredients}>
+                  {updatingIngredients ? 'Updating...' : 'Save Rename'}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+
+          <Dialog open={mergeDialogOpen} onOpenChange={setMergeDialogOpen}>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Merge Ingredients</DialogTitle>
+                <DialogDescription>
+                  Combine this ingredient into another entry to correct split parsing.
+                </DialogDescription>
+              </DialogHeader>
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Merge "{selectedIngredient}" into</label>
+                <select
+                  className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                  value={mergeTargetIngredient}
+                  onChange={(event) => setMergeTargetIngredient(event.target.value)}
+                >
+                  <option value="">Select target ingredient</option>
+                  {ingredientsList
+                    .filter((name) => !selectedIngredient || !namesMatch(name, selectedIngredient))
+                    .map((name) => (
+                      <option key={name} value={name}>
+                        {name}
+                      </option>
+                    ))}
+                </select>
+              </div>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setMergeDialogOpen(false)}>
+                  Cancel
+                </Button>
+                <Button onClick={handleMergeIngredient} disabled={updatingIngredients || !mergeTargetIngredient}>
+                  {updatingIngredients ? 'Updating...' : 'Merge'}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+
+          <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Delete Ingredient</DialogTitle>
+                <DialogDescription>
+                  Remove "{selectedIngredient}" from this product scan list and clear its validations.
+                </DialogDescription>
+              </DialogHeader>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setDeleteDialogOpen(false)}>
+                  Cancel
+                </Button>
+                <Button onClick={handleDeleteIngredient} disabled={updatingIngredients}>
+                  {updatingIngredients ? 'Updating...' : 'Delete Ingredient'}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
         </div>
       </AppShell>
     );
@@ -872,11 +1531,8 @@ export default function StudentReviewer() {
                                   <Badge variant="outline" className="text-[10px]">
                                     Verified: {summary.validated}
                                   </Badge>
-                                  <Badge variant="outline" className="text-[10px]">
-                                    Needs Correction: {summary.needsCorrection}
-                                  </Badge>
-                                  <Badge variant="outline" className="text-[10px]">
-                                    In Progress: {summary.inProgress}
+                                  <Badge variant="outline" className="text-[10px] bg-amber-500/10 text-amber-700 border-amber-500/30">
+                                    In Progress: {summary.needsCorrection + summary.inProgress}
                                   </Badge>
                                   {summary.lastReviewer && (
                                     <span>Last updated by {summary.lastReviewer}</span>
@@ -986,15 +1642,24 @@ export default function StudentReviewer() {
                                 </div>
                               </div>
                               <div className="flex flex-wrap items-center gap-3 sm:justify-end">
-                                <Badge variant={status === 'validated' ? 'secondary' : 'destructive'}>
-                                  {status === 'validated' ? 'Reviewed' : 'Needs Correction'}
+                                <Badge
+                                  variant="outline"
+                                  className={status === 'validated'
+                                    ? 'bg-green-500/10 text-green-700 border-green-500/30'
+                                    : 'bg-amber-500/10 text-amber-700 border-amber-500/30'}
+                                >
+                                  {status === 'validated' ? 'Verified' : 'In Progress'}
                                 </Badge>
                                 <span className="text-xs text-muted-foreground">
                                   {formatReviewDate(v.updated_at)}
                                 </span>
                                 {/* Status indicator for who last updated */}
                                 <span className="text-xs text-blue-600">
-                                  {v.validator_email ? `Updated by ${v.validator_email}` : ''}
+                                  {`Updated by ${
+                                    isAdminReviewer
+                                      ? (v.validator_email || v.validator_role || 'Reviewer')
+                                      : (v.validator_role || 'Reviewer')
+                                  }`}
                                 </span>
                               </div>
                             </button>
