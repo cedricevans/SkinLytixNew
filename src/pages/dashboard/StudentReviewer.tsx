@@ -7,6 +7,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
 import {
   Dialog,
   DialogContent,
@@ -103,6 +104,15 @@ interface ValidationListItem {
   } | null;
 }
 
+interface IngredientEditDraft {
+  name: string;
+  role: string;
+  explanation: string;
+  safetyProfile: string;
+  riskScore: string;
+  molecularWeight: string;
+}
+
 const mapValidationStatus = (record: any): 'pending' | 'validated' | 'needs_correction' => {
   if (record?.validation_status) return record.validation_status;
   if (record?.verdict === 'confirm') return 'validated';
@@ -139,7 +149,14 @@ export default function StudentReviewer() {
   const [renameDialogOpen, setRenameDialogOpen] = useState(false);
   const [mergeDialogOpen, setMergeDialogOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-  const [newIngredientName, setNewIngredientName] = useState('');
+  const [ingredientEditDraft, setIngredientEditDraft] = useState<IngredientEditDraft>({
+    name: '',
+    role: '',
+    explanation: '',
+    safetyProfile: '',
+    riskScore: '',
+    molecularWeight: ''
+  });
   const [mergeTargetIngredient, setMergeTargetIngredient] = useState('');
   const [updatingIngredients, setUpdatingIngredients] = useState(false);
   const ingredientListRef = useRef<HTMLDivElement | null>(null);
@@ -195,9 +212,9 @@ export default function StudentReviewer() {
 
   useEffect(() => {
     if (!selectedIngredient) return;
-    setNewIngredientName(selectedIngredient);
+    setIngredientEditDraft(getIngredientEditDefaults(selectedIngredient));
     setMergeTargetIngredient('');
-  }, [selectedIngredient]);
+  }, [selectedIngredient, selectedProduct]);
 
   useEffect(() => {
     if (!selectedProduct) return;
@@ -898,6 +915,111 @@ export default function StudentReviewer() {
     return next;
   };
 
+  const getIngredientEditDefaults = (ingredientName: string): IngredientEditDraft => {
+    const recommendations = selectedProduct?.recommendations_json || {};
+    const keys = ['safe_ingredients', 'problematic_ingredients', 'beneficial_ingredients', 'concern_ingredients', 'ingredient_data'];
+
+    for (const key of keys) {
+      const current = recommendations?.[key];
+      if (!Array.isArray(current)) continue;
+      const match = current.find((entry: any) => {
+        const entryName = typeof entry === 'string' ? entry : entry?.name;
+        return entryName && namesMatch(String(entryName), ingredientName);
+      });
+      if (match && typeof match === 'object') {
+        return {
+          name: String(match.name || ingredientName),
+          role: String(match.role || ''),
+          explanation: String(match.explanation || ''),
+          safetyProfile: String(match.safety_profile || ''),
+          riskScore:
+            match.risk_score === null || match.risk_score === undefined ? '' : String(match.risk_score),
+          molecularWeight:
+            match.molecular_weight === null || match.molecular_weight === undefined
+              ? ''
+              : String(match.molecular_weight)
+        };
+      }
+    }
+
+    return {
+      name: ingredientName,
+      role: '',
+      explanation: '',
+      safetyProfile: '',
+      riskScore: '',
+      molecularWeight: ''
+    };
+  };
+
+  const applyIngredientDraftToEntry = (entry: any, draft: IngredientEditDraft) => {
+    const next = typeof entry === 'string' ? { name: draft.name } : { ...entry, name: draft.name };
+
+    const role = draft.role.trim();
+    const explanation = draft.explanation.trim();
+    const safetyProfile = draft.safetyProfile.trim();
+    const riskScore = draft.riskScore.trim();
+    const molecularWeight = draft.molecularWeight.trim();
+
+    if (role) next.role = role;
+    else delete next.role;
+
+    if (explanation) next.explanation = explanation;
+    else delete next.explanation;
+
+    if (safetyProfile) next.safety_profile = safetyProfile;
+    else delete next.safety_profile;
+
+    if (riskScore) {
+      const riskValue = Number(riskScore);
+      if (Number.isFinite(riskValue)) next.risk_score = riskValue;
+    } else {
+      delete next.risk_score;
+    }
+
+    if (molecularWeight) {
+      const mwValue = Number(molecularWeight);
+      if (Number.isFinite(mwValue)) next.molecular_weight = mwValue;
+    } else {
+      delete next.molecular_weight;
+    }
+
+    return next;
+  };
+
+  const updateRecommendationIngredientDetails = (
+    source: any,
+    fromName: string,
+    draft: IngredientEditDraft
+  ) => {
+    if (!source || typeof source !== 'object') return source;
+    const next = { ...source };
+    const keys = ['safe_ingredients', 'problematic_ingredients', 'beneficial_ingredients', 'concern_ingredients', 'ingredient_data'];
+    let updatedAny = false;
+
+    keys.forEach((key) => {
+      const current = (next as any)[key];
+      if (!Array.isArray(current)) return;
+      const mapped = current.map((entry: any) => {
+        const entryName = typeof entry === 'string' ? entry : entry?.name;
+        if (!entryName || !namesMatch(String(entryName), fromName)) return entry;
+        updatedAny = true;
+        return applyIngredientDraftToEntry(entry, draft);
+      });
+      (next as any)[key] = dedupeByIngredientName(mapped);
+    });
+
+    if (!updatedAny) {
+      const ingredientData = Array.isArray((next as any).ingredient_data)
+        ? [...(next as any).ingredient_data]
+        : [];
+      ingredientData.push(applyIngredientDraftToEntry({ name: draft.name }, draft));
+      (next as any).ingredient_data = dedupeByIngredientName(ingredientData);
+    }
+
+    return next;
+  };
+
   const persistIngredientListChange = async (
     operation: 'rename' | 'merge' | 'delete',
     sourceIngredient: string,
@@ -994,7 +1116,7 @@ export default function StudentReviewer() {
   };
 
   const handleRenameIngredient = async () => {
-    if (!selectedIngredient) return;
+    if (!selectedIngredient || !selectedProduct || !userId) return;
     if (!canModifyIngredientEntry(selectedIngredient)) {
       toast({
         title: 'Edit restricted',
@@ -1003,17 +1125,108 @@ export default function StudentReviewer() {
       });
       return;
     }
-    const nextName = newIngredientName.trim();
+    const nextName = ingredientEditDraft.name.trim();
     if (!nextName) {
       toast({ title: 'Name required', description: 'Enter a new ingredient name.', variant: 'destructive' });
       return;
     }
-    if (namesMatch(nextName, selectedIngredient)) {
-      setRenameDialogOpen(false);
+    if (ingredientEditDraft.riskScore.trim() && Number.isNaN(Number(ingredientEditDraft.riskScore))) {
+      toast({ title: 'Invalid risk score', description: 'Risk score must be a number.', variant: 'destructive' });
       return;
     }
-    await persistIngredientListChange('rename', selectedIngredient, nextName);
-    setRenameDialogOpen(false);
+    if (ingredientEditDraft.molecularWeight.trim() && Number.isNaN(Number(ingredientEditDraft.molecularWeight))) {
+      toast({ title: 'Invalid molecular weight', description: 'Molecular weight must be a number.', variant: 'destructive' });
+      return;
+    }
+
+    const currentIngredients = selectedProduct.ingredients_list
+      .split(',')
+      .map((entry) => entry.trim())
+      .filter(Boolean);
+
+    let updatedIngredients = currentIngredients
+      .map((entry) => (namesMatch(entry, selectedIngredient) ? nextName : entry))
+      .filter(Boolean);
+    updatedIngredients = dedupeByIngredientName(updatedIngredients) as string[];
+
+    let updatedRecommendations = updateRecommendationIngredientArrays(
+      selectedProduct.recommendations_json || {},
+      selectedIngredient,
+      nextName,
+      'rename'
+    );
+    updatedRecommendations = updateRecommendationIngredientDetails(
+      updatedRecommendations,
+      nextName,
+      {
+        ...ingredientEditDraft,
+        name: nextName
+      }
+    );
+
+    setUpdatingIngredients(true);
+    try {
+      const { error: updateError } = await (supabase as any)
+        .from('user_analyses')
+        .update({
+          ingredients_list: updatedIngredients.join(', '),
+          recommendations_json: updatedRecommendations
+        })
+        .eq('id', selectedProduct.id);
+
+      if (updateError) throw updateError;
+
+      if (!namesMatch(nextName, selectedIngredient)) {
+        const { data: validationRows } = await (supabase as any)
+          .from('ingredient_validations')
+          .select('id, ingredient_name')
+          .eq('analysis_id', selectedProduct.id);
+
+        const staleValidationIds = (validationRows || [])
+          .filter((row: any) => namesMatch(row.ingredient_name || '', selectedIngredient))
+          .map((row: any) => row.id);
+
+        if (staleValidationIds.length > 0) {
+          const { error: deleteError } = await (supabase as any)
+            .from('ingredient_validations')
+            .delete()
+            .in('id', staleValidationIds);
+          if (deleteError) {
+            console.warn('Could not delete stale validations during ingredient edit:', deleteError);
+          }
+        }
+      }
+
+      const { data: refreshedProduct } = await (supabase as any)
+        .from('user_analyses')
+        .select('id, product_name, brand, category, epiq_score, ingredients_list, recommendations_json, analyzed_at')
+        .eq('id', selectedProduct.id)
+        .maybeSingle();
+
+      if (refreshedProduct) {
+        await selectProduct(
+          refreshedProduct as ProductAnalysis,
+          nextName,
+          isAdminReviewer
+        );
+      }
+      await loadProducts(userId, isAdminReviewer);
+
+      toast({
+        title: 'Ingredient updated',
+        description: `Saved full ingredient details for "${nextName}".`
+      });
+      setRenameDialogOpen(false);
+    } catch (error: any) {
+      console.error('Failed to update ingredient details:', error);
+      toast({
+        title: 'Update failed',
+        description: error?.message || 'Could not update ingredient details.',
+        variant: 'destructive'
+      });
+    } finally {
+      setUpdatingIngredients(false);
+    }
   };
 
   const handleMergeIngredient = async () => {
@@ -1050,7 +1263,7 @@ export default function StudentReviewer() {
 
   const openIngredientActionDialog = (ingredient: string, action: 'rename' | 'merge' | 'delete') => {
     setSelectedIngredient(ingredient);
-    setNewIngredientName(ingredient);
+    setIngredientEditDraft(getIngredientEditDefaults(ingredient));
     setMergeTargetIngredient('');
     if (action === 'rename') {
       setRenameDialogOpen(true);
@@ -1149,16 +1362,16 @@ export default function StudentReviewer() {
                       <Button
                         variant="outline"
                         size="sm"
-                        onClick={() => setRenameDialogOpen(true)}
+                        onClick={() => openIngredientActionDialog(selectedIngredient, 'rename')}
                         disabled={updatingIngredients || !canModifyIngredientEntry(selectedIngredient)}
                       >
                         <Pencil className="w-3.5 h-3.5 mr-1.5" />
-                        Rename
+                        Edit
                       </Button>
                       <Button
                         variant="outline"
                         size="sm"
-                        onClick={() => setMergeDialogOpen(true)}
+                        onClick={() => openIngredientActionDialog(selectedIngredient, 'merge')}
                         disabled={updatingIngredients || ingredientsList.length < 2 || !canModifyIngredientEntry(selectedIngredient)}
                       >
                         <GitMerge className="w-3.5 h-3.5 mr-1.5" />
@@ -1167,7 +1380,7 @@ export default function StudentReviewer() {
                       <Button
                         variant="outline"
                         size="sm"
-                        onClick={() => setDeleteDialogOpen(true)}
+                        onClick={() => openIngredientActionDialog(selectedIngredient, 'delete')}
                         disabled={updatingIngredients || !canModifyIngredientEntry(selectedIngredient)}
                       >
                         <Trash2 className="w-3.5 h-3.5 mr-1.5" />
@@ -1230,7 +1443,7 @@ export default function StudentReviewer() {
                               <span className="break-words">Stage: {stageLabel}</span>
                               {workedOn && statusLabel === 'Needs More Data' && (
                                 <Badge variant="outline" className="text-[10px] border-blue-400/40 text-blue-700">
-                                  Worked On
+                                  In Progress
                                 </Badge>
                               )}
                               <span className="break-words">{sourceLabel}</span>
@@ -1243,7 +1456,7 @@ export default function StudentReviewer() {
                               type="button"
                               variant="ghost"
                               size="icon"
-                              title="Rename ingredient"
+                              title="Edit ingredient details"
                               onClick={() => openIngredientActionDialog(ingredient, 'rename')}
                               disabled={updatingIngredients || !canModify}
                             >
@@ -1330,25 +1543,84 @@ export default function StudentReviewer() {
           <Dialog open={renameDialogOpen} onOpenChange={setRenameDialogOpen}>
             <DialogContent>
               <DialogHeader>
-                <DialogTitle>Rename Ingredient</DialogTitle>
+                <DialogTitle>Edit Ingredient Details</DialogTitle>
                 <DialogDescription>
-                  Update the ingredient name in the product scan list. This will relaunch validation for the renamed item.
+                  Update the ingredient name and metadata shown to users for this scan.
                 </DialogDescription>
               </DialogHeader>
-              <div className="space-y-2">
-                <label className="text-sm font-medium">New ingredient name</label>
-                <Input
-                  value={newIngredientName}
-                  onChange={(event) => setNewIngredientName(event.target.value)}
-                  placeholder="Enter corrected ingredient name"
-                />
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Ingredient name</label>
+                  <Input
+                    value={ingredientEditDraft.name}
+                    onChange={(event) =>
+                      setIngredientEditDraft((prev) => ({ ...prev, name: event.target.value }))
+                    }
+                    placeholder="Enter corrected ingredient name"
+                  />
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">Role</label>
+                    <Input
+                      value={ingredientEditDraft.role}
+                      onChange={(event) =>
+                        setIngredientEditDraft((prev) => ({ ...prev, role: event.target.value }))
+                      }
+                      placeholder="e.g. Humectant"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">Safety profile</label>
+                    <Input
+                      value={ingredientEditDraft.safetyProfile}
+                      onChange={(event) =>
+                        setIngredientEditDraft((prev) => ({ ...prev, safetyProfile: event.target.value }))
+                      }
+                      placeholder="e.g. low risk"
+                    />
+                  </div>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">Risk score</label>
+                    <Input
+                      value={ingredientEditDraft.riskScore}
+                      onChange={(event) =>
+                        setIngredientEditDraft((prev) => ({ ...prev, riskScore: event.target.value }))
+                      }
+                      placeholder="e.g. 3"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">Molecular weight</label>
+                    <Input
+                      value={ingredientEditDraft.molecularWeight}
+                      onChange={(event) =>
+                        setIngredientEditDraft((prev) => ({ ...prev, molecularWeight: event.target.value }))
+                      }
+                      placeholder="e.g. 150.2"
+                    />
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Explanation</label>
+                  <Textarea
+                    value={ingredientEditDraft.explanation}
+                    onChange={(event) =>
+                      setIngredientEditDraft((prev) => ({ ...prev, explanation: event.target.value }))
+                    }
+                    rows={4}
+                    placeholder="Explain why this ingredient is safe, concern, or needs review."
+                  />
+                </div>
               </div>
               <DialogFooter>
                 <Button variant="outline" onClick={() => setRenameDialogOpen(false)}>
                   Cancel
                 </Button>
                 <Button onClick={handleRenameIngredient} disabled={updatingIngredients}>
-                  {updatingIngredients ? 'Updating...' : 'Save Rename'}
+                  {updatingIngredients ? 'Updating...' : 'Save Changes'}
                 </Button>
               </DialogFooter>
             </DialogContent>

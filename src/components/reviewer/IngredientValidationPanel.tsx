@@ -88,6 +88,90 @@ interface ValidationData {
   moderatorReviewStatus: 'pending' | 'approved' | 'rejected';
 }
 
+const LOCAL_DRAFT_VERSION = 1;
+const LOCAL_DRAFT_PREFIX = 'ingredient_validation_wizard_draft';
+const TOTAL_WIZARD_STEPS = 6;
+
+interface LocalValidationDraft {
+  version: number;
+  savedAt: string;
+  analysisId: string;
+  ingredientId: string;
+  ingredientName: string;
+  currentStep: number;
+  aiApprovalActive: boolean;
+  data: {
+    aiClaimSummary: string;
+    citations: Citation[];
+    publicExplanation: string;
+    confidenceLevel: ValidationData['confidenceLevel'];
+    verdict: ValidationData['verdict'];
+    correctedSafetyLevel: ValidationData['correctedSafetyLevel'];
+    correction?: string;
+    escalationReason?: string;
+    internalNotes?: string;
+    moderatorReviewStatus: ValidationData['moderatorReviewStatus'];
+  };
+}
+
+const getDraftStorageKey = (analysisId?: string, ingredientId?: string) => {
+  if (!analysisId || !ingredientId) return null;
+  return `${LOCAL_DRAFT_PREFIX}:${analysisId}:${ingredientId}`;
+};
+
+const clampStep = (value: number) => {
+  if (!Number.isFinite(value)) return 1;
+  return Math.min(TOTAL_WIZARD_STEPS, Math.max(1, Math.trunc(value)));
+};
+
+const normalizeLoadedConfidenceLevel = (value?: string): ValidationData['confidenceLevel'] => {
+  if (value === 'High' || value === 'Moderate' || value === 'Limited') return value;
+  return '';
+};
+
+const normalizeLoadedVerdict = (value?: string): ValidationData['verdict'] => {
+  if (value === 'confirm' || value === 'correct' || value === 'escalate') return value;
+  return '';
+};
+
+const normalizeLoadedReviewStatus = (value?: string): ValidationData['moderatorReviewStatus'] => {
+  if (value === 'approved' || value === 'rejected' || value === 'pending') return value;
+  return 'pending';
+};
+
+const parseLocalDraft = (rawDraft: string | null): LocalValidationDraft | null => {
+  if (!rawDraft) return null;
+  try {
+    const parsed = JSON.parse(rawDraft) as LocalValidationDraft;
+    if (!parsed || parsed.version !== LOCAL_DRAFT_VERSION) return null;
+    return parsed;
+  } catch {
+    return null;
+  }
+};
+
+const sanitizeDraftCitations = (value: unknown): Citation[] => {
+  if (!Array.isArray(value)) return [];
+  return value
+    .map((entry: any) => {
+      const parsedYear = Number(entry?.publication_year);
+      return {
+        type: normalizeLoadedCitationType(entry?.type),
+        title: String(entry?.title ?? ''),
+        authors: String(entry?.authors ?? ''),
+        journal_name: String(entry?.journal_name ?? ''),
+        publication_year:
+          entry?.publication_year === null || entry?.publication_year === undefined || Number.isNaN(parsedYear)
+            ? null
+            : parsedYear,
+        source_id: String(entry?.source_id ?? ''),
+        requested_source_type: String(entry?.requested_source_type ?? ''),
+        source_url: String(entry?.source_url ?? '')
+      };
+    })
+    .filter((citation) => citation.title || citation.source_id || citation.source_url);
+};
+
 interface IngredientValidationPanelProps {
   ingredientId: string;
   ingredientName: string;
@@ -125,6 +209,7 @@ export function IngredientValidationPanel({
   const [existingValidationStatus, setExistingValidationStatus] = useState<string | null>(null);
   const [displayMode, setDisplayMode] = useState(false);
   const [allowExtendedSourceTypes, setAllowExtendedSourceTypes] = useState(false);
+  const [lastLocalDraftSavedAt, setLastLocalDraftSavedAt] = useState<string | null>(null);
   const draftSavingRef = useRef(false);
   const lastDraftHashRef = useRef<string>('');
   const [formData, setFormData] = useState<ValidationData>({
@@ -196,6 +281,90 @@ export function IngredientValidationPanel({
         setViewerIsAdmin(isAdmin);
         setAllowExtendedSourceTypes(canUseExtendedSources);
 
+        const applyLocalDraft = (baseData: ValidationData) => {
+          const draftKey = getDraftStorageKey(analysisId, ingredientId);
+          if (!draftKey || typeof window === 'undefined') {
+            setLastLocalDraftSavedAt(null);
+            return {
+              formData: baseData,
+              restoredStep: 1,
+              restoredAiApproval: false
+            };
+          }
+
+          const parsedDraft = parseLocalDraft(window.localStorage.getItem(draftKey));
+          if (!parsedDraft) {
+            setLastLocalDraftSavedAt(null);
+            return {
+              formData: baseData,
+              restoredStep: 1,
+              restoredAiApproval: false
+            };
+          }
+
+          if (parsedDraft.analysisId !== analysisId || parsedDraft.ingredientId !== ingredientId) {
+            setLastLocalDraftSavedAt(null);
+            return {
+              formData: baseData,
+              restoredStep: 1,
+              restoredAiApproval: false
+            };
+          }
+
+          const draftData = (parsedDraft.data || {}) as Partial<LocalValidationDraft['data']>;
+          const hasDraftCitations = Array.isArray(draftData.citations);
+          const cleanedCitations = sanitizeDraftCitations(draftData.citations);
+          const mergedData: ValidationData = {
+            ...baseData,
+            observations: {
+              ...baseData.observations,
+              aiClaimSummary:
+                typeof draftData.aiClaimSummary === 'string'
+                  ? draftData.aiClaimSummary
+                  : baseData.observations.aiClaimSummary
+            },
+            citations: hasDraftCitations ? cleanedCitations : baseData.citations,
+            publicExplanation:
+              typeof draftData.publicExplanation === 'string'
+                ? draftData.publicExplanation
+                : baseData.publicExplanation,
+            confidenceLevel:
+              typeof draftData.confidenceLevel === 'string'
+                ? normalizeLoadedConfidenceLevel(draftData.confidenceLevel)
+                : baseData.confidenceLevel,
+            verdict:
+              typeof draftData.verdict === 'string'
+                ? normalizeLoadedVerdict(draftData.verdict)
+                : baseData.verdict,
+            correctedSafetyLevel:
+              typeof draftData.correctedSafetyLevel === 'string'
+                ? normalizeSafetyLabel(draftData.correctedSafetyLevel)
+                : baseData.correctedSafetyLevel,
+            correction:
+              typeof draftData.correction === 'string' ? draftData.correction : baseData.correction,
+            escalationReason:
+              typeof draftData.escalationReason === 'string' ? draftData.escalationReason : baseData.escalationReason,
+            internalNotes:
+              typeof draftData.internalNotes === 'string' ? draftData.internalNotes : baseData.internalNotes,
+            moderatorReviewStatus:
+              typeof draftData.moderatorReviewStatus === 'string'
+                ? normalizeLoadedReviewStatus(draftData.moderatorReviewStatus)
+                : baseData.moderatorReviewStatus
+          };
+
+          setLastLocalDraftSavedAt(parsedDraft.savedAt || null);
+          toast({
+            title: 'Draft restored',
+            description: 'Your local wizard draft was restored on this device.'
+          });
+
+          return {
+            formData: mergedData,
+            restoredStep: clampStep(parsedDraft.currentStep),
+            restoredAiApproval: Boolean(parsedDraft.aiApprovalActive)
+          };
+        };
+
         const { data, error } = await (supabase as any)
           .from('ingredient_validations')
           .select('*')
@@ -207,62 +376,77 @@ export function IngredientValidationPanel({
 
         if (error) throw error;
 
+        let baseFormData: ValidationData = {
+          ingredientId,
+          observations: {
+            ingredientName,
+            aiClaimSummary: aiClaimSummary || '',
+            aiRoleClassification: aiRole || '',
+            aiSafetyLevel: aiSafetyLevel || '',
+            aiExplanation: aiExplanation || '',
+            pubchemCid: pubchemCid || undefined,
+            molecularWeight: molecularWeight || undefined
+          },
+          citations: [],
+          publicExplanation: '',
+          confidenceLevel: '',
+          verdict: '',
+          correctedSafetyLevel: '',
+          correction: undefined,
+          escalationReason: undefined,
+          internalNotes: '',
+          moderatorReviewStatus: 'pending',
+          validationId: undefined
+        };
+
         if (!data) {
           setExistingValidatorId(null);
           setExistingValidationStatus(null);
           setDisplayMode(false);
-          setFormData(prev => ({
-            ...prev,
-            validationId: undefined,
-            citations: [],
-            publicExplanation: '',
-            confidenceLevel: '',
-            verdict: '',
-            correctedSafetyLevel: '',
-            correction: undefined,
-            escalationReason: undefined,
-            internalNotes: ''
-          }));
-          return;
+        } else {
+          const canEditExisting = isAdmin || data.validator_id === user.id;
+          const validationStatus = data.validation_status || null;
+          setExistingValidatorId(data.validator_id || null);
+          setExistingValidationStatus(validationStatus);
+          setDisplayMode(validationStatus === 'validated' || !canEditExisting);
+
+          const citationData = await (supabase as any)
+            .from('ingredient_validation_citations')
+            .select('*')
+            .eq('validation_id', data.id);
+
+          baseFormData = {
+            ...baseFormData,
+            observations: {
+              ...baseFormData.observations,
+              aiClaimSummary: data.ai_claim_summary || baseFormData.observations.aiClaimSummary
+            },
+            validationId: data.id,
+            publicExplanation: data.public_explanation || '',
+            confidenceLevel: normalizeLoadedConfidenceLevel(data.confidence_level),
+            verdict: normalizeLoadedVerdict(data.verdict),
+            correctedSafetyLevel: normalizeSafetyLabel(data.corrected_safety_level),
+            correction: data.correction_notes,
+            escalationReason: data.escalation_reason,
+            internalNotes: data.internal_notes || '',
+            moderatorReviewStatus: normalizeLoadedReviewStatus(data.moderator_review_status),
+            citations: (citationData.data || []).map((c: any) => ({
+              type: normalizeLoadedCitationType(c.citation_type),
+              title: c.title,
+              authors: c.authors,
+              journal_name: c.journal_name,
+              publication_year: c.publication_year,
+              source_id: c.source_id || c.doi_or_pmid || '',
+              requested_source_type: c.requested_source_type || '',
+              source_url: c.source_url
+            }))
+          };
         }
 
-        const canEditExisting = isAdmin || data.validator_id === user.id;
-        const validationStatus = data.validation_status || null;
-        setExistingValidatorId(data.validator_id || null);
-        setExistingValidationStatus(validationStatus);
-        setDisplayMode(validationStatus === 'validated' || !canEditExisting);
-
-        const citationData = await (supabase as any)
-          .from('ingredient_validation_citations')
-          .select('*')
-          .eq('validation_id', data.id);
-
-        setFormData(prev => ({
-          ...prev,
-          observations: {
-            ...prev.observations,
-            aiClaimSummary: data.ai_claim_summary || prev.observations.aiClaimSummary
-          },
-          validationId: data.id,
-          publicExplanation: data.public_explanation || '',
-          confidenceLevel: data.confidence_level || '',
-          verdict: data.verdict || '',
-          correctedSafetyLevel: normalizeSafetyLabel(data.corrected_safety_level),
-          correction: data.correction_notes,
-          escalationReason: data.escalation_reason,
-          internalNotes: data.internal_notes || '',
-          moderatorReviewStatus: data.moderator_review_status || 'pending',
-          citations: (citationData.data || []).map((c: any) => ({
-            type: normalizeLoadedCitationType(c.citation_type),
-            title: c.title,
-            authors: c.authors,
-            journal_name: c.journal_name,
-            publication_year: c.publication_year,
-            source_id: c.source_id || c.doi_or_pmid || '',
-            requested_source_type: c.requested_source_type || '',
-            source_url: c.source_url
-          }))
-        }));
+        const restored = applyLocalDraft(baseFormData);
+        setFormData(restored.formData);
+        setCurrentStep(restored.restoredStep);
+        setAiApprovalActive(restored.restoredAiApproval);
 
       } catch (error) {
         console.error('Error loading existing validation:', error);
@@ -272,13 +456,14 @@ export function IngredientValidationPanel({
     if (ingredientId && analysisId) {
       loadExistingValidation();
     }
-  }, [ingredientId, analysisId, ingredientName]);
+  }, [ingredientId, analysisId, ingredientName, toast]);
 
   const canEditValidation =
     !existingValidatorId || viewerIsAdmin || (viewerId !== null && viewerId === existingValidatorId);
 
   const hasDraftContent = () => {
     return (
+      formData.observations.aiClaimSummary.trim().length > 0 ||
       formData.citations.length > 0 ||
       formData.publicExplanation.trim().length > 0 ||
       formData.confidenceLevel !== '' ||
@@ -302,97 +487,59 @@ export function IngredientValidationPanel({
       correction: formData.correction,
       escalationReason: formData.escalationReason,
       internalNotes: formData.internalNotes,
-      citations: formData.citations
+      moderatorReviewStatus: formData.moderatorReviewStatus,
+      citations: formData.citations,
+      currentStep,
+      aiApprovalActive
     });
 
   const saveDraft = async () => {
     if (!analysisId || !ingredientId || !ingredientName) return;
-    if (loading) return;
     if (!canEditValidation) return;
-    if (!hasDraftContent()) return;
+    const draftKey = getDraftStorageKey(analysisId, ingredientId);
+    if (!draftKey || typeof window === 'undefined') return;
+
+    if (!hasDraftContent()) {
+      window.localStorage.removeItem(draftKey);
+      setLastLocalDraftSavedAt(null);
+      lastDraftHashRef.current = '';
+      return;
+    }
+
     const draftHash = buildDraftHash();
     if (draftHash === lastDraftHashRef.current) return;
     if (draftSavingRef.current) return;
 
     draftSavingRef.current = true;
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-
-      const validationStatus = deriveValidationStatus(formData.verdict, formData.correctedSafetyLevel);
-
-      const validationRecord = {
-        ingredient_name: ingredientName,
-        analysis_id: analysisId,
-        validator_id: existingValidatorId || user.id,
-        ai_claim_summary: formData.observations.aiClaimSummary || null,
-        public_explanation: formData.publicExplanation || null,
-        confidence_level: formData.confidenceLevel || null,
-        verdict: formData.verdict || null,
-        correction_notes: formData.correction || null,
-        escalation_reason: formData.escalationReason || null,
-        internal_notes: formData.internalNotes || null,
-        is_escalated: formData.verdict === 'escalate',
-        moderator_review_status: formData.moderatorReviewStatus,
-        corrected_safety_level: formData.correctedSafetyLevel || null,
-        validation_status: validationStatus,
-        updated_at: new Date().toISOString()
+      const draftPayload: LocalValidationDraft = {
+        version: LOCAL_DRAFT_VERSION,
+        savedAt: new Date().toISOString(),
+        analysisId,
+        ingredientId,
+        ingredientName,
+        currentStep,
+        aiApprovalActive,
+        data: {
+          aiClaimSummary: formData.observations.aiClaimSummary || '',
+          citations: formData.citations,
+          publicExplanation: formData.publicExplanation || '',
+          confidenceLevel: formData.confidenceLevel,
+          verdict: formData.verdict,
+          correctedSafetyLevel: formData.correctedSafetyLevel,
+          correction: formData.correction,
+          escalationReason: formData.escalationReason,
+          internalNotes: formData.internalNotes,
+          moderatorReviewStatus: formData.moderatorReviewStatus
+        }
       };
 
-      let validationId = formData.validationId;
-      if (validationId) {
-        let updateQuery = (supabase as any)
-          .from('ingredient_validations')
-          .update(validationRecord)
-          .eq('id', validationId);
+      window.localStorage.setItem(draftKey, JSON.stringify(draftPayload));
 
-        if (!viewerIsAdmin) {
-          updateQuery = updateQuery.eq('validator_id', user.id);
-        }
-
-        const { error } = await updateQuery;
-        if (error) throw error;
-      } else {
-        const { data, error } = await (supabase as any)
-          .from('ingredient_validations')
-          .insert([validationRecord])
-          .select('id')
-          .single();
-        if (error) throw error;
-        validationId = data.id;
-        setFormData(prev => ({ ...prev, validationId }));
-      }
-
-      if (validationId) {
-        await (supabase as any)
-          .from('ingredient_validation_citations')
-          .delete()
-          .eq('validation_id', validationId);
-
-        if (formData.citations.length > 0) {
-          const citationRecords = formData.citations.map(c => ({
-            validation_id: validationId,
-            citation_type: c.type,
-            title: c.title,
-            authors: c.authors,
-            journal_name: c.journal_name,
-            publication_year: c.publication_year,
-            source_id: c.source_id || null,
-            doi_or_pmid: c.source_id || null,
-            requested_source_type: c.requested_source_type || null,
-            source_url: c.source_url
-          }));
-
-          const { error } = await (supabase as any)
-            .from('ingredient_validation_citations')
-            .insert(citationRecords);
-          if (error) throw error;
-        }
-      }
-
+      setLastLocalDraftSavedAt(draftPayload.savedAt);
       lastDraftHashRef.current = draftHash;
     } catch (error) {
-      console.warn('Draft autosave failed:', error);
+      console.warn('Local draft autosave failed:', error);
     } finally {
       draftSavingRef.current = false;
     }
@@ -400,12 +547,19 @@ export function IngredientValidationPanel({
 
   useEffect(() => {
     if (!analysisId || !ingredientId) return;
-    if (!hasDraftContent()) return;
     const timer = setTimeout(() => {
       void saveDraft();
     }, 1000);
     return () => clearTimeout(timer);
-  }, [analysisId, ingredientId, ingredientName, formData]);
+  }, [analysisId, ingredientId, ingredientName, formData, currentStep, aiApprovalActive]);
+
+  useEffect(() => {
+    if (!analysisId || !ingredientId) return;
+    const interval = setInterval(() => {
+      void saveDraft();
+    }, 60_000);
+    return () => clearInterval(interval);
+  }, [analysisId, ingredientId, ingredientName, formData, currentStep, aiApprovalActive]);
 
   // Validation helpers
   const canProceedFromStep = (step: number): boolean => {
@@ -584,6 +738,13 @@ export function IngredientValidationPanel({
       if (validationStatus === 'validated') {
         setDisplayMode(true);
       }
+
+      const draftKey = getDraftStorageKey(analysisId, ingredientId);
+      if (draftKey && typeof window !== 'undefined') {
+        window.localStorage.removeItem(draftKey);
+      }
+      setLastLocalDraftSavedAt(null);
+      lastDraftHashRef.current = '';
 
       onValidationComplete();
 
@@ -908,6 +1069,12 @@ export function IngredientValidationPanel({
             {Math.round((currentStep / 6) * 100)}% complete
           </div>
         </div>
+        {lastLocalDraftSavedAt && (
+          <p className="text-xs text-muted-foreground">
+            Draft saved locally at {new Date(lastLocalDraftSavedAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}.
+            It will stay on this device until you submit.
+          </p>
+        )}
       </CardHeader>
       <CardContent className="space-y-6">
         {renderStep()}

@@ -165,15 +165,19 @@ serve(async (req) => {
     const escapedIngredient = escapeHtml(ingredientName);
     const escapedStatus = escapeHtml(statusText);
 
-    const subject = `Scan updated: ${productName}`;
+    const subject = `Your scan has an expert update: ${productName}`;
     const htmlContent = `
       <div style="font-family:Arial,sans-serif;line-height:1.5;color:#111827;">
         <p>Hi ${escapedName},</p>
-        <p>A reviewer updated your scan.</p>
+        <p>
+          An ingredient in your recent scan has been reviewed by our Cosmetic Science Analysts and
+          strengthened with peer-reviewed validation to ensure accuracy and clarity.
+        </p>
+        <p><strong>What was updated:</strong></p>
         <ul>
           <li><strong>Product:</strong> ${escapedProduct}</li>
           <li><strong>Ingredient:</strong> ${escapedIngredient}</li>
-          <li><strong>Reviewer decision:</strong> ${escapedStatus}</li>
+          <li><strong>Updated expert label:</strong> ${escapedStatus}</li>
           <li><strong>Current EpiQ score:</strong> ${scoreText}</li>
         </ul>
         ${
@@ -181,7 +185,8 @@ serve(async (req) => {
             ? `<p><a href="${reviewUrl}" style="display:inline-block;background:#111827;color:#ffffff;padding:10px 14px;border-radius:8px;text-decoration:none;">View Updated Scan</a></p>`
             : `<p>Open SkinLytix to view your updated scan.</p>`
         }
-        <p style="color:#6b7280;font-size:12px;">This was triggered after reviewer verification activity.</p>
+        <p>Open your report to review the full expert update and latest recommendations.</p>
+        <p style="color:#6b7280;font-size:12px;">This message was triggered by reviewer verification activity.</p>
       </div>
     `;
 
