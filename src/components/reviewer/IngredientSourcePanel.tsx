@@ -37,7 +37,7 @@ export function IngredientSourcePanel({
   obfData
 }: IngredientSourcePanelProps) {
   return (
-    <Card className="h-full">
+    <Card>
       <CardHeader className="pb-3">
         <CardTitle className="text-sm font-medium flex items-center gap-2">
           <Database className="w-4 h-4" />
