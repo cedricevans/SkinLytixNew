@@ -21,17 +21,16 @@ export const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
         return;
       }
 
-      // Check user_roles for admin or moderator
+      // Reviewer dashboard access only
       const { data: roles } = await supabase
         .from('user_roles')
         .select('role')
         .eq('user_id', user.id);
 
       const hasRole = roles?.some(r => 
-        r.role === 'admin' || r.role === 'moderator'
+        r.role === 'reviewer' || r.role === 'admin' || r.role === 'moderator'
       );
 
-      // Check student_certifications
       const { data: certification } = await supabase
         .from('student_certifications')
         .select('id')

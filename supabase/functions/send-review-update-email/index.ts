@@ -87,7 +87,7 @@ serve(async (req) => {
 
     const { data: analysis, error: analysisError } = await supabase
       .from("user_analyses")
-      .select("id, user_id, product_name, epiq_score")
+      .select("id, user_id, product_name, brand, category, epiq_score")
       .eq("id", analysisId)
       .maybeSingle();
 
@@ -143,6 +143,25 @@ serve(async (req) => {
     const statusText = normalizeLabel(body.finalLabel);
     const scoreText = typeof analysis.epiq_score === "number" ? String(analysis.epiq_score) : "Updated";
     const productName = analysis.product_name || "your product";
+    const brandName = (analysis as any)?.brand ? String((analysis as any).brand) : "Not specified";
+    const categoryName = (analysis as any)?.category ? String((analysis as any).category) : "Not specified";
+
+    const { data: latestValidation } = await supabase
+      .from("ingredient_validations")
+      .select("updated_at")
+      .eq("analysis_id", analysisId)
+      .eq("ingredient_name", ingredientName)
+      .order("updated_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    const reviewedAtRaw = latestValidation?.updated_at || new Date().toISOString();
+    const reviewedAtText = new Date(reviewedAtRaw).toLocaleString("en-US", {
+      dateStyle: "medium",
+      timeStyle: "short",
+      timeZone: "America/New_York",
+    });
+
     const siteUrl = (Deno.env.get("SITE_URL") || Deno.env.get("PUBLIC_SITE_URL") || "").replace(/\/$/, "");
     const analysisPath = `/analysis/${analysisId}?reviewUpdate=1`;
     const reviewUrl = siteUrl ? `${siteUrl}${analysisPath}` : "";
@@ -164,6 +183,9 @@ serve(async (req) => {
     const escapedProduct = escapeHtml(productName);
     const escapedIngredient = escapeHtml(ingredientName);
     const escapedStatus = escapeHtml(statusText);
+    const escapedBrand = escapeHtml(brandName);
+    const escapedCategory = escapeHtml(categoryName);
+    const escapedReviewedAt = escapeHtml(reviewedAtText);
 
     const subject = `Your scan has an expert update: ${productName}`;
     const htmlContent = `
@@ -176,8 +198,11 @@ serve(async (req) => {
         <p><strong>What was updated:</strong></p>
         <ul>
           <li><strong>Product:</strong> ${escapedProduct}</li>
+          <li><strong>Brand:</strong> ${escapedBrand}</li>
+          <li><strong>Category:</strong> ${escapedCategory}</li>
           <li><strong>Ingredient:</strong> ${escapedIngredient}</li>
           <li><strong>Updated expert label:</strong> ${escapedStatus}</li>
+          <li><strong>Last reviewed:</strong> ${escapedReviewedAt} ET</li>
           <li><strong>Current EpiQ score:</strong> ${scoreText}</li>
         </ul>
         ${

@@ -238,19 +238,19 @@ export default function StudentReviewer() {
 
       setUserId(user.id);
 
-      // Check for admin/moderator role
+      // Reviewer dashboard access: reviewer/admin/moderator roles or certification
       const { data: roles } = await supabase
         .from('user_roles')
         .select('role')
         .eq('user_id', user.id);
 
-      const hasReviewerRole = roles?.some(r => 
-        r.role === 'admin' || r.role === 'moderator'
+      const hasReviewerRole = roles?.some(r =>
+        r.role === 'reviewer' || r.role === 'admin' || r.role === 'moderator'
       );
       const isAdmin = roles?.some((r) => r.role === 'admin') ?? false;
       setIsAdminReviewer(isAdmin);
 
-      // Check for student certification
+      // Certification still grants reviewer access.
       const { data: certification } = await supabase
         .from('student_certifications')
         .select('institution, certification_level')
@@ -260,7 +260,7 @@ export default function StudentReviewer() {
       if (!hasReviewerRole && !certification) {
         toast({
           title: "Access Denied",
-          description: "You need student reviewer certification to access this dashboard.",
+          description: "Reviewer access is required for this section.",
           variant: "destructive",
         });
         navigate('/home');
@@ -538,6 +538,10 @@ export default function StudentReviewer() {
       }
       if (roleSet.has('moderator')) {
         map.set(id, 'Moderator Reviewer');
+        return;
+      }
+      if (roleSet.has('reviewer')) {
+        map.set(id, 'Reviewer');
         return;
       }
 
