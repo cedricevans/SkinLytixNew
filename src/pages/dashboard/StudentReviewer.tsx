@@ -871,10 +871,105 @@ export default function StudentReviewer() {
   const namesMatch = (left: string, right: string) =>
     normalizeIngredientName(left) === normalizeIngredientName(right);
 
+  const getIngredientEntryName = (entry: any) =>
+    typeof entry === 'string' ? entry : entry?.name;
+
+  const hasTextValue = (value: any) =>
+    typeof value === 'string' && value.trim().length > 0;
+
+  const getPreferredTextValue = (...values: any[]) => {
+    for (const value of values) {
+      if (hasTextValue(value)) return String(value).trim();
+    }
+    return '';
+  };
+
+  const getIngredientMetadataScore = (entry: any) => {
+    if (!entry || typeof entry !== 'object') return 0;
+    let score = 0;
+    const textFields = ['role', 'explanation', 'summary', 'reason', 'benefit', 'details', 'safety_profile'];
+    textFields.forEach((field) => {
+      if (hasTextValue(entry[field])) score += 1;
+    });
+    if (entry.risk_score !== null && entry.risk_score !== undefined && Number.isFinite(Number(entry.risk_score))) {
+      score += 1;
+    }
+    if (entry.molecular_weight !== null && entry.molecular_weight !== undefined && Number.isFinite(Number(entry.molecular_weight))) {
+      score += 1;
+    }
+    return score;
+  };
+
+  const mergeRecommendationEntries = (existingEntry: any, duplicateEntry: any, mergedName: string) => {
+    if (typeof existingEntry === 'string' && typeof duplicateEntry === 'string') {
+      return mergedName;
+    }
+
+    const existingObject = typeof existingEntry === 'string'
+      ? { name: mergedName }
+      : { ...existingEntry, name: mergedName };
+    const duplicateObject = typeof duplicateEntry === 'string'
+      ? { name: mergedName }
+      : { ...duplicateEntry, name: mergedName };
+
+    const existingScore = getIngredientMetadataScore(existingObject);
+    const duplicateScore = getIngredientMetadataScore(duplicateObject);
+    const primary = existingScore >= duplicateScore ? existingObject : duplicateObject;
+    const secondary = existingScore >= duplicateScore ? duplicateObject : existingObject;
+
+    const merged = { ...primary, name: mergedName };
+
+    Object.keys(secondary).forEach((field) => {
+      if (field === 'name') return;
+      const current = (merged as any)[field];
+      const incoming = (secondary as any)[field];
+      const currentMissing = current === null || current === undefined || (typeof current === 'string' && current.trim().length === 0);
+      if (currentMissing && incoming !== null && incoming !== undefined) {
+        (merged as any)[field] = incoming;
+      }
+    });
+
+    const explanation = getPreferredTextValue(merged.explanation, merged.summary, merged.reason, merged.benefit, merged.details);
+    if (explanation) {
+      merged.explanation = explanation;
+      merged.summary = explanation;
+    }
+
+    return merged;
+  };
+
+  const dedupeRecommendationEntries = (items: any[], mode: 'rename' | 'merge' | 'delete') => {
+    if (mode !== 'merge') return dedupeByIngredientName(items);
+
+    const deduped: any[] = [];
+    const indexByName = new Map<string, number>();
+
+    items.forEach((entry) => {
+      const rawName = getIngredientEntryName(entry);
+      if (!rawName) {
+        deduped.push(entry);
+        return;
+      }
+
+      const key = normalizeIngredientName(String(rawName));
+      const existingIndex = indexByName.get(key);
+      if (existingIndex === undefined) {
+        indexByName.set(key, deduped.length);
+        deduped.push(entry);
+        return;
+      }
+
+      const existing = deduped[existingIndex];
+      deduped[existingIndex] = mergeRecommendationEntries(existing, entry, String(rawName));
+    });
+
+    return deduped;
+  };
+
   const dedupeByIngredientName = (items: any[]) => {
     const seen = new Set<string>();
     return items.filter((item) => {
-      const rawName = typeof item === 'string' ? item : item?.name;
+      const rawName = getIngredientEntryName(item);
       if (!rawName) return true;
       const key = normalizeIngredientName(String(rawName));
       if (seen.has(key)) return false;
@@ -913,7 +1008,7 @@ export default function StudentReviewer() {
           };
         })
         .filter(Boolean);
-      (next as any)[key] = dedupeByIngredientName(mapped);
+      (next as any)[key] = dedupeRecommendationEntries(mapped, mode);
     });
 
     return next;
@@ -931,10 +1026,17 @@ export default function StudentReviewer() {
         return entryName && namesMatch(String(entryName), ingredientName);
       });
       if (match && typeof match === 'object') {
+        const explanation = getPreferredTextValue(
+          match.explanation,
+          match.summary,
+          match.reason,
+          match.benefit,
+          match.details
+        );
         return {
           name: String(match.name || ingredientName),
           role: String(match.role || ''),
-          explanation: String(match.explanation || ''),
+          explanation,
           safetyProfile: String(match.safety_profile || ''),
           riskScore:
             match.risk_score === null || match.risk_score === undefined ? '' : String(match.risk_score),
@@ -956,7 +1058,11 @@ export default function StudentReviewer() {
     };
   };
 
-  const applyIngredientDraftToEntry = (entry: any, draft: IngredientEditDraft) => {
+  const applyIngredientDraftToEntry = (
+    entry: any,
+    draft: IngredientEditDraft,
+    arrayKey?: string
+  ) => {
     const next = typeof entry === 'string' ? { name: draft.name } : { ...entry, name: draft.name };
 
     const role = draft.role.trim();
@@ -968,8 +1074,19 @@ export default function StudentReviewer() {
     if (role) next.role = role;
     else delete next.role;
 
-    if (explanation) next.explanation = explanation;
-    else delete next.explanation;
+    if (explanation) {
+      next.explanation = explanation;
+      next.summary = explanation;
+      if (arrayKey === 'problematic_ingredients') next.reason = explanation;
+      if (arrayKey === 'beneficial_ingredients') next.benefit = explanation;
+      if (arrayKey === 'ingredient_data') next.details = explanation;
+    } else {
+      delete next.explanation;
+      delete next.summary;
+      if (arrayKey === 'problematic_ingredients') delete next.reason;
+      if (arrayKey === 'beneficial_ingredients') delete next.benefit;
+      if (arrayKey === 'ingredient_data') delete next.details;
+    }
 
     if (safetyProfile) next.safety_profile = safetyProfile;
     else delete next.safety_profile;
@@ -1008,7 +1125,7 @@ export default function StudentReviewer() {
         const entryName = typeof entry === 'string' ? entry : entry?.name;
         if (!entryName || !namesMatch(String(entryName), fromName)) return entry;
         updatedAny = true;
-        return applyIngredientDraftToEntry(entry, draft);
+        return applyIngredientDraftToEntry(entry, draft, key);
       });
       (next as any)[key] = dedupeByIngredientName(mapped);
     });
