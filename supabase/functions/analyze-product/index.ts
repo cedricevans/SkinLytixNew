@@ -463,12 +463,69 @@ serve(async (req) => {
 
     console.log("Analyzing product:", product_name);
 
-    // Get user profile for personalized scoring
-    const { data: profile } = await supabase
+    // Get user profile for personalized scoring.
+    // Defensive fallback: if the profile trigger hasn't populated yet for a new auth user,
+    // upsert a minimal profile record so analysis can proceed.
+    let { data: profile, error: profileLookupError } = await supabase
       .from("profiles")
       .select("skin_type, skin_concerns, body_concerns, scalp_type, product_preferences")
       .eq("id", user_id)
       .maybeSingle();
+
+    if (profileLookupError) {
+      console.error("Profile lookup error:", profileLookupError);
+      throw new Error(`Failed to load user profile: ${profileLookupError.message || "unknown error"}`);
+    }
+
+    if (!profile) {
+      console.warn("Profile not found for user. Attempting defensive profile upsert:", user_id);
+
+      let email: string | null = null;
+      let displayName: string | null = null;
+
+      try {
+        const { data: userData, error: userLookupError } = await supabase.auth.admin.getUserById(user_id);
+        if (userLookupError) {
+          console.warn("Could not fetch auth user metadata for profile backfill:", userLookupError);
+        } else if (userData?.user) {
+          email = userData.user.email ?? null;
+          displayName =
+            (typeof userData.user.user_metadata?.display_name === "string"
+              ? userData.user.user_metadata.display_name
+              : null) ||
+            (email ? email.split("@")[0] : null);
+        }
+      } catch (authLookupErr) {
+        console.warn("Auth lookup for profile backfill failed:", authLookupErr);
+      }
+
+      const { error: profileUpsertError } = await supabase.from("profiles").upsert(
+        {
+          id: user_id,
+          email,
+          display_name: displayName,
+        },
+        { onConflict: "id" },
+      );
+
+      if (profileUpsertError) {
+        console.error("Profile defensive upsert failed:", profileUpsertError);
+        throw new Error(`Unable to create profile for analysis: ${profileUpsertError.message || "unknown error"}`);
+      }
+
+      const { data: retriedProfile, error: retriedProfileError } = await supabase
+        .from("profiles")
+        .select("skin_type, skin_concerns, body_concerns, scalp_type, product_preferences")
+        .eq("id", user_id)
+        .maybeSingle();
+
+      if (retriedProfileError) {
+        console.error("Profile re-read failed after upsert:", retriedProfileError);
+        throw new Error(`Profile created but not readable: ${retriedProfileError.message || "unknown error"}`);
+      }
+
+      profile = retriedProfile;
+    }
 
     console.log("User profile:", profile);
 
@@ -1976,7 +2033,13 @@ serve(async (req) => {
     );
   } catch (error) {
     console.error("Error in analyze-product:", error);
-    return new Response(JSON.stringify({ error: error instanceof Error ? error.message : "Unknown error" }), {
+    const message =
+      error instanceof Error
+        ? error.message
+        : error && typeof error === "object" && "message" in error
+          ? String((error as any).message)
+          : "Unknown error";
+    return new Response(JSON.stringify({ error: message }), {
       status: 500,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
