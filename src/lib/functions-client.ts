@@ -1,6 +1,12 @@
 import { supabase } from '@/integrations/supabase/client';
+import { isKioskEmail } from '@/lib/kiosk';
 
 type InvokeResult = any;
+const KIOSK_ALLOWED_FUNCTIONS = new Set([
+  'extract-ingredients',
+  'analyze-product',
+  'delete-analysis',
+]);
 
 /**
  * Unified wrapper to invoke Supabase Edge Functions.
@@ -11,6 +17,13 @@ type InvokeResult = any;
  * Throws on network or function-level errors. Returns the parsed JSON `data` on success.
  */
 export async function invokeFunction(name: string, payload?: any): Promise<InvokeResult> {
+  const { data: userData } = await supabase.auth.getUser();
+  const userEmail = userData?.user?.email;
+
+  if (isKioskEmail(userEmail) && !KIOSK_ALLOWED_FUNCTIONS.has(name)) {
+    throw new Error(`Function '${name}' is blocked for kiosk mode.`);
+  }
+
   const useProxy = import.meta.env.DEV && import.meta.env.VITE_USE_FUNCTIONS_PROXY === 'true';
 
   if (useProxy) {

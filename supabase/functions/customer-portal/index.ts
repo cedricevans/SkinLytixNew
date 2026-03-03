@@ -6,6 +6,7 @@ const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
+const KIOSK_EMAIL = "kiosk@skinlytix.com";
 
 const logStep = (step: string, details?: any) => {
   const detailsStr = details ? ` - ${JSON.stringify(details)}` : '';
@@ -39,6 +40,12 @@ serve(async (req) => {
     if (userError) throw new Error(`Authentication error: ${userError.message}`);
     const user = userData.user;
     if (!user?.email) throw new Error("User not authenticated or email not available");
+    if (user.email.toLowerCase() === KIOSK_EMAIL) {
+      return new Response(JSON.stringify({ error: "Kiosk account cannot access customer portal." }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 403,
+      });
+    }
     logStep("User authenticated", { userId: user.id, email: user.email });
 
     // Check for stored stripe_customer_id in profiles

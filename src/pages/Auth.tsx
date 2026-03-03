@@ -9,12 +9,16 @@ import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import Navigation from "@/components/Navigation";
 import { Sparkles, ShieldCheck, FlaskConical, TrendingUp } from "lucide-react";
+import { KIOSK_EMAIL, isKioskEmail } from "@/lib/kiosk";
+
+const KIOSK_PASSWORD = "Alicia123@D";
 
 const Auth = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
+  const [isKioskLoading, setIsKioskLoading] = useState(false);
   
   const [signUpEmail, setSignUpEmail] = useState("");
   const [signUpPassword, setSignUpPassword] = useState("");
@@ -70,11 +74,21 @@ const Auth = () => {
 
       if (error) throw error;
 
+      const { data: { user } } = await supabase.auth.getUser();
+      if (isKioskEmail(user?.email)) {
+        toast({
+          title: "Kiosk Mode Ready",
+          description: "Signed in to kiosk mode.",
+        });
+        navigate("/kiosk");
+        return;
+      }
+
       // Check if profile is complete and if user has seen walkthrough
       const { data: profile } = await supabase
         .from('profiles')
         .select('is_profile_complete, has_seen_walkthrough')
-        .eq('id', (await supabase.auth.getUser()).data.user?.id!)
+        .eq('id', user?.id!)
         .single();
 
       toast({
@@ -98,6 +112,34 @@ const Auth = () => {
       });
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const handleKioskQuickLogin = async () => {
+    setIsKioskLoading(true);
+    try {
+      await supabase.auth.signOut();
+
+      const { error } = await supabase.auth.signInWithPassword({
+        email: KIOSK_EMAIL,
+        password: KIOSK_PASSWORD,
+      });
+
+      if (error) throw error;
+
+      toast({
+        title: "Kiosk Mode Ready",
+        description: "Signed in to kiosk account.",
+      });
+      navigate("/kiosk");
+    } catch (error: any) {
+      toast({
+        title: "Kiosk Login Failed",
+        description: error.message || "Unable to sign in to kiosk mode.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsKioskLoading(false);
     }
   };
 
@@ -360,6 +402,15 @@ const Auth = () => {
           </div>
         </div>
       </main>
+
+      <button
+        type="button"
+        onClick={handleKioskQuickLogin}
+        disabled={isKioskLoading || isLoading}
+        className="fixed bottom-4 right-4 z-50 rounded-full border border-primary/25 bg-background/95 px-4 py-2 text-xs font-semibold text-foreground shadow-lg backdrop-blur transition hover:bg-background disabled:opacity-60"
+      >
+        {isKioskLoading ? "Entering kiosk..." : "Kiosk Mode"}
+      </button>
     </div>
   );
 };

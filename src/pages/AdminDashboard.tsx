@@ -4,6 +4,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import AppShell from '@/components/AppShell';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
@@ -14,7 +15,8 @@ import {
   BarChart3,
   Shield,
   Lock,
-  Mail
+  Mail,
+  Monitor
 } from 'lucide-react';
 import invokeFunction from '@/lib/functions-client';
 import UserRoleManager from '@/components/admin/UserRoleManager';
@@ -181,6 +183,21 @@ export default function AdminDashboard() {
             </div>
           </AlertDescription>
         </Alert>
+
+        <Card className="mb-6 border-primary/20">
+          <CardContent className="pt-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <h3 className="font-semibold">Kiosk Mode</h3>
+              <p className="text-sm text-muted-foreground">
+                Launch touch-friendly scan mode for in-person demos.
+              </p>
+            </div>
+            <Button onClick={() => navigate('/kiosk')} className="gap-2">
+              <Monitor className="h-4 w-4" />
+              Launch Kiosk
+            </Button>
+          </CardContent>
+        </Card>
 
         {/* Statistics Cards */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">

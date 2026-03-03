@@ -122,7 +122,7 @@ All colors MUST be HSL.
     color: hsl(var(--muted-foreground) / 0.65);
   }
 
-  body {
+body {
     @apply bg-background text-foreground font-body;
     overflow-wrap: anywhere;
     word-break: break-word;
@@ -140,6 +140,23 @@ All colors MUST be HSL.
   input[type="reset"] {
     @apply whitespace-nowrap;
   }
+}
+
+html.kiosk-mode,
+body.kiosk-mode,
+html.kiosk-mode #root {
+  width: 100%;
+  max-width: none;
+}
+
+html.kiosk-mode,
+body.kiosk-mode {
+  overscroll-behavior: none;
+}
+
+body.kiosk-mode .container {
+  max-width: 100% !important;
+  width: 100% !important;
 }
 
 @media (pointer: coarse) {

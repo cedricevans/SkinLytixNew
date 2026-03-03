@@ -6,6 +6,7 @@ const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
+const KIOSK_EMAIL = "kiosk@skinlytix.com";
 
 // Product IDs to tier mapping
 const PRODUCT_TO_TIER: Record<string, string> = {
@@ -47,6 +48,12 @@ serve(async (req) => {
     if (userError) throw new Error(`Authentication error: ${userError.message}`);
     const user = userData.user;
     if (!user?.email) throw new Error("User not authenticated or email not available");
+    if (user.email.toLowerCase() === KIOSK_EMAIL) {
+      return new Response(JSON.stringify({ error: "Kiosk account cannot access subscription status." }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 403,
+      });
+    }
     logStep("User authenticated", { userId: user.id, email: user.email });
 
     const stripe = new Stripe(stripeKey, { apiVersion: "2024-11-20" });

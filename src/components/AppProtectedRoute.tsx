@@ -1,11 +1,14 @@
 import { useEffect, useState } from "react";
-import { Navigate } from "react-router-dom";
+import { Navigate, useLocation } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Loader2 } from "lucide-react";
+import { getKioskRedirectPath, isKioskEmail } from "@/lib/kiosk";
 
 const AppProtectedRoute = ({ children }: { children: React.ReactNode }) => {
+  const location = useLocation();
   const [isChecking, setIsChecking] = useState(true);
   const [isAuthed, setIsAuthed] = useState(false);
+  const [userEmail, setUserEmail] = useState<string | null>(null);
 
   useEffect(() => {
     let mounted = true;
@@ -14,11 +17,13 @@ const AppProtectedRoute = ({ children }: { children: React.ReactNode }) => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!mounted) return;
       setIsAuthed(!!user);
+      setUserEmail(user?.email || null);
       setIsChecking(false);
     };
 
     const { data: authListener } = supabase.auth.onAuthStateChange((_event, session) => {
       setIsAuthed(!!session?.user);
+      setUserEmail(session?.user?.email || null);
     });
 
     checkSession();
@@ -39,6 +44,13 @@ const AppProtectedRoute = ({ children }: { children: React.ReactNode }) => {
 
   if (!isAuthed) {
     return <Navigate to="/auth" replace />;
+  }
+
+  if (isKioskEmail(userEmail)) {
+    const kioskRedirectPath = getKioskRedirectPath(location.pathname, location.search);
+    if (kioskRedirectPath) {
+      return <Navigate to={kioskRedirectPath} replace />;
+    }
   }
 
   return <>{children}</>;

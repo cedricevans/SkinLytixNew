@@ -25,6 +25,7 @@ import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { fetchIngredientExplanations, IngredientExplanationInput } from "@/lib/ingredient-explanations";
 import { getEpiqMatchView } from "@/lib/epiq-match";
+import { requestKioskFullscreen } from "@/lib/kiosk-display";
 
 // Lazy-load heavier, below-the-fold components
 const AIExplanationAccordion = React.lazy(() => import('@/components/AIExplanationAccordion').then(m => ({ default: m.AIExplanationAccordion })));
@@ -122,6 +123,7 @@ const Analysis = () => {
   const { id } = useParams();
   const navigate = useNavigate();
   const location = useLocation();
+  const isKioskMode = new URLSearchParams(location.search).get("kiosk") === "1";
   const { toast } = useToast();
   useTracking('analysis');
   const [analysis, setAnalysis] = useState<AnalysisData | null>(null);
@@ -141,6 +143,11 @@ const Analysis = () => {
   const [autoUpgradeTriggered, setAutoUpgradeTriggered] = useState(false);
   const [detailProgress, setDetailProgress] = useState(0);
   const [detailStatus, setDetailStatus] = useState("Preparing detailed scan...");
+
+  useEffect(() => {
+    if (!isKioskMode) return;
+    requestKioskFullscreen();
+  }, [isKioskMode]);
 
   const fetchAnalysis = async (options?: { silent?: boolean }) => {
     if (!id) return;
@@ -175,7 +182,7 @@ const Analysis = () => {
             description: "Could not load the analysis data.",
             variant: "destructive",
           });
-          navigate('/home');
+          navigate(isKioskMode ? "/kiosk" : "/home");
         }
         return;
       }
@@ -231,7 +238,7 @@ const Analysis = () => {
           title: "Detailed scan ready",
           description: "Loading your full report now.",
         });
-        navigate(`/analysis/${data.analysis_id}`);
+        navigate(`/analysis/${data.analysis_id}${isKioskMode ? "?kiosk=1" : ""}`);
       } else {
         fetchAnalysis({ silent: true });
       }
@@ -646,8 +653,9 @@ const Analysis = () => {
       <AppShell
         className="bg-gradient-to-b from-background to-muted"
         contentClassName="px-[5px] lg:px-4 py-6 md:py-10"
-        showNavigation
-        showBottomNav
+        showNavigation={!isKioskMode}
+        showBottomNav={!isKioskMode}
+        showFooter={!isKioskMode}
         onAskGpt={() => setIsChatOpen(true)}
         bottomNavProps={{
           onAddToRoutine: handleAddToRoutine,
@@ -664,20 +672,22 @@ const Analysis = () => {
         header={
           <PageHeader>
             <div className="flex flex-wrap items-center justify-between gap-3">
-              <Button variant="ghost" onClick={() => navigate('/home')}>
+              <Button variant="ghost" onClick={() => navigate(isKioskMode ? "/kiosk" : "/home")}>
                 <Home className="w-4 h-4 mr-2" />
-                Back to Home
+                {isKioskMode ? "Back to Kiosk" : "Back to Home"}
               </Button>
-              <ExportAnalysisButton
-                analysisId={analysis.id}
-                productName={analysis.product_name}
-                analysisData={analysis}
-              />
+              {!isKioskMode && (
+                <ExportAnalysisButton
+                  analysisId={analysis.id}
+                  productName={analysis.product_name}
+                  analysisData={analysis}
+                />
+              )}
             </div>
           </PageHeader>
         }
       >
-      <div className="container max-w-4xl mx-auto">
+      <div className={isKioskMode ? "w-full" : "container max-w-4xl mx-auto"}>
         <div className="space-y-8 md:space-y-10">
         
         <section className="space-y-6 md:space-y-8">
@@ -718,7 +728,9 @@ const Analysis = () => {
                 <Button
                   variant="default"
                   size="sm"
-                  onClick={() => navigate(`/compare?productId=${analysis.id}`)}
+                  onClick={() =>
+                    navigate(`/compare?productId=${analysis.id}${isKioskMode ? "&kiosk=1" : ""}`)
+                  }
                 >
                   <Sparkles className="w-4 h-4 mr-2" />
                   Find Dupes
@@ -870,7 +882,9 @@ const Analysis = () => {
             </Button>
             <Button
               variant="outline"
-              onClick={() => navigate(`/compare?productId=${analysis.id}`)}
+              onClick={() =>
+                navigate(`/compare?productId=${analysis.id}${isKioskMode ? "&kiosk=1" : ""}`)
+              }
               className="gap-2 w-full sm:w-auto"
             >
               <Sparkles className="w-4 h-4" />

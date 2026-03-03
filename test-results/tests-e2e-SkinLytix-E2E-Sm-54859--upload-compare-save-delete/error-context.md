@@ -9,8 +9,7 @@
     - banner [ref=e4]:
       - generic [ref=e5]:
         - button "SkinLytix home" [ref=e6] [cursor=pointer]:
-          - text: SkinLytix
-          - superscript [ref=e7]: (TM)
+          - img "SkinLytix" [ref=e7]
         - navigation [ref=e9]:
           - button "Home" [ref=e10] [cursor=pointer]
           - button "Features" [ref=e11] [cursor=pointer]
@@ -19,29 +18,60 @@
           - button "Sign In" [active] [ref=e14] [cursor=pointer]
           - button "Get Started Free" [ref=e15] [cursor=pointer]
     - main [ref=e16]:
-      - generic [ref=e17]:
-        - generic [ref=e18]:
-          - heading "Welcome to SkinLytix" [level=1] [ref=e19]
-          - paragraph [ref=e20]: Your personal skincare intelligence engine
-        - alert [ref=e21]:
-          - img [ref=e22]
-          - generic [ref=e24]:
-            - strong [ref=e25]: "Beta Notice:"
-            - text: If you forget your password, use the password reset flow to regain access.
-        - generic [ref=e26]:
-          - tablist [ref=e27]:
-            - tab "Sign In" [selected] [ref=e28] [cursor=pointer]
-            - tab "Sign Up" [ref=e29] [cursor=pointer]
-          - tabpanel "Sign In" [ref=e30]:
-            - generic [ref=e31]:
-              - generic [ref=e32]:
-                - text: Email
-                - textbox "Email" [ref=e33]: cedric.evans@gmail.com
-              - generic [ref=e34]:
-                - text: Password
-                - textbox "Password" [ref=e35]: pa55word
-              - button "Forgot password?" [ref=e36] [cursor=pointer]
-              - button "Sign In" [ref=e37] [cursor=pointer]
-  - button "Report bug or suggest feature" [ref=e38] [cursor=pointer]:
-    - img [ref=e39]
+      - generic [ref=e18]:
+        - generic [ref=e20]:
+          - generic [ref=e21]:
+            - paragraph [ref=e22]: Science-first skincare
+            - heading "Evidence-based skincare intelligence, built for real people." [level=1] [ref=e24]
+            - paragraph [ref=e25]: SkinLytix helps you stop wasting money on products that do not work. We analyze ingredient lists, flag potential sensitivities, and surface smarter alternatives, all powered by transparent, open data.
+          - generic [ref=e26]:
+            - generic [ref=e27]:
+              - generic [ref=e28]:
+                - img [ref=e29]
+                - heading "Ingredient match score" [level=3] [ref=e32]
+              - paragraph [ref=e33]: Compare formulas side by side with clear, simple scoring.
+            - generic [ref=e34]:
+              - generic [ref=e35]:
+                - img [ref=e36]
+                - heading "Sensitivity signals" [level=3] [ref=e39]
+              - paragraph [ref=e40]: See what might irritate your skin before you buy.
+            - generic [ref=e41]:
+              - generic [ref=e42]:
+                - img [ref=e43]
+                - heading "Routine-ready dupes" [level=3] [ref=e45]
+              - paragraph [ref=e46]: Find alternatives that fit your routine and budget.
+            - generic [ref=e47]:
+              - generic [ref=e48]:
+                - img [ref=e49]
+                - heading "Open research layer" [level=3] [ref=e51]
+              - paragraph [ref=e52]: Built on real consumer research and free APIs.
+          - generic [ref=e53]:
+            - generic [ref=e54]: No spam
+            - generic [ref=e55]: Free to start
+            - generic [ref=e56]: Data-driven insights
+        - generic [ref=e57]:
+          - generic [ref=e58]:
+            - heading "Start your SkinLytix account" [level=2] [ref=e59]
+            - paragraph [ref=e60]: Sign in or create a free account to save analyses and build your routine.
+          - generic [ref=e61]:
+            - tablist [ref=e62]:
+              - tab "Sign In" [selected] [ref=e63] [cursor=pointer]
+              - tab "Sign Up" [ref=e64] [cursor=pointer]
+            - tabpanel "Sign In" [ref=e65]:
+              - generic [ref=e66]:
+                - generic [ref=e67]:
+                  - text: Email
+                  - textbox "Email" [ref=e68]: cedric.evans@gmail.com
+                - generic [ref=e69]:
+                  - text: Password
+                  - textbox "Password" [ref=e70]: pa55word
+                - generic [ref=e71]:
+                  - button "Forgot password?" [ref=e72] [cursor=pointer]
+                  - generic [ref=e73]: Secure sign-in
+                - button "Sign In" [ref=e74] [cursor=pointer]
+                - paragraph [ref=e75]:
+                  - text: Don't have an account?
+                  - button "Sign up here" [ref=e76] [cursor=pointer]
+  - button "Report bug or suggest feature" [ref=e77] [cursor=pointer]:
+    - img [ref=e78]
 ```

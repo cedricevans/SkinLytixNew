@@ -6,6 +6,7 @@ const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
+const KIOSK_EMAIL = "kiosk@skinlytix.com";
 
 // Stripe price IDs for SkinLytix subscription tiers (PRODUCTION)
 const PRICE_IDS = {
@@ -83,6 +84,12 @@ serve(async (req) => {
     
     if (!user?.email) {
       throw new Error("User not authenticated or email not available");
+    }
+    if (user.email.toLowerCase() === KIOSK_EMAIL) {
+      return new Response(JSON.stringify({ error: "Kiosk account cannot access checkout." }), {
+        status: 403,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
     logStep("User authenticated", { userId: user.id, email: user.email });
 

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { Camera, Upload as UploadIcon, Loader2, Info, Home, User } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -15,6 +15,10 @@ import OCRLoadingTips from "@/components/OCRLoadingTips";
 import { FrictionFeedbackBanner } from "@/components/FrictionFeedbackBanner";
 import AppShell from "@/components/AppShell";
 import PageHeader from "@/components/PageHeader";
+import { isKioskEmail, KIOSK_EMAIL } from "@/lib/kiosk";
+import { requestKioskFullscreen, exitKioskFullscreen } from "@/lib/kiosk-display";
+import { clearKioskBrowserState, purgeCurrentKioskSessionData } from "@/lib/kiosk-session";
+import invokeFunction from "@/lib/functions-client";
 
 // Helper: Downscale image for faster AI extraction and OCR
 const downscaleImage = (imageDataUrl, maxSize = 1600, quality = 0.82) => {
@@ -273,8 +277,10 @@ const writeAnalysisCache = (userId, signature, analysisId) => {
 
 const Upload = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const { toast } = useToast();
   useTracking("upload");
+  const isKioskMode = new URLSearchParams(location.search).get("kiosk") === "1";
 
   const fileInputRef = useRef(null);
   const cameraInputRef = useRef(null);
@@ -298,8 +304,79 @@ const Upload = () => {
   const [analysisStatus, setAnalysisStatus] = useState("Preparing analysis...");
   const [analysisId, setAnalysisId] = useState(null);
   const [analysisReady, setAnalysisReady] = useState(false);
+  const [isEndingKioskSession, setIsEndingKioskSession] = useState(false);
+  const [isCheckingKioskAccess, setIsCheckingKioskAccess] = useState(isKioskMode);
   const analysisStartRef = useRef(null);
   const [lastCacheSignature, setLastCacheSignature] = useState(null);
+
+  const handleEndKioskSession = async () => {
+    setIsEndingKioskSession(true);
+    try {
+      const purgeResult = await purgeCurrentKioskSessionData();
+      clearKioskBrowserState();
+      if (purgeResult.failed > 0) {
+        toast({
+          title: "Kiosk Session Ended",
+          description: `${purgeResult.deleted}/${purgeResult.total} scans were purged.`,
+          variant: "destructive",
+        });
+      }
+      await exitKioskFullscreen();
+      await supabase.auth.signOut();
+      navigate("/", { replace: true });
+    } catch (error) {
+      console.error("Failed to purge kiosk session data:", error);
+      await exitKioskFullscreen();
+      await supabase.auth.signOut();
+      navigate("/", { replace: true });
+    } finally {
+      setIsEndingKioskSession(false);
+    }
+  };
+
+  useEffect(() => {
+    let isMounted = true;
+
+    const enforceKioskAccount = async () => {
+      if (!isKioskMode) {
+        setIsCheckingKioskAccess(false);
+        return;
+      }
+
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!isMounted) return;
+
+      if (!user) {
+        navigate("/auth?tab=signin", { replace: true });
+        return;
+      }
+
+      if (!isKioskEmail(user.email)) {
+        await supabase.auth.signOut();
+        if (!isMounted) return;
+        toast({
+          title: "Kiosk Account Required",
+          description: `Sign in with ${KIOSK_EMAIL} to use kiosk mode.`,
+          variant: "destructive",
+        });
+        navigate("/auth?tab=signin", { replace: true });
+        return;
+      }
+
+      setIsCheckingKioskAccess(false);
+    };
+
+    enforceKioskAccount();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [isKioskMode, navigate, toast]);
+
+  useEffect(() => {
+    if (!isKioskMode || isCheckingKioskAccess) return;
+    requestKioskFullscreen();
+  }, [isKioskMode, isCheckingKioskAccess]);
 
   // OCR worker init
   // Key change: force worker paths (fixes blank OCR in many Vite builds)
@@ -548,14 +625,10 @@ const Upload = () => {
 
     try {
       const compressedImage = await downscaleImage(imageDataUrl, 1600, 0.82);
-      const { data, error } = await supabase.functions.invoke("extract-ingredients", {
-        body: {
-          image: compressedImage,
-          productType: productType === "auto" ? null : productType,
-        },
+      const data: any = await invokeFunction("extract-ingredients", {
+        image: compressedImage,
+        productType: productType === "auto" ? null : productType,
       });
-
-      if (error) throw error;
 
       const aiIngredientsRaw = Array.isArray(data?.ingredients)
         ? data.ingredients.join(", ")
@@ -685,37 +758,7 @@ const Upload = () => {
         scan_mode: "detailed",
         skip_ai_explanation: false,
       };
-
-      const useProxy = import.meta.env.DEV && import.meta.env.VITE_USE_FUNCTIONS_PROXY === "true";
-      let data;
-
-      if (useProxy) {
-        const { data: sessionData } = await supabase.auth.getSession();
-        const accessToken = sessionData.session?.access_token;
-
-        const response = await fetch("/functions/analyze-product", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            apikey: import.meta.env.VITE_SUPABASE_ANON_KEY,
-            ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
-          },
-          body: JSON.stringify(payload),
-        });
-
-        if (!response.ok) {
-          const errorText = await response.text();
-          throw new Error(errorText || "Failed to analyze product");
-        }
-
-        data = await response.json();
-      } else {
-        const { data: invokeData, error } = await supabase.functions.invoke("analyze-product", {
-          body: payload,
-        });
-        if (error) throw error;
-        data = invokeData;
-      }
+      const data: any = await invokeFunction("analyze-product", payload);
 
       trackEvent({
         eventName: "product_analyzed",
@@ -860,30 +903,56 @@ const Upload = () => {
 
   return (
     <TooltipProvider>
+      {isKioskMode && isCheckingKioskAccess ? (
+        <AppShell showFooter={false} className="bg-background">
+          <div className="min-h-[60vh] flex items-center justify-center">
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <Loader2 className="h-4 w-4 animate-spin" />
+              Verifying kiosk account...
+            </div>
+          </div>
+        </AppShell>
+      ) : (
       <AppShell
         className="bg-gradient-to-b from-background to-muted"
-        showNavigation
-        showBottomNav
+        showNavigation={!isKioskMode}
+        showBottomNav={!isKioskMode}
+        showFooter={!isKioskMode}
         header={
           <PageHeader>
             <div className="flex flex-col gap-3">
-              <div className="flex flex-wrap gap-2">
-                <Button variant="ghost" onClick={() => navigate("/home")} className="gap-2">
-                  <Home className="w-4 h-4" />
-                  Home
-                </Button>
-                <Button variant="ghost" onClick={() => navigate("/profile")} className="gap-2">
-                  <User className="w-4 h-4" />
-                  Profile
-                </Button>
-              </div>
-              <h1 className="text-3xl md:text-4xl font-bold">Upload Product</h1>
+              {isKioskMode ? (
+                <div className="flex items-center justify-between gap-3">
+                  <h1 className="text-3xl md:text-4xl font-bold">Kiosk Scan</h1>
+                  <Button
+                    variant="outline"
+                    onClick={handleEndKioskSession}
+                    disabled={isEndingKioskSession}
+                  >
+                    {isEndingKioskSession ? "Ending session..." : "Exit Kiosk"}
+                  </Button>
+                </div>
+              ) : (
+                <>
+                  <div className="flex flex-wrap gap-2">
+                    <Button variant="ghost" onClick={() => navigate("/home")} className="gap-2">
+                      <Home className="w-4 h-4" />
+                      Home
+                    </Button>
+                    <Button variant="ghost" onClick={() => navigate("/profile")} className="gap-2">
+                      <User className="w-4 h-4" />
+                      Profile
+                    </Button>
+                  </div>
+                  <h1 className="text-3xl md:text-4xl font-bold">Upload Product</h1>
+                </>
+              )}
             </div>
           </PageHeader>
         }
         contentClassName="px-[5px] lg:px-4 py-10 overflow-x-hidden"
       >
-        <div className="container max-w-3xl mx-auto w-full">
+        <div className={isKioskMode ? "w-full" : "container max-w-3xl mx-auto w-full"}>
           {showFrictionBanner && (
             <div className="mb-6">
               <FrictionFeedbackBanner trigger="error" context="Analysis failed" />
@@ -1140,7 +1209,7 @@ const Upload = () => {
             <Button
               onClick={(e) => {
                 if (analysisReady && analysisId) {
-                  navigate(`/analysis/${analysisId}`);
+                  navigate(`/analysis/${analysisId}${isKioskMode ? "?kiosk=1" : ""}`);
                 } else {
                   // Prevent default to avoid form submission if inside a form
                   e.preventDefault();
@@ -1170,6 +1239,7 @@ const Upload = () => {
           </Card>
         </div>
       </AppShell>
+      )}
     </TooltipProvider>
   );
 };

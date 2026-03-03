@@ -2,7 +2,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route, useLocation } from "react-router-dom";
+import { BrowserRouter, Routes, Route, useLocation, useNavigate } from "react-router-dom";
 import { useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useDevModeLogin } from "@/hooks/useDevModeLogin";
@@ -33,6 +33,7 @@ import Favorites from "./pages/Favorites";
 import Pricing from "./pages/Pricing";
 import NotFound from "./pages/NotFound";
 import Settings from "./pages/Settings";
+import KioskMode from "./pages/KioskMode";
 import StudentReviewer from "./pages/dashboard/StudentReviewer";
 import AdminDashboard from "./pages/AdminDashboard";
 import FeedbackWidget from "@/components/FeedbackWidget";
@@ -40,6 +41,7 @@ import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { TrialCountdown } from "@/components/subscription/TrialCountdown";
 import ScrollToTop from "@/components/ScrollToTop";
 import AppProtectedRoute from "@/components/AppProtectedRoute";
+import { getKioskRedirectPath, isKioskEmail } from "@/lib/kiosk";
 
 const queryClient = new QueryClient();
 
@@ -84,6 +86,62 @@ const DevModeLoginGate = () => {
     }
   }
   
+  return null;
+};
+
+const KioskChromeGate = () => {
+  const location = useLocation();
+
+  useEffect(() => {
+    const search = new URLSearchParams(location.search);
+    const isKioskRoute = location.pathname === "/kiosk" || search.get("kiosk") === "1";
+
+    document.documentElement.classList.toggle("kiosk-mode", isKioskRoute);
+    document.body.classList.toggle("kiosk-mode", isKioskRoute);
+
+    if (!isKioskRoute) return;
+
+    const hideBrowserChrome = () => {
+      window.setTimeout(() => window.scrollTo(0, 1), 50);
+    };
+
+    hideBrowserChrome();
+    window.addEventListener("orientationchange", hideBrowserChrome);
+    window.addEventListener("resize", hideBrowserChrome);
+
+    return () => {
+      window.removeEventListener("orientationchange", hideBrowserChrome);
+      window.removeEventListener("resize", hideBrowserChrome);
+    };
+  }, [location.pathname, location.search]);
+
+  return null;
+};
+
+const KioskAccountLockGate = () => {
+  const location = useLocation();
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    let isMounted = true;
+
+    const enforceKioskLock = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!isMounted || !isKioskEmail(user?.email)) return;
+
+      const kioskRedirectPath = getKioskRedirectPath(location.pathname, location.search);
+      if (!kioskRedirectPath) return;
+
+      navigate(kioskRedirectPath, { replace: true });
+    };
+
+    enforceKioskLock();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [location.pathname, location.search, navigate]);
+
   return null;
 };
 
@@ -139,6 +197,8 @@ const App = () => (
         <ScrollToTop />
         <SessionRefreshGate />
         <DevModeLoginGate />
+        <KioskChromeGate />
+        <KioskAccountLockGate />
         <SubscriptionSyncGate />
         <Routes>
           <Route path="/" element={<Index />} />
@@ -160,6 +220,7 @@ const App = () => (
           <Route path="/compare" element={<AppProtectedRoute><Compare /></AppProtectedRoute>} />
           <Route path="/favorites" element={<AppProtectedRoute><Favorites /></AppProtectedRoute>} />
           <Route path="/settings" element={<AppProtectedRoute><Settings /></AppProtectedRoute>} />
+          <Route path="/kiosk" element={<AppProtectedRoute><KioskMode /></AppProtectedRoute>} />
           <Route path="/pricing" element={<Pricing />} />
           <Route path="/about" element={<About />} />
           <Route path="/faq" element={<Faq />} />
