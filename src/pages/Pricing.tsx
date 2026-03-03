@@ -14,7 +14,6 @@ import {
   AccordionTrigger,
 } from '@/components/ui/accordion';
 import Navigation from '@/components/Navigation';
-import BrandName from '@/components/landing/BrandName';
 
 const PREMIUM_FEATURES = [
   'Everything in Free',
@@ -81,6 +80,9 @@ const Pricing = () => {
         const data: any = await (await import('@/lib/functions-client')).invokeFunction('create-checkout', { plan, billingCycle });
         if (data?.url) {
           window.open(data.url, '_blank');
+          if (data?.specialPricingApplied) {
+            toast.success(`Waitlister pricing applied (${data?.specialPricing?.discountPercentage ?? ""}% off)`);
+          }
           toast.success('Checkout opened in new tab');
         }
       } catch (err) {
@@ -111,14 +113,18 @@ const Pricing = () => {
     <div className="min-h-screen bg-background">
       {/* Header */}
       <header className="sticky top-0 z-50 w-full bg-primary text-primary-foreground">
-        <div className="max-w-6xl mx-auto px-[10px] lg:px-6 flex items-center justify-between h-16">
+        <div className="max-w-6xl mx-auto px-[10px] lg:px-6 flex items-center justify-between">
           <button
             type="button"
             onClick={() => navigate('/')}
-            className="font-heading text-xl font-bold text-primary-foreground hover:opacity-80 transition-opacity"
+            className="hover:opacity-80 transition-opacity"
             aria-label="SkinLytix home"
           >
-            <BrandName />
+            <img
+              src="/logo.png"
+              alt="SkinLytix"
+              className="h-[50px] md:h-[65px] w-auto object-contain pl-[15px] md:pl-0"
+            />
           </button>
           <Navigation />
         </div>
@@ -342,6 +348,11 @@ const Pricing = () => {
       {/* Footer */}
       <footer className="border-t py-8">
         <div className="max-w-6xl mx-auto px-4 text-center text-sm text-muted-foreground">
+          <img
+            src="/logo.png"
+            alt="SkinLytix"
+            className="h-[50px] md:h-[65px] w-auto object-contain mx-auto mb-3"
+          />
           <p>© 2024 SkinLytix. All rights reserved.</p>
           <p className="mt-2">
             Cancel anytime • No questions asked • Money-back guarantee

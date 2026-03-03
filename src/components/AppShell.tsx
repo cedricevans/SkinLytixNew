@@ -3,7 +3,6 @@ import { cn } from "@/lib/utils";
 import Navigation from "@/components/Navigation";
 import Footer from "@/components/Footer";
 import { ResponsiveBottomNav, ResponsiveBottomNavProps } from "@/components/ResponsiveBottomNav";
-import BrandName from "@/components/landing/BrandName";
 import TopLoadingBar from "@/components/TopLoadingBar";
 
 type AppShellProps = {
@@ -42,7 +41,11 @@ const AppShell = ({
         <header className="w-full bg-primary shadow-soft">
           <div className="max-w-6xl mx-auto px-[10px] md:px-6 py-3 md:py-4 flex justify-between items-center">
             <h2 className="text-xl md:text-2xl font-heading font-bold text-primary-foreground">
-              <BrandName />
+              <img
+                src="/logo.png"
+                alt="SkinLytix"
+                className="h-[50px] md:h-[65px] w-auto object-contain pl-[15px] md:pl-0"
+              />
             </h2>
             <Navigation variant="app" onAskGpt={onAskGpt} />
           </div>

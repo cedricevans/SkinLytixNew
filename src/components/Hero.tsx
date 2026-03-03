@@ -23,9 +23,11 @@ const Hero = () => {
       {/* Header Bar */}
       <header className="relative z-20 w-full bg-primary shadow-soft">
         <div className="max-w-6xl mx-auto px-4 md:px-6 py-3 md:py-4 flex justify-between items-center">
-          <h2 className="text-xl md:text-2xl font-heading font-bold text-primary-foreground">
-            SkinLytix
-          </h2>
+          <img
+            src="/logo.png"
+            alt="SkinLytix"
+            className="h-[50px] md:h-[65px] w-auto object-contain pl-[15px] md:pl-0"
+          />
           <Navigation />
         </div>
       </header>

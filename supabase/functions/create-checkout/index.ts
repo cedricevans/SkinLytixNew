@@ -20,6 +20,44 @@ const logStep = (step: string, details?: any) => {
   console.log(`[CREATE-CHECKOUT] ${step}${detailsStr}`);
 };
 
+type WaitlistOffer = {
+  id: string;
+  user_id: string | null;
+  email: string;
+  promo_code: string;
+  tier_offering: "premium" | "pro";
+  billing_cycle: "monthly" | "annual" | null;
+  discount_percentage: number;
+  valid_from: string;
+  valid_until: string;
+  status: "pending" | "sent" | "activated" | "expired" | "cancelled";
+  original_price: number | null;
+  discounted_price: number | null;
+};
+
+const normalizeEmail = (value: string) => value.trim().toLowerCase();
+
+const isOfferActiveForCheckout = (
+  offer: WaitlistOffer,
+  plan: "premium" | "pro",
+  billingCycle: "monthly" | "annual",
+) => {
+  if (!offer) return false;
+  if (!["pending", "sent"].includes(offer.status)) return false;
+  if (offer.tier_offering !== plan) return false;
+  if (offer.billing_cycle && offer.billing_cycle !== billingCycle) return false;
+
+  const now = Date.now();
+  const validFrom = new Date(offer.valid_from).getTime();
+  const validUntil = new Date(offer.valid_until).getTime();
+  if (Number.isFinite(validFrom) && validFrom > now) return false;
+  if (!Number.isFinite(validUntil) || validUntil <= now) return false;
+  return true;
+};
+
+const pickBestOffer = (offers: WaitlistOffer[]) =>
+  [...offers].sort((a, b) => b.discount_percentage - a.discount_percentage)[0] ?? null;
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -28,6 +66,10 @@ serve(async (req) => {
   const supabaseClient = createClient(
     Deno.env.get("SUPABASE_URL") ?? "",
     Deno.env.get("SUPABASE_ANON_KEY") ?? ""
+  );
+  const supabaseAdmin = createClient(
+    Deno.env.get("SUPABASE_URL") ?? "",
+    Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? Deno.env.get("SUPABASE_ANON_KEY") ?? ""
   );
 
   try {
@@ -43,8 +85,8 @@ serve(async (req) => {
     }
     logStep("User authenticated", { userId: user.id, email: user.email });
 
-    const { plan, billingCycle } = await req.json();
-    logStep("Request params", { plan, billingCycle });
+    const { plan, billingCycle, promoCode } = await req.json();
+    logStep("Request params", { plan, billingCycle, hasPromoCode: Boolean(promoCode) });
 
     // Determine the correct price ID
     const priceKey = `${plan}_${billingCycle}` as keyof typeof PRICE_IDS;
@@ -58,6 +100,110 @@ serve(async (req) => {
     const stripe = new Stripe(Deno.env.get("STRIPE_SECRET_KEY") || "", {
       apiVersion: "2025-08-27.basil",
     });
+
+    // Resolve any active waitlist special-pricing offer for this user.
+    const normalizedEmail = normalizeEmail(user.email);
+    const promoCodeNormalized =
+      typeof promoCode === "string" && promoCode.trim().length > 0
+        ? promoCode.trim().toUpperCase()
+        : null;
+    let selectedOffer: WaitlistOffer | null = null;
+
+    try {
+      if (promoCodeNormalized) {
+        const { data: promoOffer, error: promoError } = await supabaseAdmin
+          .from("waitlist_special_pricing")
+          .select("*")
+          .eq("promo_code", promoCodeNormalized)
+          .maybeSingle();
+
+        if (promoError) {
+          logStep("Promo lookup error", { message: promoError.message });
+        } else if (promoOffer) {
+          const ownedByUser =
+            promoOffer.user_id === user.id ||
+            normalizeEmail(promoOffer.email || "") === normalizedEmail;
+          if (ownedByUser && isOfferActiveForCheckout(promoOffer as WaitlistOffer, plan, billingCycle)) {
+            selectedOffer = promoOffer as WaitlistOffer;
+          }
+        }
+      }
+
+      if (!selectedOffer) {
+        const { data: userOffers, error: userOffersError } = await supabaseAdmin
+          .from("waitlist_special_pricing")
+          .select("*")
+          .eq("user_id", user.id)
+          .in("status", ["pending", "sent"])
+          .limit(10);
+
+        if (userOffersError) {
+          logStep("User offer lookup error", { message: userOffersError.message });
+        } else {
+          const eligible = (userOffers || []).filter((offer) =>
+            isOfferActiveForCheckout(offer as WaitlistOffer, plan, billingCycle)
+          ) as WaitlistOffer[];
+          selectedOffer = pickBestOffer(eligible);
+        }
+      }
+
+      if (!selectedOffer) {
+        const { data: emailOffers, error: emailOffersError } = await supabaseAdmin
+          .from("waitlist_special_pricing")
+          .select("*")
+          .ilike("email", normalizedEmail)
+          .in("status", ["pending", "sent"])
+          .limit(10);
+
+        if (emailOffersError) {
+          logStep("Email offer lookup error", { message: emailOffersError.message });
+        } else {
+          const eligible = (emailOffers || []).filter((offer) =>
+            isOfferActiveForCheckout(offer as WaitlistOffer, plan, billingCycle)
+          ) as WaitlistOffer[];
+          selectedOffer = pickBestOffer(eligible);
+        }
+      }
+    } catch (lookupError) {
+      const message = lookupError instanceof Error ? lookupError.message : String(lookupError);
+      logStep("Special pricing lookup failed", { message });
+      selectedOffer = null;
+    }
+
+    let discounts: Array<{ coupon: string }> | undefined;
+    if (selectedOffer) {
+      const couponId = `waitlist_${selectedOffer.promo_code}`
+        .toLowerCase()
+        .replace(/[^a-z0-9_]/g, "_")
+        .slice(0, 40);
+
+      try {
+        await stripe.coupons.retrieve(couponId);
+      } catch {
+        await stripe.coupons.create({
+          id: couponId,
+          percent_off: selectedOffer.discount_percentage,
+          duration: "once",
+          name: `Waitlister ${selectedOffer.promo_code}`,
+        });
+      }
+
+      discounts = [{ coupon: couponId }];
+      logStep("Special pricing applied", {
+        offerId: selectedOffer.id,
+        promoCode: selectedOffer.promo_code,
+        discountPercentage: selectedOffer.discount_percentage,
+      });
+
+      // Bind the offer to the authenticated user for future lookups.
+      await supabaseAdmin
+        .from("waitlist_special_pricing")
+        .update({
+          user_id: user.id,
+          status: selectedOffer.status === "pending" ? "sent" : selectedOffer.status,
+        })
+        .eq("id", selectedOffer.id);
+    }
 
     // Check if a Stripe customer already exists
     const customers = await stripe.customers.list({ email: user.email, limit: 1 });
@@ -80,6 +226,7 @@ serve(async (req) => {
           quantity: 1,
         },
       ],
+      discounts,
       mode: "subscription",
       success_url: `${origin}/profile?subscription=success`,
       cancel_url: `${origin}/profile?subscription=canceled`,
@@ -87,12 +234,27 @@ serve(async (req) => {
         user_id: user.id,
         plan: plan,
         billing_cycle: billingCycle,
+        waitlist_special_pricing_id: selectedOffer?.id || "",
+        waitlist_promo_code: selectedOffer?.promo_code || "",
+        waitlist_discount_percentage: selectedOffer?.discount_percentage?.toString() || "",
       },
     });
 
     logStep("Checkout session created", { sessionId: session.id, url: session.url });
 
-    return new Response(JSON.stringify({ url: session.url }), {
+    return new Response(JSON.stringify({
+      url: session.url,
+      specialPricingApplied: Boolean(selectedOffer),
+      specialPricing: selectedOffer
+        ? {
+            promoCode: selectedOffer.promo_code,
+            discountPercentage: selectedOffer.discount_percentage,
+            tier: selectedOffer.tier_offering,
+            billingCycle: selectedOffer.billing_cycle,
+            validUntil: selectedOffer.valid_until,
+          }
+        : null,
+    }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
       status: 200,
     });

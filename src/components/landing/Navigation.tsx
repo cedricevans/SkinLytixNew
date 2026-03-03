@@ -8,7 +8,6 @@ import {
   SheetTrigger,
 } from '@/components/ui/sheet';
 import { Button } from '@/components/ui/button';
-import BrandName from './BrandName';
 
 const Navigation = () => {
   const [open, setOpen] = useState(false);
@@ -24,13 +23,17 @@ const Navigation = () => {
   return (
     <header className="sticky top-0 z-50 w-full bg-azure">
       <div className="container mx-auto px-[5px] lg:px-6">
-        <div className="flex h-16 items-center justify-between">
+        <div className="flex items-center justify-between">
           {/* Logo */}
           <button
             onClick={() => scrollToSection('#home')}
-            className="font-heading text-xl md:text-2xl font-bold text-primary-foreground hover:text-primary-foreground/80 transition-colors"
+            className="hover:opacity-80 transition-opacity"
           >
-            <BrandName />
+            <img
+              src="/logo.png"
+              alt="SkinLytix"
+              className="h-[50px] md:h-[65px] w-auto object-contain pl-[15px] md:pl-0"
+            />
           </button>
 
           {/* Desktop Navigation */}

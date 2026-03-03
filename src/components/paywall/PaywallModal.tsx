@@ -93,6 +93,9 @@ export function PaywallModal({
             return;
           }
           onOpenChange(false);
+          if (data?.specialPricingApplied) {
+            toast.success(`Waitlister pricing applied (${data?.specialPricing?.discountPercentage ?? ""}% off)`);
+          }
           toast.success('Checkout opened in new tab');
         }
       } catch (err) {

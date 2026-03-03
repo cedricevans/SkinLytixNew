@@ -1,5 +1,4 @@
 import { Instagram, Facebook, Linkedin, Youtube } from 'lucide-react';
-import BrandName from './BrandName';
 
 const Footer = () => {
   const links = [
@@ -38,9 +37,11 @@ const Footer = () => {
         {/* Main Footer Content */}
         <div className="flex flex-col md:flex-row items-center justify-between gap-6 mb-8">
           {/* Logo */}
-          <div className="font-heading text-xl font-bold">
-            <BrandName />
-          </div>
+          <img
+            src="/logo.png"
+            alt="SkinLytix"
+            className="h-[50px] md:h-[65px] w-auto object-contain"
+          />
           
           {/* Links */}
           <nav className="flex flex-wrap justify-center gap-6">
@@ -101,7 +102,7 @@ const Footer = () => {
             Built on real consumer research. Powered by free, open APIs.
           </p>
           <p className="text-xs text-primary-foreground/50">
-            (c) 2026 <BrandName /><sup className="text-[10px] align-super ml-0.5">TM</sup>. Built with open science &amp; real user data.
+            (c) 2026 SkinLytix. Built with open science &amp; real user data.
           </p>
         </div>
       </div>

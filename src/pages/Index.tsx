@@ -2,7 +2,6 @@ import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import Navigation from "@/components/Navigation";
-import BrandName from "@/components/landing/BrandName";
 import Hero from "@/components/landing/Hero";
 import ProblemSection from "@/components/landing/ProblemSection";
 import FreeChecklist from "@/components/landing/FreeChecklist";
@@ -30,14 +29,18 @@ const Index = () => {
     <main className="min-h-screen font-landing">
       <header className="sticky top-0 z-50 w-full bg-azure text-primary-foreground">
         <div className="container mx-auto px-[10px] lg:px-6">
-          <div className="flex h-16 items-center justify-between">
+          <div className="flex items-center justify-between">
             <button
               type="button"
               onClick={() => window.document.getElementById("home")?.scrollIntoView({ behavior: "smooth" })}
-              className="font-heading text-xl md:text-2xl font-bold text-primary-foreground hover:text-primary-foreground/80 transition-colors"
+              className="hover:opacity-80 transition-opacity"
               aria-label="SkinLytix home"
             >
-              <BrandName />
+              <img
+                src="/logo.png"
+                alt="SkinLytix"
+                className="h-[50px] md:h-[65px] w-auto object-contain pl-[15px] md:pl-0"
+              />
             </button>
             <Navigation />
           </div>

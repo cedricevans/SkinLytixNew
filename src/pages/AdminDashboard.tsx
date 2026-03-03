@@ -13,13 +13,15 @@ import {
   Users2,
   BarChart3,
   Shield,
-  Lock
+  Lock,
+  Mail
 } from 'lucide-react';
 import invokeFunction from '@/lib/functions-client';
 import UserRoleManager from '@/components/admin/UserRoleManager';
 import CertificationManager from '@/components/admin/CertificationManager';
 import ReviewerGroupManager from '@/components/admin/ReviewerGroupManager';
 import AuditLog from '@/components/admin/AuditLog';
+import WaitlistMagicLinkManager from '@/components/admin/WaitlistMagicLinkManager';
 
 // Authorized admin emails
 const ADMIN_EMAILS = [
@@ -225,7 +227,7 @@ export default function AdminDashboard() {
 
         {/* Management Tabs */}
         <Tabs defaultValue="users" className="w-full">
-          <TabsList className="grid w-full grid-cols-2 sm:grid-cols-4 gap-2 h-auto">
+          <TabsList className="grid w-full grid-cols-2 sm:grid-cols-5 gap-2 h-auto">
             <TabsTrigger value="users" className="flex items-center gap-2">
               <Users className="h-4 w-4" />
               <span className="hidden sm:inline">Users & Roles</span>
@@ -245,6 +247,11 @@ export default function AdminDashboard() {
               <BarChart3 className="h-4 w-4" />
               <span className="hidden sm:inline">Audit Log</span>
               <span className="sm:hidden">Audit</span>
+            </TabsTrigger>
+            <TabsTrigger value="waitlist" className="flex items-center gap-2">
+              <Mail className="h-4 w-4" />
+              <span className="hidden sm:inline">Waitlist</span>
+              <span className="sm:hidden">Waitlist</span>
             </TabsTrigger>
           </TabsList>
 
@@ -266,6 +273,11 @@ export default function AdminDashboard() {
           {/* Audit Log Tab */}
           <TabsContent value="audit" className="mt-6">
             <AuditLog />
+          </TabsContent>
+
+          {/* Waitlist Campaign Tab */}
+          <TabsContent value="waitlist" className="mt-6">
+            <WaitlistMagicLinkManager />
           </TabsContent>
         </Tabs>
       </div>

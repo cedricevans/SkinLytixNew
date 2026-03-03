@@ -39,7 +39,7 @@ const FreeChecklist = () => {
                 </p>
 
                 <p className="text-muted-foreground mb-6">
-                  Get the <span className="font-semibold text-foreground">SkinLytix™ Before-You-Buy Checklist</span> — the same framework beauty pros use (but
+                  Get the <span className="font-semibold text-foreground">SkinLytix Before-You-Buy Checklist</span> — the same framework beauty pros use (but
                   nobody ever shares publicly). This guide shows you exactly how to tell if a product is actually worth
                   your money… in under 60 seconds.
                 </p>

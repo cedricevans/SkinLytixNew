@@ -10,7 +10,32 @@ export type Database = {
   // Allows to automatically instantiate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
-    PostgrestVersion: "13.0.5"
+    PostgrestVersion: "13.0.4"
+  }
+  graphql_public: {
+    Tables: {
+      [_ in never]: never
+    }
+    Views: {
+      [_ in never]: never
+    }
+    Functions: {
+      graphql: {
+        Args: {
+          extensions?: Json
+          operationName?: string
+          query?: string
+          variables?: Json
+        }
+        Returns: Json
+      }
+    }
+    Enums: {
+      [_ in never]: never
+    }
+    CompositeTypes: {
+      [_ in never]: never
+    }
   }
   public: {
     Tables: {
@@ -44,6 +69,39 @@ export type Database = {
           name?: string
           partnership_tier?: string
           short_code?: string
+        }
+        Relationships: []
+      }
+      audit_logs: {
+        Row: {
+          action: string
+          admin_email: string | null
+          admin_id: string | null
+          created_at: string | null
+          details: Json | null
+          id: string
+          target_user_email: string | null
+          target_user_id: string | null
+        }
+        Insert: {
+          action: string
+          admin_email?: string | null
+          admin_id?: string | null
+          created_at?: string | null
+          details?: Json | null
+          id?: string
+          target_user_email?: string | null
+          target_user_id?: string | null
+        }
+        Update: {
+          action?: string
+          admin_email?: string | null
+          admin_id?: string | null
+          created_at?: string | null
+          details?: Json | null
+          id?: string
+          target_user_email?: string | null
+          target_user_id?: string | null
         }
         Relationships: []
       }
@@ -211,6 +269,13 @@ export type Database = {
             foreignKeyName: "expert_reviews_analysis_id_fkey"
             columns: ["analysis_id"]
             isOneToOne: false
+            referencedRelation: "reviewer_ingredient_work_queue"
+            referencedColumns: ["analysis_id"]
+          },
+          {
+            foreignKeyName: "expert_reviews_analysis_id_fkey"
+            columns: ["analysis_id"]
+            isOneToOne: false
             referencedRelation: "user_analyses"
             referencedColumns: ["id"]
           },
@@ -330,65 +395,197 @@ export type Database = {
         }
         Relationships: []
       }
+      ingredient_validation_citations: {
+        Row: {
+          authors: string
+          citation_type: string
+          created_at: string | null
+          doi_or_pmid: string | null
+          id: string
+          journal_name: string
+          publication_year: number | null
+          requested_source_type: string | null
+          source_id: string | null
+          source_url: string
+          title: string
+          validation_id: string
+        }
+        Insert: {
+          authors: string
+          citation_type: string
+          created_at?: string | null
+          doi_or_pmid?: string | null
+          id?: string
+          journal_name: string
+          publication_year?: number | null
+          requested_source_type?: string | null
+          source_id?: string | null
+          source_url: string
+          title: string
+          validation_id: string
+        }
+        Update: {
+          authors?: string
+          citation_type?: string
+          created_at?: string | null
+          doi_or_pmid?: string | null
+          id?: string
+          journal_name?: string
+          publication_year?: number | null
+          requested_source_type?: string | null
+          source_id?: string | null
+          source_url?: string
+          title?: string
+          validation_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ingredient_validation_citations_validation_id_fkey"
+            columns: ["validation_id"]
+            isOneToOne: false
+            referencedRelation: "ingredient_validations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       ingredient_validations: {
         Row: {
+          ai_claim_summary: string | null
           ai_explanation_accurate: boolean | null
           ai_role_classification_correct: boolean | null
           analysis_id: string | null
+          confidence_level: string | null
           corrected_role: string | null
           corrected_safety_level: string | null
           correction_notes: string | null
           created_at: string | null
+          escalation_reason: string | null
           id: string
           ingredient_name: string
+          internal_notes: string | null
+          is_escalated: boolean | null
+          moderator_review_status: string | null
           molecular_weight_correct: boolean | null
           pubchem_cid_verified: string | null
           pubchem_data_correct: boolean | null
+          public_explanation: string | null
           reference_sources: Json | null
+          updated_at: string | null
           validation_status: string | null
           validator_id: string
           validator_institution: string | null
+          verdict: string | null
         }
         Insert: {
+          ai_claim_summary?: string | null
           ai_explanation_accurate?: boolean | null
           ai_role_classification_correct?: boolean | null
           analysis_id?: string | null
+          confidence_level?: string | null
           corrected_role?: string | null
           corrected_safety_level?: string | null
           correction_notes?: string | null
           created_at?: string | null
+          escalation_reason?: string | null
           id?: string
           ingredient_name: string
+          internal_notes?: string | null
+          is_escalated?: boolean | null
+          moderator_review_status?: string | null
           molecular_weight_correct?: boolean | null
           pubchem_cid_verified?: string | null
           pubchem_data_correct?: boolean | null
+          public_explanation?: string | null
           reference_sources?: Json | null
+          updated_at?: string | null
           validation_status?: string | null
           validator_id: string
           validator_institution?: string | null
+          verdict?: string | null
         }
         Update: {
+          ai_claim_summary?: string | null
           ai_explanation_accurate?: boolean | null
           ai_role_classification_correct?: boolean | null
           analysis_id?: string | null
+          confidence_level?: string | null
           corrected_role?: string | null
           corrected_safety_level?: string | null
           correction_notes?: string | null
           created_at?: string | null
+          escalation_reason?: string | null
           id?: string
           ingredient_name?: string
+          internal_notes?: string | null
+          is_escalated?: boolean | null
+          moderator_review_status?: string | null
           molecular_weight_correct?: boolean | null
           pubchem_cid_verified?: string | null
           pubchem_data_correct?: boolean | null
+          public_explanation?: string | null
           reference_sources?: Json | null
+          updated_at?: string | null
           validation_status?: string | null
           validator_id?: string
           validator_institution?: string | null
+          verdict?: string | null
         }
         Relationships: [
           {
             foreignKeyName: "ingredient_validations_analysis_id_fkey"
             columns: ["analysis_id"]
+            isOneToOne: false
+            referencedRelation: "reviewer_ingredient_work_queue"
+            referencedColumns: ["analysis_id"]
+          },
+          {
+            foreignKeyName: "ingredient_validations_analysis_id_fkey"
+            columns: ["analysis_id"]
+            isOneToOne: false
+            referencedRelation: "user_analyses"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      market_dupe_cache: {
+        Row: {
+          created_at: string | null
+          dupes: Json | null
+          dupes_count: number | null
+          id: string
+          source_product_id: string
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          dupes?: Json | null
+          dupes_count?: number | null
+          id?: string
+          source_product_id: string
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          dupes?: Json | null
+          dupes_count?: number | null
+          id?: string
+          source_product_id?: string
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "market_dupe_cache_source_product_id_fkey"
+            columns: ["source_product_id"]
+            isOneToOne: false
+            referencedRelation: "reviewer_ingredient_work_queue"
+            referencedColumns: ["analysis_id"]
+          },
+          {
+            foreignKeyName: "market_dupe_cache_source_product_id_fkey"
+            columns: ["source_product_id"]
             isOneToOne: false
             referencedRelation: "user_analyses"
             referencedColumns: ["id"]
@@ -530,6 +727,69 @@ export type Database = {
         }
         Relationships: []
       }
+      reviewer_group_members: {
+        Row: {
+          added_by: string | null
+          created_at: string | null
+          group_id: string
+          id: string
+          user_id: string
+        }
+        Insert: {
+          added_by?: string | null
+          created_at?: string | null
+          group_id: string
+          id?: string
+          user_id: string
+        }
+        Update: {
+          added_by?: string | null
+          created_at?: string | null
+          group_id?: string
+          id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "reviewer_group_members_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "reviewer_groups"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "reviewer_group_members_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      reviewer_groups: {
+        Row: {
+          created_at: string | null
+          created_by: string | null
+          description: string | null
+          id: string
+          name: string
+        }
+        Insert: {
+          created_at?: string | null
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          name: string
+        }
+        Update: {
+          created_at?: string | null
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          name?: string
+        }
+        Relationships: []
+      }
       routine_optimizations: {
         Row: {
           created_at: string
@@ -588,6 +848,13 @@ export type Database = {
           usage_frequency?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "routine_products_analysis_id_fkey"
+            columns: ["analysis_id"]
+            isOneToOne: false
+            referencedRelation: "reviewer_ingredient_work_queue"
+            referencedColumns: ["analysis_id"]
+          },
           {
             foreignKeyName: "routine_products_analysis_id_fkey"
             columns: ["analysis_id"]
@@ -669,6 +936,13 @@ export type Database = {
           user_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "saved_dupes_source_product_id_fkey"
+            columns: ["source_product_id"]
+            isOneToOne: false
+            referencedRelation: "reviewer_ingredient_work_queue"
+            referencedColumns: ["analysis_id"]
+          },
           {
             foreignKeyName: "saved_dupes_source_product_id_fkey"
             columns: ["source_product_id"]
@@ -906,7 +1180,7 @@ export type Database = {
         Insert: {
           created_at?: string | null
           id?: string
-          role: Database["public"]["Enums"]["app_role"]
+          role?: Database["public"]["Enums"]["app_role"]
           user_id: string
         }
         Update: {
@@ -915,7 +1189,15 @@ export type Database = {
           role?: Database["public"]["Enums"]["app_role"]
           user_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "user_roles_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       waitlist: {
         Row: {
@@ -950,89 +1232,122 @@ export type Database = {
         }
         Relationships: []
       }
+      waitlist_special_pricing: {
+        Row: {
+          activated_at: string | null
+          activated_subscription_id: string | null
+          billing_cycle: string | null
+          created_at: string
+          discount_percentage: number
+          discounted_price: number | null
+          email: string
+          email_sent_at: string | null
+          id: string
+          metadata: Json
+          original_price: number | null
+          promo_code: string
+          status: string
+          tier_offering: string
+          updated_at: string
+          user_id: string | null
+          valid_from: string
+          valid_until: string
+          waitlist_user_id: string | null
+        }
+        Insert: {
+          activated_at?: string | null
+          activated_subscription_id?: string | null
+          billing_cycle?: string | null
+          created_at?: string
+          discount_percentage: number
+          discounted_price?: number | null
+          email: string
+          email_sent_at?: string | null
+          id?: string
+          metadata?: Json
+          original_price?: number | null
+          promo_code: string
+          status?: string
+          tier_offering: string
+          updated_at?: string
+          user_id?: string | null
+          valid_from?: string
+          valid_until: string
+          waitlist_user_id?: string | null
+        }
+        Update: {
+          activated_at?: string | null
+          activated_subscription_id?: string | null
+          billing_cycle?: string | null
+          created_at?: string
+          discount_percentage?: number
+          discounted_price?: number | null
+          email?: string
+          email_sent_at?: string | null
+          id?: string
+          metadata?: Json
+          original_price?: number | null
+          promo_code?: string
+          status?: string
+          tier_offering?: string
+          updated_at?: string
+          user_id?: string | null
+          valid_from?: string
+          valid_until?: string
+          waitlist_user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "waitlist_special_pricing_waitlist_user_id_fkey"
+            columns: ["waitlist_user_id"]
+            isOneToOne: false
+            referencedRelation: "waitlist"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
-      analytics_daily_active_users: {
+      reviewer_ingredient_work_queue: {
         Row: {
-          active_users: number | null
-          date: string | null
+          analysis_id: string | null
+          brand: string | null
+          final_label: string | null
+          ingredient_name: string | null
+          last_activity_at: string | null
+          needs_review: boolean | null
+          product_name: string | null
+          user_id: string | null
+          validation_status: string | null
+          validator_id: string | null
+          verdict: string | null
+          worked_on: boolean | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "user_analyses_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
       }
-      analytics_feature_adoption: {
+      reviewer_stats: {
         Row: {
-          event_category: string | null
-          event_count: number | null
-          event_name: string | null
-          unique_users: number | null
-        }
-        Relationships: []
-      }
-      conversion_funnel_metrics: {
-        Row: {
-          completed_onboarding: number | null
-          date: string | null
-          demo_clicks: number | null
-          demo_ctr: number | null
-          first_analysis: number | null
-          homepage_views: number | null
-          onboarding_completion_rate: number | null
-          signup_clicks: number | null
-          signup_ctr: number | null
-        }
-        Relationships: []
-      }
-      cta_performance_metrics: {
-        Row: {
-          cta_text: string | null
-          date: string | null
-          event_name: string | null
-          location: string | null
-          total_clicks: number | null
-          unique_users: number | null
-        }
-        Relationships: []
-      }
-      engagement_metrics_summary: {
-        Row: {
-          analyses: number | null
-          avg_conversions_per_user: number | null
-          avg_engagement_per_user: number | null
-          conversion_events: number | null
-          daily_active_users: number | null
-          date: string | null
-          engagement_events: number | null
-          routines_created: number | null
-          routines_optimized: number | null
-        }
-        Relationships: []
-      }
-      rate_limit_abuse_alerts: {
-        Row: {
-          endpoint: string | null
-          first_request: string | null
-          ip_address: string | null
-          last_request: string | null
-          requests_last_5min: number | null
-          total_requests: number | null
-        }
-        Relationships: []
-      }
-      user_journey_analysis: {
-        Row: {
-          avg_minutes_to_complete_onboarding: number | null
-          avg_minutes_to_demo: number | null
-          avg_minutes_to_signup: number | null
-          clicked_demo: number | null
-          clicked_signup: number | null
-          completed_first_analysis: number | null
-          completed_onboarding: number | null
-          homepage_to_demo_rate: number | null
-          homepage_to_signup_rate: number | null
-          onboarding_to_analysis_rate: number | null
-          signup_to_onboarding_rate: number | null
-          total_users: number | null
-          viewed_homepage: number | null
+          approval_rate: number | null
+          approved_count: number | null
+          confirmed_validations: number | null
+          corrected_validations: number | null
+          escalated_validations: number | null
+          high_confidence_count: number | null
+          institution: string | null
+          last_validation_date: string | null
+          limited_confidence_count: number | null
+          moderate_confidence_count: number | null
+          rejected_count: number | null
+          total_validations: number | null
+          user_id: string | null
         }
         Relationships: []
       }
@@ -1047,12 +1362,34 @@ export type Database = {
         }
         Returns: Json
       }
+      derive_epiq_match: {
+        Args: { p_epiq_score: number; p_melanin_alert: boolean }
+        Returns: {
+          color: string
+          pct: number
+          show_epiq_score_sublabel: boolean
+          tier: string
+          verdict: string
+        }[]
+      }
+      get_reviewer_emails: {
+        Args: { p_user_ids: string[] }
+        Returns: {
+          email: string
+          id: string
+        }[]
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
           _user_id: string
         }
         Returns: boolean
+      }
+      is_admin: { Args: { _user_id: string }; Returns: boolean }
+      recalculate_analysis_score_from_validations: {
+        Args: { p_analysis_id: string }
+        Returns: number
       }
     }
     Enums: {
@@ -1184,6 +1521,9 @@ export type CompositeTypes<
     : never
 
 export const Constants = {
+  graphql_public: {
+    Enums: {},
+  },
   public: {
     Enums: {
       app_role: ["admin", "moderator", "user"],

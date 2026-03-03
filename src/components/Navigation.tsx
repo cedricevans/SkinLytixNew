@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Bell, ClipboardCheck, LogOut, Menu, Settings, User, Shield } from "lucide-react";
+import { Bell, ClipboardCheck, Crown, LogOut, Menu, Settings, User, Shield } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import {
@@ -13,6 +13,7 @@ import { useNavigate } from "react-router-dom";
 import { useReviewerAccess } from "@/hooks/useReviewerAccess";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { cn } from "@/lib/utils";
 
 const ADMIN_EMAILS = [
   'cedric.evans@gmail.com',
@@ -50,6 +51,7 @@ const Navigation = ({
   const { toast } = useToast();
   const [userEmail, setUserEmail] = useState<string | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [isWaitlister, setIsWaitlister] = useState(false);
   const isAppNav = variant === "app";
   const navigationItems = isAppNav ? appNavigationItems : marketingNavigationItems;
   const desktopNavigationItems = isAppNav
@@ -79,6 +81,7 @@ const Navigation = ({
         setUserInitials("SL");
         setUserEmail(null);
         setIsAdmin(false);
+        setIsWaitlister(false);
         if (typeof window !== "undefined") {
           localStorage.removeItem("sl_user_initials");
         }
@@ -105,6 +108,38 @@ const Navigation = ({
         console.error('Failed to load admin role', e);
         setIsAdmin(emailIsAdmin);
       }
+
+      try {
+        const { data: waitlistEntry } = await supabase
+          .from("waitlist")
+          .select("id")
+          .ilike("email", email || "")
+          .maybeSingle();
+
+        const waitlister = Boolean(waitlistEntry);
+        setIsWaitlister(waitlister);
+
+        if (waitlister) {
+          const { data: existingBadge } = await supabase
+            .from("user_badges")
+            .select("id")
+            .eq("user_id", user.id)
+            .eq("badge_type", "waitlister")
+            .maybeSingle();
+
+          if (!existingBadge) {
+            await supabase.from("user_badges").insert({
+              user_id: user.id,
+              badge_type: "waitlister",
+              metadata: { source: "waitlist" },
+            });
+          }
+        }
+      } catch (e) {
+        console.error("Failed to resolve waitlister status", e);
+        setIsWaitlister(false);
+      }
+
       if (typeof window !== "undefined") {
         localStorage.setItem("sl_user_initials", nextInitials);
       }
@@ -165,15 +200,33 @@ const Navigation = ({
         <Button
           variant="ghost"
           size="icon"
-          className={className}
+          className={cn(
+            "relative overflow-visible",
+            className,
+            isWaitlister && "ring-2 ring-amber-300 ring-offset-1 ring-offset-primary/20"
+          )}
           aria-label="Open profile menu"
         >
           <span className="text-xs font-semibold">
             {userInitials || (isInitialsLoaded ? "SL" : "...")}
           </span>
+          {isWaitlister && (
+            <span className="absolute -right-1 -top-1 flex h-4 w-4 items-center justify-center rounded-full bg-amber-500 text-white shadow-sm">
+              <Crown className="h-2.5 w-2.5" />
+            </span>
+          )}
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-44">
+        {isWaitlister && (
+          <>
+            <DropdownMenuItem disabled>
+              <Crown className="mr-2 h-4 w-4 text-amber-500" />
+              Waitlister
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+          </>
+        )}
         <DropdownMenuItem onClick={() => navigate("/profile")}>
           <User className="mr-2 h-4 w-4" />
           Profile

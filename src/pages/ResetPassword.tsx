@@ -7,7 +7,6 @@ import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import Navigation from "@/components/Navigation";
-import BrandName from "@/components/landing/BrandName";
 
 const ResetPassword = () => {
   const navigate = useNavigate();
@@ -121,10 +120,14 @@ const ResetPassword = () => {
           <button
             type="button"
             onClick={() => navigate('/')}
-            className="font-heading text-lg font-bold text-primary-foreground hover:opacity-80 transition-opacity"
+            className="hover:opacity-80 transition-opacity"
             aria-label="SkinLytix home"
           >
-            <BrandName />
+            <img
+              src="/logo.png"
+              alt="SkinLytix"
+              className="h-[50px] md:h-[65px] w-auto object-contain pl-[15px] md:pl-0"
+            />
           </button>
           <Navigation />
         </div>

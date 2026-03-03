@@ -5,7 +5,7 @@ interface BrandNameProps {
 }
 
 /**
- * Reusable component for displaying the SkinLytix brand name with trademark symbol.
+ * Reusable component for displaying the SkinLytix brand name.
  * Use this component anywhere the brand name appears in the UI.
  * 
  * @example
@@ -13,13 +13,13 @@ interface BrandNameProps {
  * <BrandName />
  * 
  * @example
- * // With suffix (e.g., "SkinLytix TM Analyzer")
+ * // With suffix (e.g., "SkinLytix Analyzer")
  * <BrandName> Analyzer</BrandName>
  */
 const BrandName = ({ children }: BrandNameProps) => {
   return (
     <>
-      SkinLytix<sup className="text-[0.6em]">TM</sup>{children}
+      SkinLytix{children}
     </>
   );
 };

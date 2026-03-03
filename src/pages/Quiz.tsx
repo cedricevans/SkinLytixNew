@@ -3,7 +3,6 @@ import { useNavigate } from "react-router-dom";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import Navigation from "@/components/Navigation";
-import BrandName from "@/components/landing/BrandName";
 import { SkinTypeQuiz } from "@/components/SkinTypeQuiz";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
@@ -42,14 +41,18 @@ const Quiz = () => {
   return (
     <main className="min-h-screen bg-gradient-to-b from-background to-muted">
       <header className="sticky top-0 z-50 w-full bg-primary text-primary-foreground">
-        <div className="max-w-6xl mx-auto px-[5px] lg:px-4 flex items-center justify-between h-16">
+        <div className="max-w-6xl mx-auto px-[5px] lg:px-4 flex items-center justify-between">
           <button
             type="button"
             onClick={() => navigate('/')}
-            className="font-heading text-xl font-bold text-primary-foreground hover:opacity-80 transition-opacity"
+            className="hover:opacity-80 transition-opacity"
             aria-label="SkinLytix home"
           >
-            <BrandName />
+            <img
+              src="/logo.png"
+              alt="SkinLytix"
+              className="h-[50px] md:h-[65px] w-auto object-contain pl-[15px] md:pl-0"
+            />
           </button>
           <Navigation />
         </div>
