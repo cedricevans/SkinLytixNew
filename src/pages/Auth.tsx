@@ -407,7 +407,7 @@ const Auth = () => {
         type="button"
         onClick={handleKioskQuickLogin}
         disabled={isKioskLoading || isLoading}
-        className="fixed bottom-4 right-4 z-50 rounded-full border border-primary/25 bg-background/95 px-4 py-2 text-xs font-semibold text-foreground shadow-lg backdrop-blur transition hover:bg-background disabled:opacity-60"
+        className="fixed bottom-4 left-1/2 -translate-x-1/2 z-50 rounded-full border border-primary/25 bg-background/95 px-4 py-2 text-xs font-semibold text-foreground shadow-lg backdrop-blur transition hover:bg-background disabled:opacity-60"
       >
         {isKioskLoading ? "Entering kiosk..." : "Kiosk Mode"}
       </button>
