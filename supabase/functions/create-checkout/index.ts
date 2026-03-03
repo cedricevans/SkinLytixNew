@@ -21,6 +21,42 @@ const logStep = (step: string, details?: any) => {
   console.log(`[CREATE-CHECKOUT] ${step}${detailsStr}`);
 };
 
+const DEFAULT_SITE_URL = "https://www.skinlytix.com";
+
+const normalizeOrigin = (value: string | null | undefined): string | null => {
+  if (!value) return null;
+  try {
+    const parsed = new URL(value);
+    return `${parsed.protocol}//${parsed.host}`;
+  } catch {
+    return null;
+  }
+};
+
+const resolveRequestOrigin = (req: Request): string => {
+  const configuredSite = normalizeOrigin(Deno.env.get("SITE_URL")) || DEFAULT_SITE_URL;
+  const configuredAllowed = (Deno.env.get("ALLOWED_ORIGINS") || "")
+    .split(",")
+    .map((entry) => normalizeOrigin(entry.trim()))
+    .filter((entry): entry is string => Boolean(entry));
+
+  const allowedOrigins = new Set<string>([
+    configuredSite,
+    "https://www.skinlytix.com",
+    "https://skinlytix.com",
+    "http://localhost:5173",
+    "http://localhost:3000",
+    ...configuredAllowed,
+  ]);
+
+  const requestOrigin = normalizeOrigin(req.headers.get("origin"));
+  if (requestOrigin && allowedOrigins.has(requestOrigin)) {
+    return requestOrigin;
+  }
+
+  return configuredSite;
+};
+
 type WaitlistOffer = {
   id: string;
   user_id: string | null;
@@ -223,7 +259,7 @@ serve(async (req) => {
       logStep("No existing customer, will create during checkout");
     }
 
-    const origin = req.headers.get("origin") || "https://yflbjaetupvakadqjhfb.lovableproject.com";
+    const origin = resolveRequestOrigin(req);
     
     const session = await stripe.checkout.sessions.create({
       customer: customerId,
