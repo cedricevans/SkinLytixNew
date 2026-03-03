@@ -20,6 +20,18 @@ interface PaywallModalProps {
   showTrial?: boolean;
 }
 
+type WaitlistOffer = {
+  id: string;
+  promo_code: string;
+  tier_offering: 'premium' | 'pro';
+  billing_cycle: 'monthly' | 'annual' | null;
+  discount_percentage: number;
+  original_price: number | null;
+  discounted_price: number | null;
+  valid_until: string;
+  status: 'pending' | 'sent' | 'activated' | 'expired' | 'cancelled';
+};
+
 const PREMIUM_FEATURES = [
   'Full EpiQ Score breakdown',
   'Complete AI explanations',
@@ -50,6 +62,8 @@ export function PaywallModal({
   const [billingCycle, setBillingCycle] = useState<'monthly' | 'annual'>('annual');
   const [socialProofCount, setSocialProofCount] = useState(847);
   const [isLoading, setIsLoading] = useState(false);
+  const [eligibleOffers, setEligibleOffers] = useState<WaitlistOffer[]>([]);
+  const [loadingOffers, setLoadingOffers] = useState(false);
 
   // Simulate real-time social proof updates
   useEffect(() => {
@@ -61,15 +75,94 @@ export function PaywallModal({
     }
   }, [open]);
 
+  useEffect(() => {
+    if (!open) return;
+    let isMounted = true;
+
+    const loadEligibleOffers = async () => {
+      setLoadingOffers(true);
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session?.user) {
+          if (isMounted) setEligibleOffers([]);
+          return;
+        }
+
+        const nowIso = new Date().toISOString();
+        const { data, error } = await (supabase as any)
+          .from('waitlist_special_pricing')
+          .select('id,promo_code,tier_offering,billing_cycle,discount_percentage,original_price,discounted_price,valid_until,status')
+          .in('status', ['pending', 'sent', 'activated'])
+          .gt('valid_until', nowIso)
+          .order('discount_percentage', { ascending: false })
+          .limit(20);
+
+        if (error) throw error;
+
+        const offers = (data || []) as WaitlistOffer[];
+        if (!isMounted) return;
+        setEligibleOffers(offers);
+
+        // Pre-select plan/cycle to the best waitlist offer, if available.
+        const best = offers[0];
+        if (best) {
+          setSelectedPlan(best.tier_offering);
+          if (best.billing_cycle === 'monthly' || best.billing_cycle === 'annual') {
+            setBillingCycle(best.billing_cycle);
+          }
+        }
+      } catch (error) {
+        console.error('Failed to load waitlist offers for paywall:', error);
+        if (isMounted) setEligibleOffers([]);
+      } finally {
+        if (isMounted) setLoadingOffers(false);
+      }
+    };
+
+    loadEligibleOffers();
+    return () => {
+      isMounted = false;
+    };
+  }, [open]);
+
+  const activeOffer = eligibleOffers
+    .filter((offer) => {
+      if (offer.tier_offering !== selectedPlan) return false;
+      if (offer.billing_cycle && offer.billing_cycle !== billingCycle) return false;
+      return true;
+    })
+    .sort((a, b) => b.discount_percentage - a.discount_percentage)[0] || null;
+
   const getPricing = () => {
+    const basePrice = selectedPlan === 'premium'
+      ? (billingCycle === 'monthly' ? 7.99 : 6.58)
+      : (billingCycle === 'monthly' ? 14.99 : 12.42);
+
+    const savings = selectedPlan === 'premium'
+      ? (billingCycle === 'annual' ? 'Save $17/year' : null)
+      : (billingCycle === 'annual' ? 'Save $31/year' : null);
+
+    if (activeOffer) {
+      const discountedNumeric = activeOffer.discounted_price ?? Number(
+        (basePrice * (1 - activeOffer.discount_percentage / 100)).toFixed(2)
+      );
+      return {
+        price: `$${discountedNumeric.toFixed(2)}`,
+        period: '/month',
+        savings,
+        originalPrice: `$${basePrice.toFixed(2)}`,
+        waitlistDiscount: `${activeOffer.discount_percentage}% off`,
+      };
+    }
+
     if (selectedPlan === 'premium') {
       return billingCycle === 'monthly' 
-        ? { price: '$7.99', period: '/month', savings: null }
-        : { price: '$6.58', period: '/month', savings: 'Save $17/year' };
+        ? { price: '$7.99', period: '/month', savings: null, originalPrice: null, waitlistDiscount: null }
+        : { price: '$6.58', period: '/month', savings: 'Save $17/year', originalPrice: null, waitlistDiscount: null };
     }
     return billingCycle === 'monthly'
-      ? { price: '$14.99', period: '/month', savings: null }
-      : { price: '$12.42', period: '/month', savings: 'Save $31/year' };
+      ? { price: '$14.99', period: '/month', savings: null, originalPrice: null, waitlistDiscount: null }
+      : { price: '$12.42', period: '/month', savings: 'Save $31/year', originalPrice: null, waitlistDiscount: null };
   };
 
   const handleCheckout = async () => {
@@ -85,7 +178,11 @@ export function PaywallModal({
       }
 
       try {
-        const data: any = await (await import('@/lib/functions-client')).invokeFunction('create-checkout', { plan: selectedPlan, billingCycle });
+        const data: any = await (await import('@/lib/functions-client')).invokeFunction('create-checkout', {
+          plan: selectedPlan,
+          billingCycle,
+          promoCode: activeOffer?.promo_code,
+        });
         if (data?.url) {
           const popup = window.open(data.url, '_blank');
           if (!popup) {
@@ -226,6 +323,21 @@ export function PaywallModal({
             </button>
           </div>
 
+          {(loadingOffers || activeOffer) && (
+            <div className="rounded-lg border border-primary/20 bg-primary/5 p-3 text-sm">
+              {loadingOffers ? (
+                <span className="text-muted-foreground">Checking your waitlist pricing...</span>
+              ) : activeOffer ? (
+                <div className="space-y-1">
+                  <p className="font-medium text-primary">Waitlist offer detected: {activeOffer.discount_percentage}% off</p>
+                  <p className="text-muted-foreground">
+                    Promo: {activeOffer.promo_code} • Valid until {new Date(activeOffer.valid_until).toLocaleDateString()}
+                  </p>
+                </div>
+              ) : null}
+            </div>
+          )}
+
           {/* Features List */}
           <div className="space-y-2">
             {(selectedPlan === 'premium' ? PREMIUM_FEATURES : PRO_FEATURES).map((feat, i) => (
@@ -263,6 +375,13 @@ export function PaywallModal({
 
             {/* Price anchoring */}
             <div className="text-center text-sm text-muted-foreground">
+              {pricing.originalPrice && pricing.waitlistDiscount && (
+                <span className="mr-1">
+                  <span className="line-through opacity-70">{pricing.originalPrice}</span>
+                  <span className="ml-2 text-green-600 font-medium">{pricing.waitlistDiscount}</span>
+                  <span> • </span>
+                </span>
+              )}
               {billingCycle === 'annual' && pricing.savings && (
                 <span className="text-green-600 font-medium">{pricing.savings} • </span>
               )}

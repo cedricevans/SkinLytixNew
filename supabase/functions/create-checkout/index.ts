@@ -43,7 +43,8 @@ const isOfferActiveForCheckout = (
   billingCycle: "monthly" | "annual",
 ) => {
   if (!offer) return false;
-  if (!["pending", "sent"].includes(offer.status)) return false;
+  // "activated" can be set by auth-linking flow before checkout completion.
+  if (!["pending", "sent", "activated"].includes(offer.status)) return false;
   if (offer.tier_offering !== plan) return false;
   if (offer.billing_cycle && offer.billing_cycle !== billingCycle) return false;
 
@@ -134,7 +135,7 @@ serve(async (req) => {
           .from("waitlist_special_pricing")
           .select("*")
           .eq("user_id", user.id)
-          .in("status", ["pending", "sent"])
+          .in("status", ["pending", "sent", "activated"])
           .limit(10);
 
         if (userOffersError) {
@@ -152,7 +153,7 @@ serve(async (req) => {
           .from("waitlist_special_pricing")
           .select("*")
           .ilike("email", normalizedEmail)
-          .in("status", ["pending", "sent"])
+          .in("status", ["pending", "sent", "activated"])
           .limit(10);
 
         if (emailOffersError) {
