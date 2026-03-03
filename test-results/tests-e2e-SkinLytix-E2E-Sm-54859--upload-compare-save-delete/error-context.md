@@ -72,6 +72,7 @@
                 - paragraph [ref=e75]:
                   - text: Don't have an account?
                   - button "Sign up here" [ref=e76] [cursor=pointer]
-  - button "Report bug or suggest feature" [ref=e77] [cursor=pointer]:
-    - img [ref=e78]
+    - button "Kiosk Mode" [ref=e77] [cursor=pointer]
+  - button "Report bug or suggest feature" [ref=e78] [cursor=pointer]:
+    - img [ref=e79]
 ```

@@ -6,6 +6,7 @@ const KIOSK_ALLOWED_FUNCTIONS = new Set([
   'extract-ingredients',
   'analyze-product',
   'delete-analysis',
+  'create-kiosk-transfer',
 ]);
 
 /**

@@ -271,25 +271,26 @@ export default function WaitlistMagicLinkManager() {
           ) : offers.length === 0 ? (
             <p className="text-sm text-muted-foreground">No waitlist offers found.</p>
           ) : (
-            <div className="max-h-96 overflow-y-auto border rounded">
-              <table className="w-full text-sm">
+            <div className="max-h-96 overflow-auto border rounded">
+              <table className="w-full min-w-[760px] text-sm">
                 <thead className="sticky top-0 bg-background border-b">
                   <tr>
-                    <th className="text-left p-2">Email</th>
-                    <th className="text-left p-2">Status</th>
-                    <th className="text-left p-2">Sent At</th>
-                    <th className="text-left p-2">Linked</th>
-                    <th className="text-left p-2">Action</th>
+                    <th className="text-left p-2 whitespace-nowrap">Email</th>
+                    <th className="text-left p-2 whitespace-nowrap">Status</th>
+                    <th className="text-left p-2 whitespace-nowrap">Sent At</th>
+                    <th className="text-left p-2 whitespace-nowrap">Linked</th>
+                    <th className="text-left p-2 whitespace-nowrap">Action</th>
                   </tr>
                 </thead>
                 <tbody>
                   {offers.slice(0, 100).map((offer) => (
                     <tr key={offer.id} className="border-b">
-                      <td className="p-2 break-all">
+                      <td className="p-2 max-w-[300px] truncate">
                         <button
                           type="button"
                           className="text-left text-primary hover:underline"
                           onClick={() => openSingleSendForEmail(offer.email)}
+                          title={offer.email}
                         >
                           {offer.email}
                         </button>
@@ -297,11 +298,11 @@ export default function WaitlistMagicLinkManager() {
                       <td className="p-2">
                         <Badge variant={offer.status === "activated" ? "default" : "secondary"}>{offer.status}</Badge>
                       </td>
-                      <td className="p-2">
+                      <td className="p-2 whitespace-nowrap">
                         {offer.email_sent_at ? new Date(offer.email_sent_at).toLocaleString() : "Not sent"}
                       </td>
-                      <td className="p-2">{offer.user_id ? "Yes" : "No"}</td>
-                      <td className="p-2">
+                      <td className="p-2 whitespace-nowrap">{offer.user_id ? "Yes" : "No"}</td>
+                      <td className="p-2 whitespace-nowrap">
                         <Button
                           size="sm"
                           variant="outline"

@@ -5,6 +5,7 @@ export const isKioskEmail = (email?: string | null): boolean =>
 
 export const getKioskRedirectPath = (pathname: string, search: string): string | null => {
   if (pathname === "/kiosk") return null;
+  if (pathname === "/kiosk/claim") return null;
 
   const searchParams = new URLSearchParams(search);
 

@@ -13,6 +13,22 @@ import { KIOSK_EMAIL, isKioskEmail } from "@/lib/kiosk";
 
 const KIOSK_PASSWORD = "Alicia123@D";
 
+const resolveNextPath = (rawValue: string | null) => {
+  if (!rawValue) return null;
+  const value = rawValue.trim();
+  if (!value) return null;
+  try {
+    const decoded = decodeURIComponent(value);
+    if (decoded.startsWith("/") && !decoded.startsWith("//")) {
+      return decoded;
+    }
+  } catch {
+    // fall through
+  }
+  if (value.startsWith("/") && !value.startsWith("//")) return value;
+  return null;
+};
+
 const Auth = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -26,6 +42,9 @@ const Auth = () => {
   
   const [signInEmail, setSignInEmail] = useState("");
   const [signInPassword, setSignInPassword] = useState("");
+  const nextPath = resolveNextPath(searchParams.get("next"));
+  const getAuthTabUrl = (tab: "signin" | "signup") =>
+    nextPath ? `/auth?tab=${tab}&next=${encodeURIComponent(nextPath)}` : `/auth?tab=${tab}`;
 
   const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -95,6 +114,11 @@ const Auth = () => {
         title: "Welcome Back!",
         description: "Successfully signed in.",
       });
+
+      if (nextPath) {
+        navigate(nextPath);
+        return;
+      }
       
       // Route based on profile status
       if (!profile?.is_profile_complete) {
@@ -338,7 +362,7 @@ const Auth = () => {
                       Don&apos;t have an account?{" "}
                       <button
                         type="button"
-                        onClick={() => navigate("/auth?tab=signup")}
+                        onClick={() => navigate(getAuthTabUrl("signup"))}
                         className="font-semibold text-foreground hover:text-emerald-600 transition-colors"
                       >
                         Sign up here
@@ -388,7 +412,7 @@ const Auth = () => {
                       Already have an account?{" "}
                       <button
                         type="button"
-                        onClick={() => navigate("/auth?tab=signin")}
+                        onClick={() => navigate(getAuthTabUrl("signin"))}
                         className="font-semibold text-foreground hover:text-emerald-600 transition-colors"
                       >
                         Sign in here

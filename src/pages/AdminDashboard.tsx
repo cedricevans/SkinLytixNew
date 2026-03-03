@@ -16,7 +16,8 @@ import {
   Shield,
   Lock,
   Mail,
-  Monitor
+  Monitor,
+  Smartphone
 } from 'lucide-react';
 import invokeFunction from '@/lib/functions-client';
 import UserRoleManager from '@/components/admin/UserRoleManager';
@@ -24,6 +25,7 @@ import CertificationManager from '@/components/admin/CertificationManager';
 import ReviewerGroupManager from '@/components/admin/ReviewerGroupManager';
 import AuditLog from '@/components/admin/AuditLog';
 import WaitlistMagicLinkManager from '@/components/admin/WaitlistMagicLinkManager';
+import KioskAnalyticsManager from '@/components/admin/KioskAnalyticsManager';
 
 // Authorized admin emails
 const ADMIN_EMAILS = [
@@ -244,7 +246,7 @@ export default function AdminDashboard() {
 
         {/* Management Tabs */}
         <Tabs defaultValue="users" className="w-full">
-          <TabsList className="grid w-full grid-cols-2 sm:grid-cols-5 gap-2 h-auto">
+          <TabsList className="grid w-full grid-cols-2 sm:grid-cols-6 gap-2 h-auto">
             <TabsTrigger value="users" className="flex items-center gap-2">
               <Users className="h-4 w-4" />
               <span className="hidden sm:inline">Users & Roles</span>
@@ -269,6 +271,11 @@ export default function AdminDashboard() {
               <Mail className="h-4 w-4" />
               <span className="hidden sm:inline">Waitlist</span>
               <span className="sm:hidden">Waitlist</span>
+            </TabsTrigger>
+            <TabsTrigger value="kiosk" className="flex items-center gap-2">
+              <Smartphone className="h-4 w-4" />
+              <span className="hidden sm:inline">Kiosk Analytics</span>
+              <span className="sm:hidden">Kiosk</span>
             </TabsTrigger>
           </TabsList>
 
@@ -295,6 +302,10 @@ export default function AdminDashboard() {
           {/* Waitlist Campaign Tab */}
           <TabsContent value="waitlist" className="mt-6">
             <WaitlistMagicLinkManager />
+          </TabsContent>
+
+          <TabsContent value="kiosk" className="mt-6">
+            <KioskAnalyticsManager />
           </TabsContent>
         </Tabs>
       </div>

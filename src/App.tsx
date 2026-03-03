@@ -34,6 +34,7 @@ import Pricing from "./pages/Pricing";
 import NotFound from "./pages/NotFound";
 import Settings from "./pages/Settings";
 import KioskMode from "./pages/KioskMode";
+import KioskClaim from "./pages/KioskClaim";
 import StudentReviewer from "./pages/dashboard/StudentReviewer";
 import AdminDashboard from "./pages/AdminDashboard";
 import FeedbackWidget from "@/components/FeedbackWidget";
@@ -221,6 +222,7 @@ const App = () => (
           <Route path="/favorites" element={<AppProtectedRoute><Favorites /></AppProtectedRoute>} />
           <Route path="/settings" element={<AppProtectedRoute><Settings /></AppProtectedRoute>} />
           <Route path="/kiosk" element={<AppProtectedRoute><KioskMode /></AppProtectedRoute>} />
+          <Route path="/kiosk/claim" element={<KioskClaim />} />
           <Route path="/pricing" element={<Pricing />} />
           <Route path="/about" element={<About />} />
           <Route path="/faq" element={<Faq />} />
