@@ -10,12 +10,17 @@ import { useToast } from "@/hooks/use-toast";
 import { useTracking, trackEvent } from "@/hooks/useTracking";
 import { ScanLine, ArrowRight, History, TrendingUp } from "lucide-react";
 import heroBg from "@/assets/landing/hero-background.jpg";
+import { getEpiqMatchView, hasEpiqMatchData } from "@/lib/epiq-match";
 
 type Analysis = {
   id: string;
   product_name: string;
   brand: string | null;
   epiq_score: number | null;
+  epiq_match_tier?: string | null;
+  epiq_match_pct?: number | null;
+  epiq_match_color?: string | null;
+  melanin_alert?: boolean | null;
   analyzed_at: string | null;
   category: string | null;
   recommendations_json?: unknown;
@@ -32,6 +37,10 @@ type RoutineProduct = {
   id: string;
   product_name: string;
   epiq_score: number | null;
+  epiq_match_tier?: string | null;
+  epiq_match_pct?: number | null;
+  epiq_match_color?: string | null;
+  melanin_alert?: boolean | null;
   product_price: number | null;
   category: string | null;
 };
@@ -137,8 +146,8 @@ const Home = () => {
             }
 
             toast({
-              title: "Product score updated",
-              description: `Your EpiQ score changed to ${event.event_properties?.new_score ?? "a new value"} after reviewer verification.`,
+              title: "Product match updated",
+              description: `Your EpiQ Match changed to ${event.event_properties?.new_match_pct ?? event.event_properties?.new_score ?? "a new value"} after reviewer verification.`,
             });
           });
 
@@ -149,7 +158,7 @@ const Home = () => {
         const [analysesRes, totalRes, favoritesRes, routineRes] = await Promise.all([
           supabase
             .from("user_analyses")
-            .select("id, product_name, brand, epiq_score, analyzed_at, category, recommendations_json, image_url")
+            .select("id, product_name, brand, epiq_score, epiq_match_tier, epiq_match_pct, epiq_match_color, melanin_alert, analyzed_at, category, recommendations_json, image_url")
             .eq("user_id", user.id)
             .order("analyzed_at", { ascending: false })
             .limit(8),
@@ -165,7 +174,7 @@ const Home = () => {
             .limit(5),
           supabase
             .from("routine_products")
-            .select("id, product_price, category, user_analyses (product_name, epiq_score, product_price)")
+            .select("id, product_price, category, user_analyses (product_name, epiq_score, epiq_match_tier, epiq_match_pct, epiq_match_color, melanin_alert, product_price)")
             .eq("user_analyses.user_id", user.id),
         ]);
 
@@ -184,6 +193,10 @@ const Home = () => {
           id: entry.id,
           product_name: entry.user_analyses?.product_name,
           epiq_score: entry.user_analyses?.epiq_score ?? null,
+          epiq_match_tier: entry.user_analyses?.epiq_match_tier ?? null,
+          epiq_match_pct: entry.user_analyses?.epiq_match_pct ?? null,
+          epiq_match_color: entry.user_analyses?.epiq_match_color ?? null,
+          melanin_alert: entry.user_analyses?.melanin_alert ?? null,
           product_price: entry.user_analyses?.product_price ?? entry.product_price ?? null,
           category: entry.category ?? "Routine",
         }));
@@ -221,7 +234,9 @@ const Home = () => {
   const latestAnalysis = recentAnalyses[0];
 
   const hydrationScore = useMemo(() => {
-    const scores = recentAnalyses.map((analysis) => analysis.epiq_score || 0).filter(Boolean);
+    const scores = recentAnalyses
+      .map((analysis) => getEpiqMatchView(analysis).pct)
+      .filter((value) => Number.isFinite(value) && value > 0);
     if (!scores.length) return null;
     return Math.round(scores.reduce((acc, value) => acc + value, 0) / scores.length);
   }, [recentAnalyses]);
@@ -232,19 +247,19 @@ const Home = () => {
   );
 
   const highestEpiq = useMemo(
-    () => Math.max(...routineProducts.map((p) => p.epiq_score || 0), 0),
+    () => Math.max(...routineProducts.map((p) => getEpiqMatchView(p).pct), 0),
     [routineProducts]
   );
 
   const lowestEpiq = useMemo(
-    () => (routineProducts.length ? Math.min(...routineProducts.map((p) => p.epiq_score || 0)) : 0),
+    () => (routineProducts.length ? Math.min(...routineProducts.map((p) => getEpiqMatchView(p).pct)) : 0),
     [routineProducts]
   );
 
   const nextAction = useMemo(() => {
     if (!recentAnalyses.length) return "Start by scanning a product to populate this dashboard.";
     if (!routineProducts.length) return "Add scans to your routine to unlock balance insights.";
-    if (hydrationScore !== null && hydrationScore < 70) return "Your hydration index is below 70—review your routine.";
+    if (hydrationScore !== null && hydrationScore < 55) return "Your compatibility trend is below 55. Review your routine.";
     return "Keep scanning to unlock deeper ingredient insights.";
   }, [recentAnalyses.length, routineProducts.length, hydrationScore]);
 
@@ -312,7 +327,7 @@ const Home = () => {
             <Card className="bg-white/25 text-white p-4 rounded-2xl border border-white/40 shadow-lg">
               <p className="text-xs uppercase tracking-[0.4em] opacity-80">Hydration index</p>
               <p className="text-2xl font-bold">{hydrationScore !== null ? `${hydrationScore}/100` : "—"}</p>
-              <p className="text-xs text-white/80">Average EpiQ of recent scans</p>
+              <p className="text-xs text-white/80">Average EpiQ Match of recent scans</p>
             </Card>
             <Card className="bg-white/25 text-white p-4 rounded-2xl border border-white/40 shadow-lg">
               <p className="text-xs uppercase tracking-[0.4em] opacity-80">Routine balance</p>
@@ -331,10 +346,14 @@ const Home = () => {
             <p className="text-xs text-muted-foreground mt-1">Across your entire history</p>
           </Card>
           <Card className="rounded-2xl border border-[#d7e3ee] bg-white shadow-[0_10px_25px_rgba(15,23,42,0.08)] px-5 py-6">
-            <p className="text-xs uppercase tracking-[0.4em] text-muted-foreground">Latest EpiQ</p>
-            <p className="mt-3 text-3xl font-semibold">{latestAnalysis?.epiq_score ?? "—"}</p>
+            <p className="text-xs uppercase tracking-[0.4em] text-muted-foreground">Latest EpiQ Match</p>
+            <p className="mt-3 text-3xl font-semibold">
+              {latestAnalysis && hasEpiqMatchData(latestAnalysis) ? `${getEpiqMatchView(latestAnalysis).pct}%` : "—"}
+            </p>
             <p className="text-xs text-muted-foreground mt-1">
-              {latestAnalysis ? `${latestAnalysis.product_name} • ${formatDate(latestAnalysis.analyzed_at)}` : "Upload a product to see it here"}
+              {latestAnalysis
+                ? `${latestAnalysis.product_name} • ${hasEpiqMatchData(latestAnalysis) ? getEpiqMatchView(latestAnalysis).tier : "Not scored"}`
+                : "Upload a product to see it here"}
             </p>
           </Card>
           <Card className="rounded-2xl border border-[#d7e3ee] bg-white shadow-[0_10px_25px_rgba(15,23,42,0.08)] px-5 py-6">
@@ -356,18 +375,23 @@ const Home = () => {
             <h3 className="text-2xl font-semibold">Real-time routine insights</h3>
             <div className="text-sm text-white/80 space-y-2">
               <p>Total routine cost: {formatCurrency(routineCost)}</p>
-              <p>Highest EpiQ product: {highestEpiq}</p>
-              <p>Lowest EpiQ product: {lowestEpiq}</p>
+              <p>Highest match product: {highestEpiq}%</p>
+              <p>Lowest match product: {lowestEpiq}%</p>
             </div>
             <div className="space-y-2 text-sm text-white/70">
               {routineProducts.slice(0, 3).map((product) => (
+                (() => {
+                  const match = getEpiqMatchView(product);
+                  return (
                 <div key={product.id} className="flex items-center justify-between">
                   <div>
                     <p className="font-medium text-white">{product.product_name}</p>
                     <p className="text-xs text-white/60">{product.category}</p>
                   </div>
-                  <span className="text-xs text-white/60">{product.epiq_score ?? "—"} EpiQ</span>
+                  <span className="text-xs text-white/60">{hasEpiqMatchData(product) ? `${match.pct}% • ${match.tier}` : "Not scored"}</span>
                 </div>
+                  );
+                })()
               ))}
             </div>
           </Card>
@@ -461,10 +485,17 @@ const Home = () => {
             <div className="space-y-3 text-sm">
               {routineProducts.length ? (
                 routineProducts.slice(0, 3).map((product) => (
+                  (() => {
+                    const match = getEpiqMatchView(product);
+                    return (
                   <div key={product.id} className="rounded-lg bg-white/10 p-3">
                     <p className="font-medium">{product.product_name}</p>
-                    <p className="text-xs text-white/70">{product.category} • {product.epiq_score ?? "—"} EpiQ</p>
+                    <p className="text-xs text-white/70">
+                      {product.category} • {hasEpiqMatchData(product) ? `${match.pct}% Match` : "Not scored"}
+                    </p>
                   </div>
+                    );
+                  })()
                 ))
               ) : (
                 <p>No routine products yet. Add scans to populate your board.</p>
@@ -517,6 +548,9 @@ const Home = () => {
             ) : (
               <div className="space-y-3">
                 {recentAnalyses.slice(0, 5).map((analysis) => (
+                  (() => {
+                    const match = getEpiqMatchView(analysis);
+                    return (
                   <div key={analysis.id} className="flex items-center justify-between gap-4 rounded-xl border border-slate-200 bg-slate-50/70 px-4 py-3 shadow-sm">
                     <div>
                       <p className="font-semibold text-foreground">{analysis.product_name}</p>
@@ -525,10 +559,14 @@ const Home = () => {
                       </p>
                     </div>
                     <div className="text-right">
-                      <p className="text-sm font-semibold">{analysis.epiq_score ?? "—"}</p>
-                      <p className="text-[11px] uppercase text-muted-foreground tracking-[0.3em]">EpiQ</p>
+                      <p className="text-sm font-semibold">{hasEpiqMatchData(analysis) ? `${match.pct}%` : "—"}</p>
+                      <p className="text-[11px] uppercase text-muted-foreground tracking-[0.3em]">
+                        {hasEpiqMatchData(analysis) ? match.tier : "Not scored"}
+                      </p>
                     </div>
                   </div>
+                    );
+                  })()
                 ))}
               </div>
             )}

@@ -24,6 +24,7 @@ import PageHeader from "@/components/PageHeader";
 import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { fetchIngredientExplanations, IngredientExplanationInput } from "@/lib/ingredient-explanations";
+import { getEpiqMatchView } from "@/lib/epiq-match";
 
 // Lazy-load heavier, below-the-fold components
 const AIExplanationAccordion = React.lazy(() => import('@/components/AIExplanationAccordion').then(m => ({ default: m.AIExplanationAccordion })));
@@ -37,19 +38,24 @@ interface AnalysisData {
   category?: string;
   ingredients_list: string;
   epiq_score: number;
-    recommendations_json: {
-      safe_ingredients: Array<{ name: string; risk_score?: number; role?: string; explanation?: string; molecular_weight?: number; safety_profile?: string }>;
+  epiq_match_tier?: string | null;
+  epiq_match_pct?: number | null;
+  epiq_match_color?: string | null;
+  verdict?: string | null;
+  melanin_alert?: boolean | null;
+  melanin_alert_message?: string | null;
+  show_epiq_score_sublabel?: boolean | null;
+  recommendations_json: {
+    safe_ingredients: Array<{ name: string; role?: string; explanation?: string; molecular_weight?: number; safety_profile?: string }>;
     problematic_ingredients?: Array<{
       name: string;
       reason: string;
-      risk_score?: number;
     }>;
     beneficial_ingredients?: Array<{
       name: string;
       benefit: string;
-      risk_score?: number;
     }>;
-    concern_ingredients: Array<{ name: string; risk_score?: number; role?: string; explanation?: string; molecular_weight?: number; safety_profile?: string }>;
+    concern_ingredients: Array<{ name: string; role?: string; explanation?: string; molecular_weight?: number; safety_profile?: string }>;
       verification_summary?: {
         baseline_score?: number;
         validated_count?: number;
@@ -67,12 +73,20 @@ interface AnalysisData {
       routine_suggestions: string[];
       personalized?: boolean;
       fast_mode?: boolean;
+      melanin_alert?: boolean;
+      melanin_alert_message?: string | null;
+      epiq_match?: {
+        tier?: string;
+        pct?: number;
+        color?: string;
+        verdict?: string;
+      };
       sub_scores?: {
         ingredient_safety: number;
-      skin_compatibility: number;
-      active_quality: number;
-      preservative_safety: number;
-    };
+        skin_compatibility: number;
+        active_quality: number;
+        preservative_safety: number;
+      };
     product_metadata?: {
       brand?: string;
       category?: string;
@@ -585,22 +599,40 @@ const Analysis = () => {
   const needsCorrectionCount = parseCount(verificationSummary.needs_correction_count, 0);
   const hasVerificationProgress = validatedCount > 0 || pendingCount > 0 || needsCorrectionCount > 0;
 
-  const getScoreColor = (score: number) => {
-    if (score >= 70) return "text-emerald-500 dark:text-emerald-400";
-    if (score >= 50) return "text-amber-500 dark:text-amber-400";
+  const matchView = getEpiqMatchView({
+    epiq_score: analysis.epiq_score,
+    epiq_match_tier: analysis.epiq_match_tier ?? analysis.recommendations_json?.epiq_match?.tier,
+    epiq_match_pct: analysis.epiq_match_pct ?? analysis.recommendations_json?.epiq_match?.pct,
+    epiq_match_color: analysis.epiq_match_color ?? analysis.recommendations_json?.epiq_match?.color,
+    melanin_alert: analysis.melanin_alert ?? analysis.recommendations_json?.melanin_alert,
+  });
+
+  const showEpiqScoreSublabel =
+    analysis.show_epiq_score_sublabel ??
+    analysis.recommendations_json?.show_epiq_score_sublabel ??
+    !matchView.isMelaninAlert;
+
+  const melaninAlertMessage =
+    analysis.melanin_alert_message ?? analysis.recommendations_json?.melanin_alert_message ?? null;
+
+  const getScoreColor = () => {
+    if (matchView.isMelaninAlert) return "text-violet-500 dark:text-violet-400";
+    if (matchView.pct >= 90) return "text-emerald-500 dark:text-emerald-400";
+    if (matchView.pct >= 75) return "text-lime-500 dark:text-lime-400";
+    if (matchView.pct >= 55) return "text-amber-500 dark:text-amber-400";
+    if (matchView.pct >= 30) return "text-orange-500 dark:text-orange-400";
     return "text-rose-500 dark:text-rose-400";
   };
 
-  const getScoreLabel = (score: number) => {
-    if (score >= 70) return "Excellent";
-    if (score >= 50) return "Good";
-    return "Needs Attention";
-  };
+  const getScoreLabel = () => matchView.tier;
 
-  const getScoreContext = (score: number) => {
-    if (score >= 70) return "Strong compatibility range";
-    if (score >= 50) return "Good compatibility range";
-    return "Lower compatibility range";
+  const getScoreContext = () => {
+    if (matchView.isMelaninAlert) return "Review before use due to melanin-specific risk signals";
+    if (matchView.pct >= 90) return "Excellent compatibility range";
+    if (matchView.pct >= 75) return "Strong compatibility range";
+    if (matchView.pct >= 55) return "Moderate compatibility range";
+    if (matchView.pct >= 30) return "Low compatibility range";
+    return "Not a match for this profile";
   };
 
   return (
@@ -737,7 +769,7 @@ const Analysis = () => {
         <Card className="p-4 md:p-6">
           <div className="flex items-center justify-between flex-wrap gap-3 mb-4">
             <h2 className="text-xl font-semibold">Quick Takeaways</h2>
-            <Badge variant="secondary">{getScoreLabel(analysis.epiq_score)}</Badge>
+            <Badge variant="secondary">{getScoreLabel()}</Badge>
           </div>
           <div className="space-y-3 text-sm text-muted-foreground">
             {analysis.recommendations_json.fast_mode && (
@@ -746,11 +778,21 @@ const Analysis = () => {
               </p>
             )}
             <p>
-              <span className="font-semibold text-foreground">EpiQ Score:</span> {analysis.epiq_score}/100 — {analysis.recommendations_json.summary}
+              <span className="font-semibold text-foreground">EpiQ Match:</span> {matchView.pct}% skin match • {getScoreLabel()} — {analysis.recommendations_json.summary}
             </p>
             <p>
-              <span className="font-semibold text-foreground">What this means:</span> {analysis.epiq_score} is a {getScoreContext(analysis.epiq_score)}. This is a compatibility index, not a school grade.
+              <span className="font-semibold text-foreground">What this means:</span> {matchView.pct}% is in the {getScoreContext()}. This is a compatibility index, not a school grade.
             </p>
+            {showEpiqScoreSublabel && (
+              <p>
+                <span className="font-semibold text-foreground">EpiQ Score (internal):</span> {analysis.epiq_score}/100
+              </p>
+            )}
+            {matchView.isMelaninAlert && melaninAlertMessage && (
+              <p>
+                <span className="font-semibold text-foreground">Melanin Alert:</span> {melaninAlertMessage}
+              </p>
+            )}
             <p>
               <span className="font-semibold text-foreground">Ingredient profile:</span>{" "}
               {safeCount} safe,{" "}
@@ -871,23 +913,26 @@ const Analysis = () => {
 
         <Card className="p-4 md:p-6 lg:p-8 text-center bg-gradient-to-br from-primary/5 to-accent/5">
           <div className="flex items-center justify-center gap-2 mb-6">
-            <h2 className="text-2xl font-semibold">EpiQ Score</h2>
+            <h2 className="text-2xl font-semibold">EpiQ Match</h2>
             <Tooltip>
               <TooltipTrigger asChild>
                 <Info className="w-4 h-4 text-muted-foreground cursor-help" />
               </TooltipTrigger>
               <TooltipContent className="max-w-sm">
-                <p>Your EpiQ Score (0-100) reflects how safe and effective this product is based on ingredient analysis, scientific research, and your personal skin profile. Higher scores = better match for your skin.</p>
-              </TooltipContent>
-            </Tooltip>
-          </div>
+                <p>EpiQ Match is your compatibility percentage for this product and profile. The raw EpiQ Score is retained as an internal reference.</p>
+            </TooltipContent>
+          </Tooltip>
+        </div>
 
-          <div className={`text-7xl font-bold mb-4 ${getScoreColor(analysis.epiq_score)}`}>
-            {analysis.epiq_score}
+          <div className={`text-7xl font-bold mb-4 ${getScoreColor()}`}>
+            {matchView.pct}%
           </div>
           <Badge variant="secondary" className="text-lg px-4 py-2">
-            {getScoreLabel(analysis.epiq_score)}
+            {getScoreLabel()}
           </Badge>
+          {showEpiqScoreSublabel && (
+            <p className="mt-2 text-xs text-muted-foreground">EpiQ Score: {analysis.epiq_score}</p>
+          )}
           {analysis.recommendations_json?.scan_mode === "quick" && (
             <div className="mt-4 space-y-2">
               <Badge variant="outline" className="text-xs uppercase tracking-[0.2em]">
@@ -902,7 +947,7 @@ const Analysis = () => {
             {analysis.recommendations_json.summary}
           </p>
           <p className="mt-2 text-xs text-muted-foreground">
-            EpiQ is a 0-100 compatibility index for your skin profile, not a pass/fail grade.
+            EpiQ Match is your user-facing compatibility view. The raw EpiQ Score is secondary.
           </p>
         </Card>
 
@@ -980,23 +1025,19 @@ const Analysis = () => {
           const allIngredients = [
             ...(analysis.recommendations_json.beneficial_ingredients?.map((ing: any) => ({
               name: ing.name,
-              category: 'beneficial' as const,
-              risk_score: ing.risk_score
+              category: 'beneficial' as const
             })) || []),
             ...(analysis.recommendations_json.safe_ingredients?.map((ing: any) => ({
               name: typeof ing === 'string' ? ing : ing.name,
-              category: 'safe' as const,
-              risk_score: typeof ing === 'object' ? ing.risk_score : undefined
+              category: 'safe' as const
             })) || []),
             ...(analysis.recommendations_json.problematic_ingredients?.map((ing: any) => ({
               name: ing.name,
-              category: 'problematic' as const,
-              risk_score: ing.risk_score
+              category: 'problematic' as const
             })) || []),
             ...(analysis.recommendations_json.concern_ingredients?.map((ing: any) => ({
               name: typeof ing === 'string' ? ing : ing.name,
-              category: 'unverified' as const,
-              risk_score: typeof ing === 'object' ? ing.risk_score : undefined
+              category: 'unverified' as const
             })) || [])
           ];
 
@@ -1097,7 +1138,6 @@ const Analysis = () => {
                       label: "Targeted",
                       details: item.benefit,
                       role: item.role,
-                      risk: item.risk_score,
                       reviewed: false,
                     })),
                     ...safe
@@ -1107,7 +1147,6 @@ const Analysis = () => {
                         label: "Safe",
                         details: typeof ingredient === "object" ? ingredient.explanation : undefined,
                         role: typeof ingredient === "object" ? ingredient.role : undefined,
-                        risk: typeof ingredient === "object" ? ingredient.risk_score : undefined,
                         reviewed: isExpertValidatedIngredient(ingredient),
                       })),
                   ];
@@ -1133,7 +1172,6 @@ const Analysis = () => {
                             </div>
                             <div className="flex items-center gap-2 text-xs text-muted-foreground">
                               {item.role && <span className="hidden sm:inline">Role: {item.role}</span>}
-                              {item.risk !== undefined && item.risk !== null && <span>Risk {item.risk}</span>}
                             </div>
                           </summary>
                           {(() => {
@@ -1194,9 +1232,6 @@ const Analysis = () => {
                                 </Badge>
                               )}
                             </div>
-                            {item.risk_score !== undefined && item.risk_score !== null && (
-                              <span className="text-xs text-muted-foreground">Risk {item.risk_score}</span>
-                            )}
                           </summary>
                           {(() => {
                             const aiDetail = getAiExplanation(item.name);

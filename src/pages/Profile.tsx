@@ -16,6 +16,7 @@ import { useTracking, trackEvent } from "@/hooks/useTracking";
 import { TrialBanner } from "@/components/subscription";
 import AppShell from "@/components/AppShell";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
+import { getEpiqBucket, getEpiqMatchView, getEpiqTierBadgeClass, hasEpiqMatchData } from "@/lib/epiq-match";
 
 const skinTypes = [
   { value: "oily", label: "Oily", icon: Droplets, description: "Shiny, prone to breakouts" },
@@ -36,6 +37,15 @@ const skinConcerns = [
   { value: "dark_circles", label: "Dark Circles" },
 ];
 
+const melaninToneLabels: Record<number, string> = {
+  1: "Very Light",
+  2: "Light-Medium",
+  3: "Medium-Olive",
+  4: "Brown",
+  5: "Deep Brown",
+  6: "Deepest Tone",
+};
+
 interface ProfileStats {
   totalAnalyses: number;
   latestRoutine: {
@@ -53,6 +63,7 @@ const Profile = () => {
   const [isEditing, setIsEditing] = useState(false);
   const [skinType, setSkinType] = useState<"oily" | "dry" | "combination" | "sensitive" | "normal" | "">("");
   const [selectedConcerns, setSelectedConcerns] = useState<string[]>([]);
+  const [melaninLevel, setMelaninLevel] = useState<number | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [stats, setStats] = useState<ProfileStats>({
@@ -111,7 +122,7 @@ const Profile = () => {
 
       const { data, error } = await supabase
         .from("profiles")
-        .select("skin_type, skin_concerns")
+        .select("skin_type, skin_concerns, melanin_level")
         .eq("id", user.id)
         .single();
 
@@ -120,6 +131,7 @@ const Profile = () => {
       if (data) {
         setSkinType(data.skin_type || "");
         setSelectedConcerns(Array.isArray(data.skin_concerns) ? data.skin_concerns.filter((c): c is string => typeof c === 'string') : []);
+        setMelaninLevel(typeof data.melanin_level === "number" ? data.melanin_level : null);
       }
     } catch (error: any) {
       toast({
@@ -296,6 +308,10 @@ const Profile = () => {
               product_name,
               product_price,
               epiq_score,
+              epiq_match_tier,
+              epiq_match_pct,
+              epiq_match_color,
+              melanin_alert,
               brand
             )
           )
@@ -334,6 +350,10 @@ const Profile = () => {
             product_name: rp.user_analyses?.product_name,
             product_price: rp.user_analyses?.product_price,
             epiq_score: rp.user_analyses?.epiq_score,
+            epiq_match_tier: rp.user_analyses?.epiq_match_tier,
+            epiq_match_pct: rp.user_analyses?.epiq_match_pct,
+            epiq_match_color: rp.user_analyses?.epiq_match_color,
+            melanin_alert: rp.user_analyses?.melanin_alert,
             brand: rp.user_analyses?.brand
           })) || [],
           productCount: routine.routine_products?.length || 0,
@@ -374,6 +394,7 @@ const Profile = () => {
         .update({
           skin_type: skinType,
           skin_concerns: selectedConcerns,
+          melanin_level: melaninLevel,
         })
         .eq("id", user.id);
 
@@ -384,7 +405,8 @@ const Profile = () => {
         eventCategory: 'profile',
         eventProperties: {
           skinType,
-          concernsCount: selectedConcerns.length
+          concernsCount: selectedConcerns.length,
+          melaninLevel,
         }
       });
 
@@ -408,27 +430,21 @@ const Profile = () => {
   // Helper functions
   const getCategoryLabel = (category: string) => {
     const labels: Record<string, string> = {
-      excellent: 'Excellent Products (70-100)',
-      good: 'Good Products (50-69)',
-      attention: 'Needs Attention (<50)'
+      excellent: 'Excellent Matches (75-100)',
+      good: 'Good Matches (55-74)',
+      attention: 'Needs Attention (<55 or alert)'
     };
     return labels[category] || category;
   };
 
   const getProductsInCategory = (category: string) => {
-    return filteredAnalyses.filter(p => {
-      if (category === 'excellent') return p.epiq_score >= 70;
-      if (category === 'good') return p.epiq_score >= 50 && p.epiq_score < 70;
-      if (category === 'attention') return p.epiq_score < 50;
-      return false;
-    });
+    return filteredAnalyses.filter((analysis) => getEpiqBucket(analysis) === category);
   };
 
-  const getScoreColorClass = (score: number) => {
-    if (score >= 70) return 'bg-green-100 text-green-800 border-green-300 dark:bg-green-900/30 dark:text-green-300 dark:border-green-700';
-    if (score >= 50) return 'bg-yellow-100 text-yellow-800 border-yellow-300 dark:bg-yellow-900/30 dark:text-yellow-300 dark:border-yellow-700';
-    return 'bg-red-100 text-red-800 border-red-300 dark:bg-red-900/30 dark:text-red-300 dark:border-red-700';
-  };
+  const getScoreColorClass = (analysis: any) =>
+    hasEpiqMatchData(analysis)
+      ? getEpiqTierBadgeClass(analysis)
+      : "bg-slate-100 text-slate-700 border-slate-300 dark:bg-slate-900/30 dark:text-slate-300 dark:border-slate-700";
 
   const handleQuickAddToRoutine = async (analysisId: string) => {
     try {
@@ -489,6 +505,7 @@ const Profile = () => {
         eventCategory: 'profile',
         eventProperties: { 
           epiq_score: analysis.epiq_score,
+          epiq_match_pct: analysis.epiq_match_pct,
           has_price: !!analysis.product_price
         }
       });
@@ -532,9 +549,10 @@ const Profile = () => {
       (analysis.brand && analysis.brand.toLowerCase().includes(searchQuery.toLowerCase()));
     
     if (scoreFilter === "all") return matchesSearch;
-    if (scoreFilter === "excellent") return matchesSearch && analysis.epiq_score >= 70;
-    if (scoreFilter === "good") return matchesSearch && analysis.epiq_score >= 50 && analysis.epiq_score < 70;
-    if (scoreFilter === "attention") return matchesSearch && analysis.epiq_score < 50;
+    const bucket = getEpiqBucket(analysis);
+    if (scoreFilter === "excellent") return matchesSearch && bucket === "excellent";
+    if (scoreFilter === "good") return matchesSearch && bucket === "good";
+    if (scoreFilter === "attention") return matchesSearch && bucket === "attention";
     return matchesSearch;
   });
 
@@ -838,6 +856,37 @@ const Profile = () => {
                   )}
                 </div>
 
+                <div>
+                  <h2 className="text-xl font-semibold mb-4">Shade Range</h2>
+                  {isEditing ? (
+                    <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                      {[1, 2, 3, 4, 5, 6].map((level) => (
+                        <button
+                          key={level}
+                          onClick={() => setMelaninLevel(level)}
+                          className={`p-4 border-2 rounded-lg transition-all hover:border-primary text-left ${
+                            melaninLevel === level ? "border-primary bg-primary/5" : "border-border"
+                          }`}
+                        >
+                          <h3 className="font-semibold">Level {level}</h3>
+                          <p className="text-sm text-muted-foreground mt-1">{melaninToneLabels[level]}</p>
+                        </button>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="p-6 border-2 rounded-lg bg-muted/30">
+                      {melaninLevel ? (
+                        <div>
+                          <h3 className="font-semibold text-lg">Level {melaninLevel}</h3>
+                          <p className="text-sm text-muted-foreground">{melaninToneLabels[melaninLevel]}</p>
+                        </div>
+                      ) : (
+                        <p className="text-muted-foreground">No shade range selected</p>
+                      )}
+                    </div>
+                  )}
+                </div>
+
                 {/* Skin Concerns Section */}
                 <div>
                   <h2 className="text-xl font-semibold mb-4">Skin Concerns</h2>
@@ -982,21 +1031,21 @@ const Profile = () => {
                   onClick={() => setScoreFilter('excellent')}
                   className="cursor-pointer"
                 >
-                  Excellent (70+)
+                  Excellent (75+)
                 </Badge>
                 <Badge 
                   variant={scoreFilter === 'good' ? 'default' : 'outline'}
                   onClick={() => setScoreFilter('good')}
                   className="cursor-pointer"
                 >
-                  Good (50-69)
+                  Good (55-74)
                 </Badge>
                 <Badge 
                   variant={scoreFilter === 'attention' ? 'default' : 'outline'}
                   onClick={() => setScoreFilter('attention')}
                   className="cursor-pointer"
                 >
-                  Needs Attention (&lt;50)
+                  Needs Attention (&lt;55 / Alert)
                 </Badge>
               </div>
             </Card>
@@ -1048,6 +1097,9 @@ const Profile = () => {
                         <CollapsibleContent className="p-4 pt-0">
                           <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-3">
                             {categoryProducts.map(product => (
+                              (() => {
+                                const match = getEpiqMatchView(product);
+                                return (
                               <Card key={product.id} className="p-4">
                                 <div className="flex items-start justify-between mb-3">
                                   <div className="flex-1">
@@ -1056,8 +1108,8 @@ const Profile = () => {
                                       <p className="text-sm text-muted-foreground">{product.brand}</p>
                                     )}
                                     <div className="flex items-center gap-2 mt-2">
-                                      <Badge className={getScoreColorClass(product.epiq_score)}>
-                                        EpiQ: {product.epiq_score}
+                                      <Badge className={getScoreColorClass(product)}>
+                                        {hasEpiqMatchData(product) ? `${match.pct}% • ${match.tier}` : "Not scored"}
                                       </Badge>
                                       <span className="text-xs text-muted-foreground">
                                         {new Date(product.analyzed_at).toLocaleDateString()}
@@ -1110,6 +1162,8 @@ const Profile = () => {
                                   </CollapsibleContent>
                                 </Collapsible>
                               </Card>
+                                );
+                              })()
                             ))}
                           </div>
                         </CollapsibleContent>
@@ -1175,17 +1229,22 @@ const Profile = () => {
                           </CollapsibleTrigger>
                           <CollapsibleContent className="mt-3 space-y-2">
                             {currentRoutine.products.map((product: any) => (
+                              (() => {
+                                const match = getEpiqMatchView(product);
+                                return (
                               <div key={product.id} className="flex items-center justify-between p-3 bg-muted/30 rounded-lg">
                                 <div>
                                   <p className="font-medium">{product.product_name}</p>
                                   <p className="text-xs text-muted-foreground">
-                                    {product.usage_frequency} • EpiQ: {product.epiq_score}
+                                    {product.usage_frequency} • {hasEpiqMatchData(product) ? `Match: ${match.pct}% (${match.tier})` : "Not scored"}
                                   </p>
                                 </div>
                                 <Badge variant="outline">
                                   ${product.product_price || 0}
                                 </Badge>
                               </div>
+                                );
+                              })()
                             ))}
                           </CollapsibleContent>
                         </Collapsible>

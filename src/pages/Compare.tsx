@@ -26,6 +26,7 @@ import { DupeCard } from "@/components/DupeCard";
 import { toast } from "@/hooks/use-toast";
 import { invokeFunction } from "@/lib/functions-client";
 import noImageFound from "@/assets/no_image_found.png";
+import { getEpiqMatchView, hasEpiqMatchData } from "@/lib/epiq-match";
 
 const CATEGORY_FILTERS = ["all", "face", "body", "hair", "scalp"];
 const norm = (v) => String(v || "").trim();
@@ -328,9 +329,11 @@ export default function Compare() {
   }, [analyses, categoryFilter]);
 
   const getScoreColor = (score) => {
-    if (!score) return "text-muted-foreground";
-    if (score >= 70) return "text-emerald-500";
-    if (score >= 50) return "text-amber-500";
+    if (!hasEpiqMatchData(score)) return "text-muted-foreground";
+    const match = getEpiqMatchView(score);
+    if (match.isMelaninAlert) return "text-violet-500";
+    if (match.pct >= 75) return "text-emerald-500";
+    if (match.pct >= 55) return "text-amber-500";
     return "text-red-500";
   };
 
@@ -691,7 +694,7 @@ export default function Compare() {
         // 2) Always refresh from Supabase after (source of truth)
         const { data: analysesData } = await supabase
           .from("user_analyses")
-          .select("id, product_name, brand, epiq_score, product_price, category, analyzed_at, image_url")
+          .select("id, product_name, brand, epiq_score, epiq_match_tier, epiq_match_pct, epiq_match_color, melanin_alert, product_price, category, analyzed_at, image_url")
           .eq("user_id", uid)
           .order("analyzed_at", { ascending: false })
           .limit(50);
@@ -992,9 +995,9 @@ export default function Compare() {
                       {analyses.map((a) => (
                         <SelectItem key={a.id} value={a.id}>
                           {a.product_name}
-                          {a.epiq_score ? (
+                          {hasEpiqMatchData(a) ? (
                             <Badge variant="secondary" className="ml-2 text-xs">
-                              {a.epiq_score}
+                              {getEpiqMatchView(a).pct}%
                             </Badge>
                           ) : null}
                         </SelectItem>
@@ -1026,20 +1029,26 @@ export default function Compare() {
                 </div>
 
                 {selectedProduct ? (
+                  (() => {
+                    const match = getEpiqMatchView(selectedProduct);
+                    return (
                   <div className="p-3 bg-muted/50 rounded-lg flex items-center justify-between">
                     <div className="min-w-0">
                       <p className="font-medium truncate">{selectedProduct.product_name}</p>
                       <p className="text-sm text-muted-foreground truncate">{selectedProduct.brand}</p>
                     </div>
                     <div className="text-right">
-                      <p className={`font-bold text-lg ${getScoreColor(selectedProduct.epiq_score)}`}>
-                        {selectedProduct.epiq_score || "—"}
+                      <p className={`font-bold text-lg ${getScoreColor(selectedProduct)}`}>
+                        {hasEpiqMatchData(selectedProduct) ? `${match.pct}%` : "—"}
                       </p>
+                      <p className="text-xs text-muted-foreground">{hasEpiqMatchData(selectedProduct) ? match.tier : "Not scored"}</p>
                       {selectedProduct.product_price ? (
                         <p className="text-sm text-muted-foreground">${selectedProduct.product_price}</p>
                       ) : null}
                     </div>
                   </div>
+                    );
+                  })()
                 ) : null}
 
                 <CacheIndicator />
@@ -1179,6 +1188,9 @@ export default function Compare() {
                 ) : (
                   <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
                     {filteredAnalyses.map((a) => (
+                      (() => {
+                        const match = getEpiqMatchView(a);
+                        return (
                       <Card key={a.id} className="overflow-hidden">
                         <CardHeader className="pb-2">
                           <CardTitle className="text-sm font-medium truncate">{a.product_name}</CardTitle>
@@ -1199,9 +1211,10 @@ export default function Compare() {
                           </div>
 
                           <div className="flex items-center justify-between">
-                            <div className="text-sm">EpiQ: {a.epiq_score ?? "—"}</div>
+                            <div className="text-sm">Match: {hasEpiqMatchData(a) ? `${match.pct}%` : "—"}</div>
                             <div className="text-sm text-muted-foreground">{a.category || "—"}</div>
                           </div>
+                          <div className="text-xs text-muted-foreground">{hasEpiqMatchData(a) ? match.tier : "Not scored"}</div>
 
                           <div className="flex gap-2">
                             <Button
@@ -1229,6 +1242,8 @@ export default function Compare() {
                           </div>
                         </CardContent>
                       </Card>
+                        );
+                      })()
                     ))}
                   </div>
                 )}

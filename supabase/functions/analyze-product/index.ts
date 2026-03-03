@@ -468,7 +468,9 @@ serve(async (req) => {
     // upsert a minimal profile record so analysis can proceed.
     let { data: profile, error: profileLookupError } = await supabase
       .from("profiles")
-      .select("skin_type, skin_concerns, body_concerns, scalp_type, product_preferences")
+      .select(
+        "skin_type, skin_concerns, body_concerns, scalp_type, product_preferences, melanin_level, sensitivities, pregnancy_safe, vegan",
+      )
       .eq("id", user_id)
       .maybeSingle();
 
@@ -515,7 +517,9 @@ serve(async (req) => {
 
       const { data: retriedProfile, error: retriedProfileError } = await supabase
         .from("profiles")
-        .select("skin_type, skin_concerns, body_concerns, scalp_type, product_preferences")
+        .select(
+          "skin_type, skin_concerns, body_concerns, scalp_type, product_preferences, melanin_level, sensitivities, pregnancy_safe, vegan",
+        )
         .eq("id", user_id)
         .maybeSingle();
 
@@ -795,15 +799,190 @@ serve(async (req) => {
       return SAFE_COMMON_INGREDIENTS.some((safe) => lower.includes(safe));
     };
 
+    const profileMelaninLevel = typeof profile?.melanin_level === "number" ? profile.melanin_level : null;
+    const melaninAwareMode = profileMelaninLevel !== null && profileMelaninLevel >= 4;
+    const profileSensitivities = Array.isArray(profile?.sensitivities)
+      ? profile.sensitivities
+          .filter((value: unknown): value is string => typeof value === "string")
+          .map((value: string) => value.toLowerCase())
+      : [];
+    const pregnancySafeMode = Boolean(profile?.pregnancy_safe);
+    const veganPreferenceMode = Boolean(profile?.vegan);
+
+    const sensitivityRules: Record<string, { tokens: string[]; message: string }> = {
+      fragrance: {
+        tokens: ["fragrance", "parfum", "essential oil", "limonene", "linalool"],
+        message: "May trigger fragrance sensitivity",
+      },
+      alcohol: {
+        tokens: ["alcohol denat", "ethanol", "sd alcohol", "isopropyl alcohol"],
+        message: "May be drying for alcohol-sensitive skin",
+      },
+      silicones: {
+        tokens: ["dimethicone", "siloxane", "silicone", "cyclopentasiloxane"],
+        message: "May not suit silicone-sensitive users",
+      },
+      sulfates: {
+        tokens: ["sulfate", "sulphate", "sls", "sles"],
+        message: "May be harsh for sulfate-sensitive skin",
+      },
+      parabens: {
+        tokens: ["paraben"],
+        message: "Contains parabens",
+      },
+    };
+
+    const pregnancyRiskTokens = [
+      "retinol",
+      "retinal",
+      "retinoid",
+      "tretinoin",
+      "adapalene",
+      "tazarotene",
+      "hydroquinone",
+      "salicylic acid",
+    ];
+
+    const veganRiskTokens = ["lanolin", "beeswax", "honey", "carmine", "snail", "collagen", "keratin"];
+
+    const melaninAlertRules: Array<{ tokens: string[]; reason: string }> = [
+      {
+        tokens: ["glycolic acid", "lactic acid", "trichloroacetic acid", "tca", "jessner"],
+        reason: "High-intensity exfoliant that may increase PIH risk on deeper skin tones",
+      },
+      {
+        tokens: ["retinol", "retinal", "tretinoin", "adapalene", "tazarotene"],
+        reason: "Retinoid exposure may need slower ramp-up to reduce irritation and PIH risk",
+      },
+      {
+        tokens: ["benzoyl peroxide"],
+        reason: "Benzoyl peroxide can trigger dryness/irritation that may worsen discoloration",
+      },
+      {
+        tokens: ["hydroquinone"],
+        reason: "Hydroquinone requires careful use and monitoring for tone-related side effects",
+      },
+      {
+        tokens: ["l-ascorbic acid", "ascorbic acid"],
+        reason: "Low-pH vitamin C forms may irritate reactive melanated skin",
+      },
+    ];
+
+    const severeConflictTokens = [
+      "retinol",
+      "retinal",
+      "retinoid",
+      "tretinoin",
+      "adapalene",
+      "tazarotene",
+      "glycolic acid",
+      "lactic acid",
+      "trichloroacetic acid",
+      "tca",
+      "jessner",
+      "hydroquinone",
+    ];
+    const moderateConflictTokens = [
+      "benzoyl peroxide",
+      "salicylic acid",
+      "fragrance",
+      "parfum",
+      "alcohol denat",
+      "sulfate",
+      "sulphate",
+      "paraben",
+    ];
+
     // Analyze ingredients with new categorization
-    const safe = []; // Ingredients that are verified AND not problematic
-    const problematic = []; // Ingredients that ARE in PubChem but bad for user
-    const concerns = []; // Ingredients NOT in PubChem (unverified)
-    const warnings = []; // Personalized warning messages
-    const beneficial = []; // Ingredients that target user's specific concerns
+    const safe: string[] = []; // Ingredients that are verified AND not problematic
+    const problematic: Array<{ name: string; reason: string }> = []; // Ingredients bad for this profile
+    const concerns: string[] = []; // Ingredients NOT in PubChem (unverified)
+    const warnings: string[] = []; // Personalized warning messages
+    const beneficial: Array<{ name: string; benefit: string }> = []; // Ingredients that target concerns
+    const melaninAlertIngredients: Array<{ name: string; reason: string }> = [];
+
+    const problematicKeys = new Set<string>();
+    const melaninAlertKeys = new Set<string>();
+    const conflictSeverityCounts = { minor: 0, moderate: 0, severe: 0 };
+
+    const hasTokenMatch = (ingredientLower: string, tokens: string[]): boolean =>
+      tokens.some((token) => ingredientLower.includes(token));
+
+    const classifyConflictSeverity = (ingredientLower: string): "minor" | "moderate" | "severe" => {
+      if (hasTokenMatch(ingredientLower, severeConflictTokens)) return "severe";
+      if (hasTokenMatch(ingredientLower, moderateConflictTokens)) return "moderate";
+      return "minor";
+    };
+
+    const addWarning = (message: string) => {
+      if (!warnings.includes(message)) warnings.push(message);
+    };
+
+    const addProblematicIngredient = (ingredientName: string, reason: string): boolean => {
+      const ingredientKey = ingredientName.toLowerCase().trim();
+      if (problematicKeys.has(ingredientKey)) return false;
+
+      problematicKeys.add(ingredientKey);
+      problematic.push({ name: ingredientName, reason });
+
+      const severity = classifyConflictSeverity(ingredientKey);
+      conflictSeverityCounts[severity] += 1;
+      return true;
+    };
+
+    const addMelaninAlert = (ingredientName: string, reason: string): boolean => {
+      const ingredientKey = ingredientName.toLowerCase().trim();
+      if (melaninAlertKeys.has(ingredientKey)) return false;
+      melaninAlertKeys.add(ingredientKey);
+      melaninAlertIngredients.push({ name: ingredientName, reason });
+      addWarning(`🚨 ${ingredientName}: ${reason}`);
+      return true;
+    };
+
+    const applyAdditionalRiskRules = (ingredientName: string, ingredientLower: string): boolean => {
+      let flagged = false;
+
+      for (const sensitivity of profileSensitivities) {
+        const rule = sensitivityRules[sensitivity];
+        if (rule && hasTokenMatch(ingredientLower, rule.tokens)) {
+          if (addProblematicIngredient(ingredientName, rule.message)) {
+            addWarning(`⚠️ ${ingredientName}: ${rule.message}`);
+          }
+          flagged = true;
+        }
+      }
+
+      if (pregnancySafeMode && hasTokenMatch(ingredientLower, pregnancyRiskTokens)) {
+        if (addProblematicIngredient(ingredientName, "Excluded by pregnancy-safe preference")) {
+          addWarning(`⚠️ ${ingredientName} may not be ideal with pregnancy-safe filtering`);
+        }
+        flagged = true;
+      }
+
+      if (veganPreferenceMode && hasTokenMatch(ingredientLower, veganRiskTokens)) {
+        if (addProblematicIngredient(ingredientName, "May not align with vegan preference")) {
+          addWarning(`⚠️ ${ingredientName} may not align with vegan preference`);
+        }
+        flagged = true;
+      }
+
+      return flagged;
+    };
+
+    const evaluateMelaninAlert = (ingredientName: string, ingredientLower: string) => {
+      if (!melaninAwareMode) return;
+      for (const rule of melaninAlertRules) {
+        if (hasTokenMatch(ingredientLower, rule.tokens)) {
+          addMelaninAlert(ingredientName, rule.reason);
+          return;
+        }
+      }
+    };
 
     for (const result of ingredientResults as Array<{ name: string; data: any; source?: string }>) {
       const ingredientLower = result.name.toLowerCase();
+      evaluateMelaninAlert(result.name, ingredientLower);
+      const hasGlobalRiskFlag = applyAdditionalRiskRules(result.name, ingredientLower);
 
       if (result.source === "local" && !isQuickScan) {
         concerns.push(result.name);
@@ -811,7 +990,7 @@ serve(async (req) => {
       }
 
       if (isQuickScan) {
-        let isProblematic = false;
+        let isProblematic = hasGlobalRiskFlag;
         let isBeneficial = false;
 
         if (profile) {
@@ -820,12 +999,10 @@ serve(async (req) => {
           if (productType === "face" && profile.skin_type) {
             const problematicList = problematicIngredients[profile.skin_type] || [];
             if (problematicList.some((p) => ingredientLower.includes(p))) {
+              if (addProblematicIngredient(result.name, `May not suit ${profile.skin_type} skin`)) {
+                addWarning(`⚠️ ${result.name} may not suit ${profile.skin_type} skin`);
+              }
               isProblematic = true;
-              problematic.push({
-                name: result.name,
-                reason: `May not suit ${profile.skin_type} skin`,
-              });
-              warnings.push(`⚠️ ${result.name} may not suit ${profile.skin_type} skin`);
             }
           }
 
@@ -833,13 +1010,11 @@ serve(async (req) => {
             const problematicList = problematicIngredients[concern] || [];
             if (problematicList.some((p) => ingredientLower.includes(p))) {
               if (!isProblematic) {
-                isProblematic = true;
                 const concernLabel = concern.replace(/-/g, " ");
-                problematic.push({
-                  name: result.name,
-                  reason: `May worsen ${concernLabel}`,
-                });
-                warnings.push(`⚠️ ${result.name} may worsen ${concernLabel}`);
+                if (addProblematicIngredient(result.name, `May worsen ${concernLabel}`)) {
+                  addWarning(`⚠️ ${result.name} may worsen ${concernLabel}`);
+                }
+                isProblematic = true;
               }
             }
           }
@@ -884,7 +1059,7 @@ serve(async (req) => {
 
       if (result.data) {
         // Ingredient IS in PubChem - now check if it's problematic for THIS user
-        let isProblematic = false;
+        let isProblematic = hasGlobalRiskFlag;
 
         if (profile) {
           const allConcerns = [...(profile.skin_concerns || []), ...(profile.body_concerns || [])];
@@ -893,12 +1068,10 @@ serve(async (req) => {
           if (productType === "face" && profile.skin_type) {
             const problematicList = problematicIngredients[profile.skin_type] || [];
             if (problematicList.some((p) => ingredientLower.includes(p))) {
+              if (addProblematicIngredient(result.name, `May not suit ${profile.skin_type} skin`)) {
+                addWarning(`⚠️ ${result.name} may not suit ${profile.skin_type} skin`);
+              }
               isProblematic = true;
-              problematic.push({
-                name: result.name,
-                reason: `May not suit ${profile.skin_type} skin`,
-              });
-              warnings.push(`⚠️ ${result.name} may not suit ${profile.skin_type} skin`);
             }
           }
 
@@ -908,13 +1081,11 @@ serve(async (req) => {
             if (problematicList.some((p) => ingredientLower.includes(p))) {
               if (!isProblematic) {
                 // Avoid duplicate entries
-                isProblematic = true;
                 const concernLabel = concern.replace(/-/g, " ");
-                problematic.push({
-                  name: result.name,
-                  reason: `May worsen ${concernLabel}`,
-                });
-                warnings.push(`⚠️ ${result.name} may worsen ${concernLabel}`);
+                if (addProblematicIngredient(result.name, `May worsen ${concernLabel}`)) {
+                  addWarning(`⚠️ ${result.name} may worsen ${concernLabel}`);
+                }
+                isProblematic = true;
               }
             }
           }
@@ -969,28 +1140,124 @@ serve(async (req) => {
     const safeCount = safe.length;
     const problematicCount = problematic.length;
     const beneficialCount = beneficial.length;
+    const unverifiedCount = concerns.length;
+    const minorConflicts = conflictSeverityCounts.minor;
+    const moderateConflicts = conflictSeverityCounts.moderate;
+    const severeConflicts = conflictSeverityCounts.severe;
+    const melaninAlertsCount = melaninAlertIngredients.length;
+    const hasSulfates = ingredientsArray.some((ingredient: string) => /sulfate|sulphate|sls|sles/i.test(ingredient));
+
+    const zoneModifier =
+      productType === "face" ? (problematicCount <= 1 ? 5 : 0) : productType === "hair" && hasSulfates ? -5 : 0;
 
     // Base score: percentage of safe ingredients
-    let epiqScore = totalIngredients > 0 ? Math.round((safeCount / totalIngredients) * 100) : 50;
+    const baseScore = totalIngredients > 0 ? Math.round((safeCount / totalIngredients) * 100) : 50;
 
-    // Heavy penalty for problematic ingredients (more severe than just warnings)
-    epiqScore = Math.max(0, epiqScore - problematicCount * 10); // -10 points per problematic ingredient
+    let epiqScore = Math.min(
+      100,
+      Math.max(
+        0,
+        baseScore -
+          minorConflicts * 3 -
+          moderateConflicts * 8 -
+          severeConflicts * 15 -
+          melaninAlertsCount * 20 -
+          unverifiedCount * 2 +
+          beneficialCount * 5 +
+          zoneModifier,
+      ),
+    );
 
-    // Bonus for beneficial ingredients
-    epiqScore = Math.min(100, epiqScore + beneficialCount * 5); // +5 points per beneficial ingredient
+    const melaninAlert = melaninAlertsCount > 0;
+    const melaninAlertMessage = melaninAlert
+      ? "Review Before Use - this formula contains ingredients that may affect melanated skin differently."
+      : null;
 
-    // Apply product type modifiers
-    if (productType === "face") {
-      epiqScore = Math.min(100, epiqScore + 5); // Face products get slight bonus
-    }
+    const deriveEpiqMatch = (score: number, hasMelaninAlert: boolean) => {
+      if (hasMelaninAlert) {
+        return {
+          tier: "Melanin Alert",
+          pct: score,
+          color: "#A855F7",
+          verdict: "caution",
+          showEpiqScoreSublabel: false,
+        };
+      }
+      if (score >= 90) {
+        return {
+          tier: "Excellent Match",
+          pct: score,
+          color: "#22C55E",
+          verdict: "compatible",
+          showEpiqScoreSublabel: true,
+        };
+      }
+      if (score >= 75) {
+        return {
+          tier: "Strong Match",
+          pct: score,
+          color: "#84CC16",
+          verdict: "compatible",
+          showEpiqScoreSublabel: true,
+        };
+      }
+      if (score >= 55) {
+        return {
+          tier: "Moderate Match",
+          pct: score,
+          color: "#EAB308",
+          verdict: "caution",
+          showEpiqScoreSublabel: true,
+        };
+      }
+      if (score >= 30) {
+        return {
+          tier: "Low Match",
+          pct: score,
+          color: "#F97316",
+          verdict: "caution",
+          showEpiqScoreSublabel: true,
+        };
+      }
+      return {
+        tier: "Not a Match",
+        pct: score,
+        color: "#EF4444",
+        verdict: "avoid",
+        showEpiqScoreSublabel: true,
+      };
+    };
+
+    const epiqMatch = deriveEpiqMatch(epiqScore, melaninAlert);
+    const scoreBreakdown = {
+      model: "v2.1",
+      base_score: baseScore,
+      safe_count: safeCount,
+      problematic_count: problematicCount,
+      beneficial_count: beneficialCount,
+      unverified_count: unverifiedCount,
+      minor_conflicts: minorConflicts,
+      moderate_conflicts: moderateConflicts,
+      severe_conflicts: severeConflicts,
+      melanin_alerts: melaninAlertsCount,
+      zone_modifier: zoneModifier,
+      final_score: epiqScore,
+    };
 
     console.log("EpiQ Score calculation:", {
       totalIngredients,
       safeCount,
       problematicCount,
       beneficialCount,
-      baseScore: Math.round((safeCount / totalIngredients) * 100),
+      unverifiedCount,
+      minorConflicts,
+      moderateConflicts,
+      severeConflicts,
+      melaninAlertsCount,
+      zoneModifier,
+      baseScore,
       finalScore: epiqScore,
+      epiqMatchTier: epiqMatch.tier,
     });
 
     // Expanded ingredient knowledge base
@@ -1913,6 +2180,14 @@ serve(async (req) => {
       routine_suggestions: routineSuggestions,
       personalized: !!profile,
       fast_mode: isQuickScan,
+      melanin_alert: melaninAlert,
+      melanin_alert_message: melaninAlertMessage,
+      melanin_alert_ingredients: melaninAlertIngredients,
+      show_epiq_score_sublabel: epiqMatch.showEpiqScoreSublabel,
+      validation_status: "ai_scored",
+      confidence_score: "moderate",
+      epiq_match: epiqMatch,
+      score_breakdown: scoreBreakdown,
       sub_scores: subScores,
       product_metadata: {
         brand: extractedBrand,
@@ -1936,16 +2211,7 @@ serve(async (req) => {
     let aiExplanation: SkinLytixGptResponse | null = null;
 
     if (geminiApiKey && !skip_ai_explanation && !isQuickScan) {
-      const scoreLabel =
-        epiqScore >= 85
-          ? "Low Risk - Excellent"
-          : epiqScore >= 70
-            ? "Low Risk - Good"
-            : epiqScore >= 50
-              ? "Moderate Risk"
-              : epiqScore >= 30
-                ? "High Risk"
-                : "Very High Risk";
+      const scoreLabel = melaninAlert ? "Melanin Alert - Review Before Use" : epiqMatch.tier;
 
       aiExplanation = await generateGptExplanation(
         {
@@ -1993,6 +2259,17 @@ serve(async (req) => {
         category: extractedCategory,
         ingredients_list,
         epiq_score: epiqScore,
+        epiq_match_tier: epiqMatch.tier,
+        epiq_match_pct: epiqMatch.pct,
+        epiq_match_color: epiqMatch.color,
+        verdict: epiqMatch.verdict,
+        melanin_alert: melaninAlert,
+        melanin_alert_message: melaninAlertMessage,
+        show_epiq_score_sublabel: epiqMatch.showEpiqScoreSublabel,
+        validation_status: "ai_scored",
+        confidence_score: "moderate",
+        epiq_engine_version: "v2.1",
+        score_breakdown: scoreBreakdown,
         product_price: product_price || null,
         image_url,
         recommendations_json: {
@@ -2025,6 +2302,10 @@ serve(async (req) => {
       JSON.stringify({
         analysis_id: analysis.id,
         epiq_score: epiqScore,
+        epiq_match: epiqMatch,
+        melanin_alert: melaninAlert,
+        melanin_alert_message: melaninAlertMessage,
+        score_breakdown: scoreBreakdown,
         recommendations,
         ingredient_data: ingredientResults,
         ai_explanation: aiExplanation,

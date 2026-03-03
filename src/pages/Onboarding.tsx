@@ -61,6 +61,15 @@ const hairConcerns = [
   { value: "scalp-sensitivity", label: "Scalp Sensitivity" },
 ];
 
+const melaninLevels = [
+  { value: 1, label: "Very Light" },
+  { value: 2, label: "Light-Medium" },
+  { value: 3, label: "Medium-Olive" },
+  { value: 4, label: "Brown" },
+  { value: 5, label: "Deep Brown" },
+  { value: 6, label: "Deepest Tone" },
+];
+
 const Onboarding = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -74,6 +83,7 @@ const Onboarding = () => {
   const [faceSkinType, setFaceSkinType] = useState<"oily" | "dry" | "combination" | "sensitive" | "normal" | "">("");
   const [bodySkinType, setBodySkinType] = useState<string>("");
   const [scalpType, setScalpType] = useState<string>("");
+  const [melaninLevel, setMelaninLevel] = useState<number | null>(null);
   
   // Step 2: Concerns
   const [selectedFaceConcerns, setSelectedFaceConcerns] = useState<string[]>([]);
@@ -138,6 +148,7 @@ const Onboarding = () => {
           skin_concerns: selectedFaceConcerns,
           body_concerns: selectedBodyConcerns,
           scalp_type: scalpType || null,
+          melanin_level: melaninLevel,
           product_preferences: productPreferences,
           is_profile_complete: true,
         })
@@ -153,6 +164,7 @@ const Onboarding = () => {
           faceSkinType,
           bodySkinType,
           scalpType,
+          melaninLevel,
           totalConcerns: allConcerns.length
         }
       });
@@ -340,6 +352,29 @@ const Onboarding = () => {
               </div>
             )}
 
+            {productPreferences.face && (
+              <div className="space-y-4">
+                <h2 className="text-xl font-semibold">Pick the shade range closest to yours</h2>
+                <p className="text-sm text-muted-foreground">
+                  This helps us flag ingredients that may affect your skin differently.
+                </p>
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                  {melaninLevels.map((level) => (
+                    <button
+                      key={level.value}
+                      onClick={() => setMelaninLevel(level.value)}
+                      className={`p-4 border-2 rounded-lg transition-all hover:border-primary text-left ${
+                        melaninLevel === level.value ? "border-primary bg-primary/5" : "border-border"
+                      }`}
+                    >
+                      <h3 className="font-semibold">Level {level.value}</h3>
+                      <p className="text-sm text-muted-foreground mt-1">{level.label}</p>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
             {productPreferences.body && (
               <div className="space-y-4">
                 <h2 className="text-xl font-semibold">What's your body skin type?</h2>
@@ -389,7 +424,7 @@ const Onboarding = () => {
                   trackEvent({
                     eventName: 'onboarding_step_1_completed',
                     eventCategory: 'onboarding',
-                    eventProperties: { faceSkinType, bodySkinType, scalpType }
+                    eventProperties: { faceSkinType, bodySkinType, scalpType, melaninLevel }
                   });
                   setStep(2);
                 }}

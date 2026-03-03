@@ -50,6 +50,7 @@ import { PaywallModal } from "@/components/paywall/PaywallModal";
 import { UsageCounter } from "@/components/paywall/UsageCounter";
 import AppShell from "@/components/AppShell";
 import PageHeader from "@/components/PageHeader";
+import { getEpiqMatchView, hasEpiqMatchData } from "@/lib/epiq-match";
 
 export default function Routine() {
   const navigate = useNavigate();
@@ -162,6 +163,10 @@ export default function Routine() {
             brand,
             category,
             epiq_score,
+            epiq_match_tier,
+            epiq_match_pct,
+            epiq_match_color,
+            melanin_alert,
             product_price
           )
         `
@@ -174,7 +179,7 @@ export default function Routine() {
 
       const { data: analyses, error: analysesError } = await supabase
         .from("user_analyses")
-        .select("id, product_name, epiq_score, analyzed_at")
+        .select("id, product_name, epiq_score, epiq_match_tier, epiq_match_pct, epiq_match_color, melanin_alert, analyzed_at")
         .eq("user_id", user.id)
         .order("analyzed_at", { ascending: false });
 
@@ -664,7 +669,12 @@ export default function Routine() {
                               <>
                                 <div className="flex items-center gap-1">
                                   <span className="text-sm text-muted-foreground">
-                                    EpiQ: {rp.user_analyses.epiq_score}
+                                    {(() => {
+                                      const match = getEpiqMatchView(rp.user_analyses);
+                                      return hasEpiqMatchData(rp.user_analyses)
+                                        ? `Match: ${match.pct}% (${match.tier})`
+                                        : "Not scored";
+                                    })()}
                                   </span>
                                   <Tooltip>
                                     <TooltipTrigger asChild>
@@ -672,8 +682,8 @@ export default function Routine() {
                                     </TooltipTrigger>
                                     <TooltipContent className="max-w-xs">
                                       <p>
-                                        This product&apos;s safety and effectiveness score (0-100)
-                                        based on ingredient analysis and your skin profile.
+                                        This product&apos;s compatibility result for your profile,
+                                        including melanin-aware flags when relevant.
                                       </p>
                                     </TooltipContent>
                                   </Tooltip>
@@ -753,7 +763,12 @@ export default function Routine() {
                       <div>
                         <h3 className="font-semibold">{analysis.product_name}</h3>
                         <p className="text-sm text-muted-foreground">
-                          EpiQ Score: {analysis.epiq_score}
+                          {(() => {
+                            const match = getEpiqMatchView(analysis);
+                            return hasEpiqMatchData(analysis)
+                              ? `EpiQ Match: ${match.pct}% (${match.tier})`
+                              : "Not scored";
+                          })()}
                         </p>
                       </div>
 
@@ -1021,7 +1036,12 @@ export default function Routine() {
                               <div className="flex items-center gap-2">
                                 {analysis.epiq_score !== null && analysis.epiq_score !== undefined && (
                                   <span className="text-sm text-muted-foreground">
-                                    EpiQ Score: {analysis.epiq_score}
+                                    {(() => {
+                                      const match = getEpiqMatchView(analysis);
+                                      return hasEpiqMatchData(analysis)
+                                        ? `EpiQ Match: ${match.pct}% (${match.tier})`
+                                        : "Not scored";
+                                    })()}
                                   </span>
                                 )}
                                 <span className="text-xs text-muted-foreground">

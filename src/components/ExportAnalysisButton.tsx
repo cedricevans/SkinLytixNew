@@ -5,6 +5,7 @@ import { useSubscription } from "@/hooks/useSubscription";
 import { useUsageLimits } from "@/hooks/useUsageLimits";
 import { PaywallModal } from "@/components/paywall/PaywallModal";
 import { toast } from "@/components/ui/sonner";
+import { getEpiqMatchView, hasEpiqMatchData } from "@/lib/epiq-match";
 
 interface ExportAnalysisButtonProps {
   analysisId: string;
@@ -79,8 +80,24 @@ export function ExportAnalysisButton({
       return `SkinLytix Analysis Report\n\nProduct: ${productName}\nAnalysis ID: ${analysisId}\n\nFull analysis data not available for export.`;
     }
 
-    const { epiq_score, recommendations_json, brand, category, analyzed_at } = analysisData;
+    const { epiq_score, epiq_match_tier, epiq_match_pct, epiq_match_color, melanin_alert, recommendations_json, brand, category, analyzed_at } = analysisData;
     const recs = recommendations_json || {};
+    const match = getEpiqMatchView({
+      epiq_score,
+      epiq_match_tier,
+      epiq_match_pct,
+      epiq_match_color,
+      melanin_alert,
+    });
+    const matchLine = hasEpiqMatchData({
+      epiq_score,
+      epiq_match_tier,
+      epiq_match_pct,
+      epiq_match_color,
+      melanin_alert,
+    })
+      ? `${match.pct}% (${match.tier})`
+      : "N/A";
 
     let content = `
 ═══════════════════════════════════════════════════════════════
@@ -93,7 +110,8 @@ ${category ? `CATEGORY: ${category}` : ''}
 ANALYZED: ${analyzed_at ? new Date(analyzed_at).toLocaleDateString() : 'N/A'}
 
 ───────────────────────────────────────────────────────────────
-                         EPIQ SCORE: ${epiq_score || 'N/A'}/100
+                    EPIQ MATCH: ${matchLine}
+                    INTERNAL SCORE: ${epiq_score || 'N/A'}/100
 ───────────────────────────────────────────────────────────────
 
 SUMMARY:

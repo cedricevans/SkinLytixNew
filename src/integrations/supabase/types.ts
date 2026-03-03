@@ -429,8 +429,11 @@ export type Database = {
           id: string
           is_profile_complete: boolean | null
           last_activity_date: string | null
+          melanin_level: number | null
+          pregnancy_safe: boolean | null
           product_preferences: Json | null
           scalp_type: string | null
+          sensitivities: Json | null
           skin_concerns: Json | null
           skin_type: Database["public"]["Enums"]["skin_type_enum"] | null
           streak_count: number | null
@@ -442,6 +445,7 @@ export type Database = {
           trial_ends_at: string | null
           trial_started_at: string | null
           updated_at: string | null
+          vegan: boolean | null
         }
         Insert: {
           body_concerns?: Json | null
@@ -455,8 +459,11 @@ export type Database = {
           id: string
           is_profile_complete?: boolean | null
           last_activity_date?: string | null
+          melanin_level?: number | null
+          pregnancy_safe?: boolean | null
           product_preferences?: Json | null
           scalp_type?: string | null
+          sensitivities?: Json | null
           skin_concerns?: Json | null
           skin_type?: Database["public"]["Enums"]["skin_type_enum"] | null
           streak_count?: number | null
@@ -468,6 +475,7 @@ export type Database = {
           trial_ends_at?: string | null
           trial_started_at?: string | null
           updated_at?: string | null
+          vegan?: boolean | null
         }
         Update: {
           body_concerns?: Json | null
@@ -481,8 +489,11 @@ export type Database = {
           id?: string
           is_profile_complete?: boolean | null
           last_activity_date?: string | null
+          melanin_level?: number | null
+          pregnancy_safe?: boolean | null
           product_preferences?: Json | null
           scalp_type?: string | null
+          sensitivities?: Json | null
           skin_concerns?: Json | null
           skin_type?: Database["public"]["Enums"]["skin_type_enum"] | null
           streak_count?: number | null
@@ -494,6 +505,7 @@ export type Database = {
           trial_ends_at?: string | null
           trial_started_at?: string | null
           updated_at?: string | null
+          vegan?: boolean | null
         }
         Relationships: []
       }
@@ -746,40 +758,73 @@ export type Database = {
           analyzed_at: string | null
           brand: string | null
           category: string | null
+          confidence_score: string | null
+          epiq_engine_version: string | null
+          epiq_match_color: string | null
+          epiq_match_pct: number | null
+          epiq_match_tier: string | null
           epiq_score: number | null
           id: string
           image_url: string | null
           ingredients_list: string
+          melanin_alert: boolean | null
+          melanin_alert_message: string | null
           product_name: string
           product_price: number | null
           recommendations_json: Json | null
+          score_breakdown: Json | null
+          show_epiq_score_sublabel: boolean | null
           user_id: string
+          validation_status: string | null
+          verdict: string | null
         }
         Insert: {
           analyzed_at?: string | null
           brand?: string | null
           category?: string | null
+          confidence_score?: string | null
+          epiq_engine_version?: string | null
+          epiq_match_color?: string | null
+          epiq_match_pct?: number | null
+          epiq_match_tier?: string | null
           epiq_score?: number | null
           id?: string
           image_url?: string | null
           ingredients_list: string
+          melanin_alert?: boolean | null
+          melanin_alert_message?: string | null
           product_name: string
           product_price?: number | null
           recommendations_json?: Json | null
+          score_breakdown?: Json | null
+          show_epiq_score_sublabel?: boolean | null
           user_id: string
+          validation_status?: string | null
+          verdict?: string | null
         }
         Update: {
           analyzed_at?: string | null
           brand?: string | null
           category?: string | null
+          confidence_score?: string | null
+          epiq_engine_version?: string | null
+          epiq_match_color?: string | null
+          epiq_match_pct?: number | null
+          epiq_match_tier?: string | null
           epiq_score?: number | null
           id?: string
           image_url?: string | null
           ingredients_list?: string
+          melanin_alert?: boolean | null
+          melanin_alert_message?: string | null
           product_name?: string
           product_price?: number | null
           recommendations_json?: Json | null
+          score_breakdown?: Json | null
+          show_epiq_score_sublabel?: boolean | null
           user_id?: string
+          validation_status?: string | null
+          verdict?: string | null
         }
         Relationships: [
           {
