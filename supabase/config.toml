@@ -34,4 +34,4 @@ verify_jwt = true
 verify_jwt = false
 
 [functions.send-waitlist-magic-links]
-verify_jwt = true
+verify_jwt = false
