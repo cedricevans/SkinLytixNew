@@ -1,16 +1,36 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Textarea } from '@/components/ui/textarea';
+import { Input } from '@/components/ui/input';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { MessageCircle } from 'lucide-react';
 
 interface InternalNotesPanelProps {
   value: string;
   onChange: (value: string) => void;
+  nuanceFlags: string[];
+  onNuanceFlagsChange: (flags: string[]) => void;
+  compatibilityAssessment: 'compatible' | 'caution' | 'avoid' | 'needs_more_data' | 'unknown';
+  onCompatibilityAssessmentChange: (value: 'compatible' | 'caution' | 'avoid' | 'needs_more_data' | 'unknown') => void;
+  compatibilityNotes: string;
+  onCompatibilityNotesChange: (value: string) => void;
   maxLength?: number;
 }
 
 export function InternalNotesPanel({
   value,
   onChange,
+  nuanceFlags,
+  onNuanceFlagsChange,
+  compatibilityAssessment,
+  onCompatibilityAssessmentChange,
+  compatibilityNotes,
+  onCompatibilityNotesChange,
   maxLength = 500
 }: InternalNotesPanelProps) {
   const characterCount = value.length;
@@ -29,6 +49,56 @@ export function InternalNotesPanel({
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
+        <div className="space-y-2">
+          <label className="text-sm font-medium">Compatibility Assessment</label>
+          <Select
+            value={compatibilityAssessment}
+            onValueChange={(value) =>
+              onCompatibilityAssessmentChange(
+                value as 'compatible' | 'caution' | 'avoid' | 'needs_more_data' | 'unknown'
+              )
+            }
+          >
+            <SelectTrigger>
+              <SelectValue placeholder="Select compatibility" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="compatible">Compatible</SelectItem>
+              <SelectItem value="caution">Use With Caution</SelectItem>
+              <SelectItem value="avoid">Avoid Pairing</SelectItem>
+              <SelectItem value="needs_more_data">Needs More Data</SelectItem>
+              <SelectItem value="unknown">Unknown</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+
+        <div className="space-y-2">
+          <label className="text-sm font-medium">Compatibility Notes</label>
+          <Textarea
+            value={compatibilityNotes}
+            onChange={(e) => onCompatibilityNotesChange(e.target.value.slice(0, maxLength))}
+            maxLength={maxLength}
+            placeholder="Explain pairings, conflicts, or sequencing considerations."
+            className="w-full min-h-[80px] p-3 border rounded-md resize-none"
+          />
+        </div>
+
+        <div className="space-y-2">
+          <label className="text-sm font-medium">Nuance Flags (comma-separated)</label>
+          <Input
+            value={nuanceFlags.join(', ')}
+            onChange={(e) =>
+              onNuanceFlagsChange(
+                e.target.value
+                  .split(',')
+                  .map((item) => item.trim())
+                  .filter(Boolean)
+              )
+            }
+            placeholder="e.g., concentration-sensitive, pregnancy caution, photo-instability"
+          />
+        </div>
+
         <Textarea
           value={value}
           onChange={(e) => onChange(e.target.value.slice(0, maxLength))}

@@ -148,12 +148,35 @@ serve(async (req) => {
 
     const { data: latestValidation } = await supabase
       .from("ingredient_validations")
-      .select("updated_at")
+      .select("updated_at, moderator_review_status")
       .eq("analysis_id", analysisId)
       .eq("ingredient_name", ingredientName)
       .order("updated_at", { ascending: false })
       .limit(1)
       .maybeSingle();
+
+    if (!latestValidation || latestValidation.moderator_review_status !== "approved") {
+      await supabase.from("user_events").insert({
+        user_id: analysis.user_id,
+        event_name: "review_update_email_skipped",
+        event_category: "verification",
+        event_properties: {
+          analysis_id: analysisId,
+          ingredient_name: ingredientName,
+          skip_reason: "moderator_approval_required",
+          moderator_review_status: latestValidation?.moderator_review_status || null,
+        },
+        page_url: `/analysis/${analysisId}`,
+      });
+
+      return new Response(
+        JSON.stringify({ ok: true, skipped: "moderator_approval_required" }),
+        {
+          status: 200,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        }
+      );
+    }
 
     const reviewedAtRaw = latestValidation?.updated_at || new Date().toISOString();
     const reviewedAtText = new Date(reviewedAtRaw).toLocaleString("en-US", {

@@ -21,5 +21,11 @@ export const getKioskRedirectPath = (pathname: string, search: string): string |
     return `${pathname}?${searchParams.toString()}`;
   }
 
+  if (pathname === "/compare") {
+    if (searchParams.get("kiosk") === "1") return null;
+    searchParams.set("kiosk", "1");
+    return `/compare?${searchParams.toString()}`;
+  }
+
   return "/kiosk";
 };

@@ -34,7 +34,7 @@ import invokeFunction from '@/lib/functions-client';
 interface UserRole {
   id: string;
   user_id: string;
-  role: 'admin' | 'moderator' | 'user';
+  role: 'admin' | 'moderator' | 'reviewer' | 'user';
   created_at: string;
   user_email?: string;
 }
@@ -189,6 +189,8 @@ export default function UserRoleManager({ onStatsUpdate }: UserRoleManagerProps)
         return 'destructive';
       case 'moderator':
         return 'default';
+      case 'reviewer':
+        return 'outline';
       default:
         return 'secondary';
     }
@@ -248,6 +250,7 @@ export default function UserRoleManager({ onStatsUpdate }: UserRoleManagerProps)
                     <SelectContent>
                       <SelectItem value="admin">Admin - Full system access</SelectItem>
                       <SelectItem value="moderator">Moderator - Can validate ingredients</SelectItem>
+                      <SelectItem value="reviewer">Reviewer - Student reviewer access</SelectItem>
                       <SelectItem value="user">User - Regular user</SelectItem>
                     </SelectContent>
                   </Select>

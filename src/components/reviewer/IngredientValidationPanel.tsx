@@ -27,6 +27,7 @@ const normalizeLoadedCitationType = (value?: string): Citation['type'] => {
 };
 
 type SafetyLabel = 'safe' | 'concern' | 'needs_more_data' | '';
+type CompatibilityAssessment = 'compatible' | 'caution' | 'avoid' | 'needs_more_data' | 'unknown';
 
 const normalizeSafetyLabel = (value?: string | null): SafetyLabel => {
   const normalized = String(value || '').trim().toLowerCase();
@@ -85,7 +86,10 @@ interface ValidationData {
   correction?: string;
   escalationReason?: string;
   internalNotes?: string;
-  moderatorReviewStatus: 'pending' | 'approved' | 'rejected';
+  nuanceFlags: string[];
+  compatibilityAssessment: CompatibilityAssessment;
+  compatibilityNotes?: string;
+  moderatorReviewStatus: 'pending' | 'approved' | 'rejected' | 'needs_revision';
 }
 
 const LOCAL_DRAFT_VERSION = 1;
@@ -110,6 +114,9 @@ interface LocalValidationDraft {
     correction?: string;
     escalationReason?: string;
     internalNotes?: string;
+    nuanceFlags: string[];
+    compatibilityAssessment: CompatibilityAssessment;
+    compatibilityNotes?: string;
     moderatorReviewStatus: ValidationData['moderatorReviewStatus'];
   };
 }
@@ -135,8 +142,15 @@ const normalizeLoadedVerdict = (value?: string): ValidationData['verdict'] => {
 };
 
 const normalizeLoadedReviewStatus = (value?: string): ValidationData['moderatorReviewStatus'] => {
-  if (value === 'approved' || value === 'rejected' || value === 'pending') return value;
+  if (value === 'approved' || value === 'rejected' || value === 'pending' || value === 'needs_revision') return value;
   return 'pending';
+};
+
+const normalizeLoadedCompatibilityAssessment = (value?: string): CompatibilityAssessment => {
+  if (value === 'compatible' || value === 'caution' || value === 'avoid' || value === 'needs_more_data' || value === 'unknown') {
+    return value;
+  }
+  return 'unknown';
 };
 
 const parseLocalDraft = (rawDraft: string | null): LocalValidationDraft | null => {
@@ -175,6 +189,7 @@ const sanitizeDraftCitations = (value: unknown): Citation[] => {
 interface IngredientValidationPanelProps {
   ingredientId: string;
   ingredientName: string;
+  userSkinType?: string;
   analysisId?: string;
   pubchemCid?: string | null;
   molecularWeight?: number | null;
@@ -189,6 +204,7 @@ interface IngredientValidationPanelProps {
 export function IngredientValidationPanel({
   ingredientId,
   ingredientName,
+  userSkinType,
   analysisId,
   pubchemCid,
   molecularWeight,
@@ -205,6 +221,7 @@ export function IngredientValidationPanel({
   const [aiApprovalActive, setAiApprovalActive] = useState(false);
   const [viewerId, setViewerId] = useState<string | null>(null);
   const [viewerIsAdmin, setViewerIsAdmin] = useState(false);
+  const [viewerCanModerate, setViewerCanModerate] = useState(false);
   const [existingValidatorId, setExistingValidatorId] = useState<string | null>(null);
   const [existingValidationStatus, setExistingValidationStatus] = useState<string | null>(null);
   const [displayMode, setDisplayMode] = useState(false);
@@ -228,6 +245,9 @@ export function IngredientValidationPanel({
     confidenceLevel: '',
     verdict: '',
     correctedSafetyLevel: '',
+    nuanceFlags: [],
+    compatibilityAssessment: 'unknown',
+    compatibilityNotes: '',
     moderatorReviewStatus: 'pending'
   });
 
@@ -277,8 +297,10 @@ export function IngredientValidationPanel({
           .in('role', ['admin', 'moderator']);
 
         const isAdmin = roleRows?.some((row) => row.role === 'admin') ?? false;
+        const canModerate = Boolean(roleRows?.length);
         const canUseExtendedSources = Boolean(roleRows?.length);
         setViewerIsAdmin(isAdmin);
+        setViewerCanModerate(canModerate);
         setAllowExtendedSourceTypes(canUseExtendedSources);
 
         const applyLocalDraft = (baseData: ValidationData) => {
@@ -346,6 +368,17 @@ export function IngredientValidationPanel({
               typeof draftData.escalationReason === 'string' ? draftData.escalationReason : baseData.escalationReason,
             internalNotes:
               typeof draftData.internalNotes === 'string' ? draftData.internalNotes : baseData.internalNotes,
+            nuanceFlags: Array.isArray(draftData.nuanceFlags)
+              ? draftData.nuanceFlags.map((entry) => String(entry).trim()).filter(Boolean)
+              : baseData.nuanceFlags,
+            compatibilityAssessment:
+              typeof draftData.compatibilityAssessment === 'string'
+                ? normalizeLoadedCompatibilityAssessment(draftData.compatibilityAssessment)
+                : baseData.compatibilityAssessment,
+            compatibilityNotes:
+              typeof draftData.compatibilityNotes === 'string'
+                ? draftData.compatibilityNotes
+                : baseData.compatibilityNotes,
             moderatorReviewStatus:
               typeof draftData.moderatorReviewStatus === 'string'
                 ? normalizeLoadedReviewStatus(draftData.moderatorReviewStatus)
@@ -395,6 +428,9 @@ export function IngredientValidationPanel({
           correction: undefined,
           escalationReason: undefined,
           internalNotes: '',
+          nuanceFlags: [],
+          compatibilityAssessment: 'unknown',
+          compatibilityNotes: '',
           moderatorReviewStatus: 'pending',
           validationId: undefined
         };
@@ -406,9 +442,10 @@ export function IngredientValidationPanel({
         } else {
           const canEditExisting = isAdmin || data.validator_id === user.id;
           const validationStatus = data.validation_status || null;
+          const moderationStatus = data.moderator_review_status || 'pending';
           setExistingValidatorId(data.validator_id || null);
           setExistingValidationStatus(validationStatus);
-          setDisplayMode(validationStatus === 'validated' || !canEditExisting);
+          setDisplayMode((validationStatus === 'validated' && moderationStatus === 'approved') || !canEditExisting);
 
           const citationData = await (supabase as any)
             .from('ingredient_validation_citations')
@@ -429,6 +466,9 @@ export function IngredientValidationPanel({
             correction: data.correction_notes,
             escalationReason: data.escalation_reason,
             internalNotes: data.internal_notes || '',
+            nuanceFlags: Array.isArray(data.nuance_flags) ? data.nuance_flags.map((entry: any) => String(entry)) : [],
+            compatibilityAssessment: normalizeLoadedCompatibilityAssessment(data.compatibility_assessment || undefined),
+            compatibilityNotes: data.compatibility_notes || '',
             moderatorReviewStatus: normalizeLoadedReviewStatus(data.moderator_review_status),
             citations: (citationData.data || []).map((c: any) => ({
               type: normalizeLoadedCitationType(c.citation_type),
@@ -471,7 +511,10 @@ export function IngredientValidationPanel({
       formData.correctedSafetyLevel !== '' ||
       Boolean(formData.correction?.trim()) ||
       Boolean(formData.escalationReason?.trim()) ||
-      Boolean(formData.internalNotes?.trim())
+      Boolean(formData.internalNotes?.trim()) ||
+      formData.nuanceFlags.length > 0 ||
+      formData.compatibilityAssessment !== 'unknown' ||
+      Boolean(formData.compatibilityNotes?.trim())
     );
   };
 
@@ -487,6 +530,9 @@ export function IngredientValidationPanel({
       correction: formData.correction,
       escalationReason: formData.escalationReason,
       internalNotes: formData.internalNotes,
+      nuanceFlags: formData.nuanceFlags,
+      compatibilityAssessment: formData.compatibilityAssessment,
+      compatibilityNotes: formData.compatibilityNotes,
       moderatorReviewStatus: formData.moderatorReviewStatus,
       citations: formData.citations,
       currentStep,
@@ -530,6 +576,9 @@ export function IngredientValidationPanel({
           correction: formData.correction,
           escalationReason: formData.escalationReason,
           internalNotes: formData.internalNotes,
+          nuanceFlags: formData.nuanceFlags,
+          compatibilityAssessment: formData.compatibilityAssessment,
+          compatibilityNotes: formData.compatibilityNotes,
           moderatorReviewStatus: formData.moderatorReviewStatus
         }
       };
@@ -663,8 +712,11 @@ export function IngredientValidationPanel({
         correction_notes: mergedData.correction,
         escalation_reason: mergedData.escalationReason,
         internal_notes: mergedData.internalNotes,
+        nuance_flags: mergedData.nuanceFlags,
+        compatibility_assessment: mergedData.compatibilityAssessment,
+        compatibility_notes: mergedData.compatibilityNotes,
         is_escalated: mergedData.verdict === 'escalate',
-        moderator_review_status: mergedData.moderatorReviewStatus,
+        moderator_review_status: viewerCanModerate ? mergedData.moderatorReviewStatus : 'pending',
         corrected_safety_level: mergedData.correctedSafetyLevel || null,
         validation_status: validationStatus,
         updated_at: new Date().toISOString(),
@@ -731,11 +783,15 @@ export function IngredientValidationPanel({
       setFormData(prev => ({
         ...prev,
         ...mergedData,
+        moderatorReviewStatus: viewerCanModerate ? mergedData.moderatorReviewStatus : 'pending',
         validationId
       }));
       setExistingValidatorId(user.id);
-      setExistingValidationStatus(validationStatus);
-      if (validationStatus === 'validated') {
+      const effectiveStatus = viewerCanModerate
+        ? validationStatus
+        : (mergedData.moderatorReviewStatus === 'approved' ? validationStatus : 'pending');
+      setExistingValidationStatus(effectiveStatus);
+      if (effectiveStatus === 'validated') {
         setDisplayMode(true);
       }
 
@@ -763,6 +819,11 @@ export function IngredientValidationPanel({
             toast({
               title: "Email skipped",
               description: "Scan owner email is missing, so no notification email was sent."
+            });
+          } else if (emailResult?.skipped === 'moderator_approval_required') {
+            toast({
+              title: "Awaiting moderator approval",
+              description: "Notification email will send after moderator approval."
             });
           }
         } catch (emailError: any) {
@@ -833,6 +894,7 @@ export function IngredientValidationPanel({
         return (
           <OEWObservationPanel
             ingredientName={formData.observations.ingredientName}
+            userSkinType={userSkinType}
             aiClaimSummary={formData.observations.aiClaimSummary}
             aiRoleClassification={formData.observations.aiRoleClassification}
             aiSafetyLevel={formData.observations.aiSafetyLevel}
@@ -950,6 +1012,16 @@ export function IngredientValidationPanel({
           <InternalNotesPanel
             value={formData.internalNotes || ''}
             onChange={(value) => setFormData(prev => ({ ...prev, internalNotes: value }))}
+            nuanceFlags={formData.nuanceFlags}
+            onNuanceFlagsChange={(nuanceFlags) => setFormData(prev => ({ ...prev, nuanceFlags }))}
+            compatibilityAssessment={formData.compatibilityAssessment}
+            onCompatibilityAssessmentChange={(compatibilityAssessment) =>
+              setFormData(prev => ({ ...prev, compatibilityAssessment }))
+            }
+            compatibilityNotes={formData.compatibilityNotes || ''}
+            onCompatibilityNotesChange={(compatibilityNotes) =>
+              setFormData(prev => ({ ...prev, compatibilityNotes }))
+            }
           />
         );
       default:
@@ -1016,6 +1088,34 @@ export function IngredientValidationPanel({
               </Badge>
             </div>
           </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div className="rounded-md border p-3">
+              <p className="text-xs text-muted-foreground">Compatibility</p>
+              <p className="text-sm font-medium capitalize">{formData.compatibilityAssessment}</p>
+            </div>
+            <div className="rounded-md border p-3">
+              <p className="text-xs text-muted-foreground">Nuance Flags</p>
+              <p className="text-sm font-medium">{formData.nuanceFlags.length || 0}</p>
+            </div>
+          </div>
+          {formData.compatibilityNotes && (
+            <div className="space-y-2">
+              <p className="text-xs uppercase tracking-wide text-muted-foreground">Compatibility Notes</p>
+              <p className="text-sm rounded-md border bg-muted/30 p-3">{formData.compatibilityNotes}</p>
+            </div>
+          )}
+          {formData.nuanceFlags.length > 0 && (
+            <div className="space-y-2">
+              <p className="text-xs uppercase tracking-wide text-muted-foreground">Nuance Flags</p>
+              <div className="flex flex-wrap gap-2">
+                {formData.nuanceFlags.map((flag) => (
+                  <Badge key={flag} variant="outline">
+                    {flag}
+                  </Badge>
+                ))}
+              </div>
+            </div>
+          )}
           {formData.citations.length > 0 && (
             <div className="space-y-2">
               <p className="text-xs uppercase tracking-wide text-muted-foreground">Source IDs</p>

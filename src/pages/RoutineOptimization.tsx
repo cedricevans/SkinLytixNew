@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { PaywallModal } from "@/components/paywall/PaywallModal";
-import { ArrowLeft, AlertTriangle, TrendingDown, DollarSign, CheckCircle, Info, AlertCircle } from "lucide-react";
+import { ArrowLeft, AlertTriangle, TrendingDown, DollarSign, CheckCircle, Info, AlertCircle, ExternalLink, Search } from "lucide-react";
 import { toast } from "@/components/ui/sonner";
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from "@/components/ui/tooltip";
 import AppShell from "@/components/AppShell";
@@ -427,9 +427,28 @@ export default function RoutineOptimization() {
                       )}
                     </div>
                   </div>
-                  <p className="text-sm">
-                    <strong>Alternative:</strong> {item.suggestedAlternative}
-                  </p>
+                  
+                  {/* Alternative Recommendation with Action Buttons */}
+                  <div className="mt-4 p-3 bg-green-50 dark:bg-green-950/30 rounded-md border border-green-200 dark:border-green-800">
+                    <div className="flex items-center justify-between gap-3 mb-2">
+                      <div>
+                        <p className="text-xs font-semibold text-green-700 dark:text-green-400 mb-1">RECOMMENDED ALTERNATIVE:</p>
+                        <p className="text-sm font-medium">{item.suggestedAlternative}</p>
+                      </div>
+                      <Button
+                        size="sm"
+                        variant="default"
+                        onClick={() => {
+                          navigate(`/compare?search=${encodeURIComponent(item.suggestedAlternative)}`);
+                        }}
+                        className="gap-2 whitespace-nowrap"
+                      >
+                        <Search className="w-4 h-4" />
+                        Find Product
+                      </Button>
+                    </div>
+                  </div>
+
                   {item.skinBenefits && (
                     <div className="mt-3 bg-primary/5 p-3 rounded-md border border-primary/10">
                       <p className="text-xs font-semibold text-primary mb-1">

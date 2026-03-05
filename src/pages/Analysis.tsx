@@ -729,7 +729,7 @@ const Analysis = () => {
                   variant="default"
                   size="sm"
                   onClick={() =>
-                    navigate(`/compare?productId=${analysis.id}${isKioskMode ? "&kiosk=1" : ""}`)
+                    navigate(`/compare?productId=${analysis.id}${isKioskMode ? `&kiosk=1&analysis_id=${analysis.id}` : ""}`)
                   }
                 >
                   <Sparkles className="w-4 h-4 mr-2" />
@@ -883,7 +883,7 @@ const Analysis = () => {
             <Button
               variant="outline"
               onClick={() =>
-                navigate(`/compare?productId=${analysis.id}${isKioskMode ? "&kiosk=1" : ""}`)
+                navigate(`/compare?productId=${analysis.id}${isKioskMode ? `&kiosk=1&analysis_id=${analysis.id}` : ""}`)
               }
               className="gap-2 w-full sm:w-auto"
             >

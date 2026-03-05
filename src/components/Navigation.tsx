@@ -50,7 +50,8 @@ const Navigation = ({
   const { hasAccess: hasReviewerAccess } = useReviewerAccess();
   const { toast } = useToast();
   const [userEmail, setUserEmail] = useState<string | null>(null);
-  const [isAdmin, setIsAdmin] = useState(false);
+  const [hasAdminRole, setHasAdminRole] = useState(false);
+  const [hasModeratorRole, setHasModeratorRole] = useState(false);
   const [isWaitlister, setIsWaitlister] = useState(false);
   const isAppNav = variant === "app";
   const navigationItems = isAppNav ? appNavigationItems : marketingNavigationItems;
@@ -80,7 +81,8 @@ const Navigation = ({
       if (!user) {
         setUserInitials("SL");
         setUserEmail(null);
-        setIsAdmin(false);
+        setHasAdminRole(false);
+        setHasModeratorRole(false);
         setIsWaitlister(false);
         if (typeof window !== "undefined") {
           localStorage.removeItem("sl_user_initials");
@@ -95,18 +97,24 @@ const Navigation = ({
       const email = user.email || null;
       setUserEmail(email);
       const emailIsAdmin = email ? ADMIN_EMAILS.includes(email) : false;
-      setIsAdmin(emailIsAdmin);
+      setHasAdminRole(emailIsAdmin);
+      setHasModeratorRole(false);
       try {
         const { data: roles } = await supabase
           .from('user_roles')
           .select('role')
           .eq('user_id', user.id)
-          .eq('role', 'admin')
-          .maybeSingle();
-        setIsAdmin(emailIsAdmin || !!roles);
+          .in('role', ['admin', 'moderator']);
+        const hasAdminDbRole = Boolean(roles?.some((row) => row.role === 'admin'));
+        const hasModeratorDbRole = Boolean(roles?.some((row) => row.role === 'moderator'));
+        const adminAccess = emailIsAdmin || hasAdminDbRole;
+        const moderatorAccess = hasModeratorDbRole;
+        setHasAdminRole(adminAccess);
+        setHasModeratorRole(moderatorAccess);
       } catch (e) {
         console.error('Failed to load admin role', e);
-        setIsAdmin(emailIsAdmin);
+        setHasAdminRole(emailIsAdmin);
+        setHasModeratorRole(false);
       }
 
       try {
@@ -231,11 +239,20 @@ const Navigation = ({
           <User className="mr-2 h-4 w-4" />
           Profile
         </DropdownMenuItem>
-        {isAdmin && (
+        {hasModeratorRole && (
+          <>
+            <DropdownMenuItem onClick={() => navigate("/moderation")}>
+              <ClipboardCheck className="mr-2 h-4 w-4" />
+              Moderation
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+          </>
+        )}
+        {hasAdminRole && (
           <>
             <DropdownMenuItem onClick={() => navigate("/admin")}>
               <Shield className="mr-2 h-4 w-4" />
-              Admin Dashboard
+              Admin
             </DropdownMenuItem>
             <DropdownMenuSeparator />
           </>
@@ -337,7 +354,19 @@ const Navigation = ({
                 Reviewer
               </button>
             )}
-            {isAdmin && (
+            {hasModeratorRole && (
+              <button
+                onClick={() => {
+                  navigate('/moderation');
+                  setOpen(false);
+                }}
+                className="text-left px-4 py-3 text-lg font-subheading hover:bg-accent/10 rounded-lg transition-colors flex items-center gap-2 text-amber-600"
+              >
+                <ClipboardCheck className="w-5 h-5" />
+                Moderation
+              </button>
+            )}
+            {hasAdminRole && (
               <button
                 onClick={() => {
                   navigate('/admin');
@@ -346,7 +375,7 @@ const Navigation = ({
                 className="text-left px-4 py-3 text-lg font-subheading hover:bg-accent/10 rounded-lg transition-colors flex items-center gap-2 text-red-600"
               >
                 <Shield className="w-5 h-5" />
-                Admin Dashboard
+                Admin
               </button>
             )}
             {isAppNav && onAskGpt && (
@@ -403,7 +432,16 @@ const Navigation = ({
             Reviewer
           </button>
         )}
-        {isAdmin && (
+        {hasModeratorRole && (
+          <button
+            onClick={() => navigate('/moderation')}
+            className="text-sm font-subheading text-primary-foreground hover:text-primary-foreground/80 transition-colors flex items-center gap-1.5"
+          >
+            <ClipboardCheck className="w-4 h-4" />
+            Moderator
+          </button>
+        )}
+        {hasAdminRole && (
           <button
             onClick={() => navigate('/admin')}
             className="text-sm font-subheading text-primary-foreground hover:text-primary-foreground/80 transition-colors flex items-center gap-1.5"

@@ -454,6 +454,8 @@ export type Database = {
           ai_explanation_accurate: boolean | null
           ai_role_classification_correct: boolean | null
           analysis_id: string | null
+          compatibility_assessment: string
+          compatibility_notes: string | null
           confidence_level: string | null
           corrected_role: string | null
           corrected_safety_level: string | null
@@ -464,8 +466,12 @@ export type Database = {
           ingredient_name: string
           internal_notes: string | null
           is_escalated: boolean | null
+          moderator_feedback: string | null
+          moderator_reviewed_at: string | null
+          moderator_reviewer_id: string | null
           moderator_review_status: string | null
           molecular_weight_correct: boolean | null
+          nuance_flags: Json
           pubchem_cid_verified: string | null
           pubchem_data_correct: boolean | null
           public_explanation: string | null
@@ -481,6 +487,8 @@ export type Database = {
           ai_explanation_accurate?: boolean | null
           ai_role_classification_correct?: boolean | null
           analysis_id?: string | null
+          compatibility_assessment?: string
+          compatibility_notes?: string | null
           confidence_level?: string | null
           corrected_role?: string | null
           corrected_safety_level?: string | null
@@ -491,8 +499,12 @@ export type Database = {
           ingredient_name: string
           internal_notes?: string | null
           is_escalated?: boolean | null
+          moderator_feedback?: string | null
+          moderator_reviewed_at?: string | null
+          moderator_reviewer_id?: string | null
           moderator_review_status?: string | null
           molecular_weight_correct?: boolean | null
+          nuance_flags?: Json
           pubchem_cid_verified?: string | null
           pubchem_data_correct?: boolean | null
           public_explanation?: string | null
@@ -508,6 +520,8 @@ export type Database = {
           ai_explanation_accurate?: boolean | null
           ai_role_classification_correct?: boolean | null
           analysis_id?: string | null
+          compatibility_assessment?: string
+          compatibility_notes?: string | null
           confidence_level?: string | null
           corrected_role?: string | null
           corrected_safety_level?: string | null
@@ -518,8 +532,12 @@ export type Database = {
           ingredient_name?: string
           internal_notes?: string | null
           is_escalated?: boolean | null
+          moderator_feedback?: string | null
+          moderator_reviewed_at?: string | null
+          moderator_reviewer_id?: string | null
           moderator_review_status?: string | null
           molecular_weight_correct?: boolean | null
+          nuance_flags?: Json
           pubchem_cid_verified?: string | null
           pubchem_data_correct?: boolean | null
           public_explanation?: string | null
@@ -1393,7 +1411,7 @@ export type Database = {
       }
     }
     Enums: {
-      app_role: "admin" | "moderator" | "user"
+      app_role: "admin" | "moderator" | "reviewer" | "user"
       skin_type_enum: "oily" | "dry" | "combination" | "sensitive" | "normal"
       subscription_tier: "free" | "premium" | "pro"
     }
@@ -1526,7 +1544,7 @@ export const Constants = {
   },
   public: {
     Enums: {
-      app_role: ["admin", "moderator", "user"],
+      app_role: ["admin", "moderator", "reviewer", "user"],
       skin_type_enum: ["oily", "dry", "combination", "sensitive", "normal"],
       subscription_tier: ["free", "premium", "pro"],
     },

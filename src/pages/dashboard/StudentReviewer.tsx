@@ -34,6 +34,7 @@ import { fetchIngredientExplanations } from '@/lib/ingredient-explanations';
 
 interface ProductAnalysis {
   id: string;
+  user_id: string;
   product_name: string;
   brand?: string | null;
   category?: string | null;
@@ -136,6 +137,7 @@ export default function StudentReviewer() {
   
   // Selected product for validation
   const [selectedProduct, setSelectedProduct] = useState<ProductAnalysis | null>(null);
+  const [selectedProductSkinType, setSelectedProductSkinType] = useState<string | null>(null);
   const [ingredientsList, setIngredientsList] = useState<string[]>([]);
   const [ingredientValidations, setIngredientValidations] = useState<Map<string, IngredientValidation>>(new Map());
   const [ingredientInitialLabels, setIngredientInitialLabels] = useState<Map<string, IngredientCategoryLabel>>(new Map());
@@ -238,15 +240,13 @@ export default function StudentReviewer() {
 
       setUserId(user.id);
 
-      // Reviewer dashboard access: reviewer/admin/moderator roles or certification
+      // Reviewer dashboard access: reviewer role or certification
       const { data: roles } = await supabase
         .from('user_roles')
         .select('role')
         .eq('user_id', user.id);
 
-      const hasReviewerRole = roles?.some(r =>
-        r.role === 'reviewer' || r.role === 'admin' || r.role === 'moderator'
-      );
+      const hasReviewerRole = roles?.some(r => r.role === 'reviewer');
       const isAdmin = roles?.some((r) => r.role === 'admin') ?? false;
       setIsAdminReviewer(isAdmin);
 
@@ -287,7 +287,7 @@ export default function StudentReviewer() {
     // Get recent analyses
     const { data: analyses } = await supabase
       .from('user_analyses')
-      .select('id, product_name, brand, category, epiq_score, ingredients_list, recommendations_json, analyzed_at')
+      .select('id, user_id, product_name, brand, category, epiq_score, ingredients_list, recommendations_json, analyzed_at')
       .order('analyzed_at', { ascending: false })
       .limit(50);
 
@@ -695,6 +695,7 @@ export default function StudentReviewer() {
 
   const selectProduct = async (product: ProductAnalysis, initialIngredient?: string, viewerIsAdmin = isAdminReviewer) => {
     setSelectedProduct(product);
+    setSelectedProductSkinType(null);
     setIngredientInitialLabels(buildIngredientInitialLabels(product.recommendations_json || {}));
     
     // Parse ingredients
@@ -777,6 +778,16 @@ export default function StudentReviewer() {
       console.warn('AI explain-ingredients failed:', error);
     }
     setIngredientAiData(aiMap);
+
+    if (product.user_id) {
+      const { data: ownerProfile } = await supabase
+        .from('profiles')
+        .select('skin_type')
+        .eq('id', product.user_id)
+        .maybeSingle();
+
+      setSelectedProductSkinType(ownerProfile?.skin_type ? String(ownerProfile.skin_type) : null);
+    }
   };
 
   const handleValidationComplete = async () => {
@@ -784,7 +795,7 @@ export default function StudentReviewer() {
 
     const { data: refreshedAnalysis } = await (supabase as any)
       .from('user_analyses')
-      .select('id, product_name, brand, category, epiq_score, ingredients_list, recommendations_json, analyzed_at')
+      .select('id, user_id, product_name, brand, category, epiq_score, ingredients_list, recommendations_json, analyzed_at')
       .eq('id', selectedProduct.id)
       .maybeSingle();
 
@@ -825,6 +836,7 @@ export default function StudentReviewer() {
 
   const exitProductValidation = () => {
     setSelectedProduct(null);
+    setSelectedProductSkinType(null);
     setIngredientsList([]);
     setIngredientValidations(new Map());
     setIngredientInitialLabels(new Map());
@@ -1202,7 +1214,7 @@ export default function StudentReviewer() {
 
       const { data: refreshedProduct } = await (supabase as any)
         .from('user_analyses')
-        .select('id, product_name, brand, category, epiq_score, ingredients_list, recommendations_json, analyzed_at')
+        .select('id, user_id, product_name, brand, category, epiq_score, ingredients_list, recommendations_json, analyzed_at')
         .eq('id', selectedProduct.id)
         .maybeSingle();
 
@@ -1320,7 +1332,7 @@ export default function StudentReviewer() {
 
       const { data: refreshedProduct } = await (supabase as any)
         .from('user_analyses')
-        .select('id, product_name, brand, category, epiq_score, ingredients_list, recommendations_json, analyzed_at')
+        .select('id, user_id, product_name, brand, category, epiq_score, ingredients_list, recommendations_json, analyzed_at')
         .eq('id', selectedProduct.id)
         .maybeSingle();
 
@@ -1434,6 +1446,11 @@ export default function StudentReviewer() {
               <p className="text-sm text-muted-foreground">
                 {selectedProduct.brand ? `${selectedProduct.brand} • ` : ''}Ingredient Validation
               </p>
+              {selectedProductSkinType && (
+                <p className="text-xs text-muted-foreground mt-1">
+                  User Skin Type: <span className="font-medium capitalize">{selectedProductSkinType}</span>
+                </p>
+              )}
             </div>
             <Button variant="ghost" onClick={exitProductValidation} className="w-full sm:w-auto">
               Back to Products
@@ -1619,6 +1636,7 @@ export default function StudentReviewer() {
                     key={`${selectedProduct.id}-${selectedIngredient}`}
                     ingredientId={selectedIngredient.toLowerCase()}
                     ingredientName={selectedIngredient}
+                    userSkinType={selectedProductSkinType || undefined}
                     analysisId={selectedProduct.id}
                     pubchemCid={currentCache?.pubchem_cid}
                     molecularWeight={currentCache?.molecular_weight}

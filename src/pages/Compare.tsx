@@ -32,7 +32,7 @@ const CATEGORY_FILTERS = ["all", "face", "body", "hair", "scalp"];
 const norm = (v) => String(v || "").trim();
 
 const CACHE_TTL_MS = 1000 * 60 * 60 * 24 * 7; // 7 days
-const ANALYSES_CACHE_TTL_MS = 1000 * 60 * 60 * 24 * 2; // 2 days
+const ANALYSES_CACHE_TTL_MS = 1000 * 60 * 60 * 4; // 4 hours (reduced from 2 days)
 
 // ---------- ingredient similarity (My Products Match) ----------
 const normalizeIngredient = (s) =>
@@ -271,6 +271,9 @@ export default function Compare() {
   const location = useLocation();
 
   const topRef = useRef(null);
+
+  const isKioskMode = new URLSearchParams(location.search).get("kiosk") === "1";
+  const kioskAnalysisId = new URLSearchParams(location.search).get("analysis_id") || null;
 
   const [isInitializing, setIsInitializing] = useState(true);
 
@@ -766,6 +769,50 @@ export default function Compare() {
     };
   }, [navigate]);
 
+  // ---------- Real-time updates subscription ----------
+  useEffect(() => {
+    if (!userId) return;
+
+    const channel = supabase
+      .channel(`compare-analyses-${userId}`)
+      .on(
+        "postgres_changes",
+        { 
+          event: "UPDATE", 
+          schema: "public", 
+          table: "user_analyses", 
+          filter: `user_id=eq.${userId}` 
+        },
+        () => {
+          // Refresh analyses when any are updated
+          (async () => {
+            try {
+              const { data: analysesData } = await supabase
+                .from("user_analyses")
+                .select("id, product_name, brand, epiq_score, epiq_match_tier, epiq_match_pct, epiq_match_color, melanin_alert, product_price, category, analyzed_at, image_url")
+                .eq("user_id", userId)
+                .order("analyzed_at", { ascending: false })
+                .limit(50);
+
+              if (Array.isArray(analysesData)) {
+                const unique = Array.from(new Map(analysesData.map((a) => [a.id, a])).values());
+                setAnalyses(unique);
+                writeAnalysesLocalCache(userId, unique);
+              }
+            } catch (error) {
+              console.error("Failed to refresh analyses on update:", error);
+            }
+          })();
+        }
+      );
+
+    channel.subscribe();
+
+    return () => {
+      void supabase.removeChannel(channel);
+    };
+  }, [userId]);
+
   // ---------- URL change handling ----------
   useEffect(() => {
     if (!analyses.length) return;
@@ -876,6 +923,7 @@ export default function Compare() {
             similarity: score,
             sharedCount,
             sharedSample,
+            beneficial_ingredients: a.recommendations_json?.beneficial_ingredients || [],
           };
         })
         .filter((m) => m.similarity > 0)
@@ -950,12 +998,19 @@ export default function Compare() {
   const baseName = selectedProduct?.product_name || "Base product";
 
   return (
-    <AppShell showNavigation showBottomNav contentClassName="px-[5px] lg:px-4 py-6">
+    <AppShell showNavigation={!isKioskMode} showBottomNav={!isKioskMode} contentClassName="px-[5px] lg:px-4 py-6">
       <main className="container mx-auto pb-24 lg:pb-8" ref={topRef}>
-        <Button variant="ghost" onClick={() => navigate(-1)} className="mb-4 -ml-2">
-          <ArrowLeft className="w-4 h-4 mr-2" />
-          Back
-        </Button>
+        {isKioskMode && kioskAnalysisId ? (
+          <Button variant="ghost" onClick={() => navigate(`/analysis/${kioskAnalysisId}?kiosk=1`)} className="mb-4 -ml-2">
+            <ArrowLeft className="w-4 h-4 mr-2" />
+            Back to Scan
+          </Button>
+        ) : (
+          <Button variant="ghost" onClick={() => navigate(-1)} className="mb-4 -ml-2">
+            <ArrowLeft className="w-4 h-4 mr-2" />
+            Back
+          </Button>
+        )}
 
         <div className="mb-6">
           <h1 className="text-2xl md:text-3xl font-bold text-foreground flex items-center gap-2">

@@ -23,9 +23,7 @@ export function useReviewerAccess() {
           .select('role')
           .eq('user_id', user.id);
 
-        const hasRole = roles?.some(r =>
-          r.role === 'reviewer' || r.role === 'admin' || r.role === 'moderator'
-        );
+        const hasRole = roles?.some(r => r.role === 'reviewer');
 
         const { data: certification } = await supabase
           .from('student_certifications')

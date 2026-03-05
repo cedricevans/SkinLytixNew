@@ -12,6 +12,7 @@ import {
 
 interface OEWObservationPanelProps {
   ingredientName: string;
+  userSkinType?: string;
   aiClaimSummary: string;
   aiRoleClassification?: string;
   aiSafetyLevel?: string;
@@ -31,6 +32,7 @@ interface OEWObservationPanelProps {
 
 export function OEWObservationPanel({
   ingredientName,
+  userSkinType,
   aiClaimSummary,
   aiRoleClassification,
   aiSafetyLevel,
@@ -135,6 +137,22 @@ export function OEWObservationPanel({
                 </div>
               </div>
             )}
+          </div>
+        )}
+
+        {userSkinType && (
+          <div className="space-y-2">
+            <p className="text-xs text-muted-foreground uppercase tracking-wide font-medium">
+              User Skin Type (Reviewer-visible)
+            </p>
+            <div className="p-3 bg-muted/50 rounded-lg border border-muted">
+              <Badge variant="outline" className="capitalize">
+                {userSkinType}
+              </Badge>
+              <p className="text-xs text-muted-foreground mt-2">
+                Limited profile context shared with reviewer.
+              </p>
+            </div>
           </div>
         )}
 

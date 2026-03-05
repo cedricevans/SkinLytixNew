@@ -93,9 +93,9 @@ const KioskMode = () => {
         await supabase.auth.signOut();
         if (!isMounted) return;
         toast({
-          title: "Kiosk Account Required",
-          description: `Sign in with ${KIOSK_EMAIL} to use kiosk mode.`,
-          variant: "destructive",
+          title: "Switched to Kiosk Mode",
+          description: "Your personal account has been securely logged out for privacy and security. Kiosk mode runs in isolation to protect your data.",
+          variant: "default",
         });
         navigate("/auth?tab=signin", { replace: true });
         return;

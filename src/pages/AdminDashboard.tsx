@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
-import { useToast } from '@/hooks/use-toast';
 import AppShell from '@/components/AppShell';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -17,7 +16,8 @@ import {
   Lock,
   Mail,
   Monitor,
-  Smartphone
+  Smartphone,
+  ClipboardCheck
 } from 'lucide-react';
 import invokeFunction from '@/lib/functions-client';
 import UserRoleManager from '@/components/admin/UserRoleManager';
@@ -26,6 +26,7 @@ import ReviewerGroupManager from '@/components/admin/ReviewerGroupManager';
 import AuditLog from '@/components/admin/AuditLog';
 import WaitlistMagicLinkManager from '@/components/admin/WaitlistMagicLinkManager';
 import KioskAnalyticsManager from '@/components/admin/KioskAnalyticsManager';
+import ModerationQueueManager from '@/components/admin/ModerationQueueManager';
 
 // Authorized admin emails
 const ADMIN_EMAILS = [
@@ -35,7 +36,6 @@ const ADMIN_EMAILS = [
 
 export default function AdminDashboard() {
   const navigate = useNavigate();
-  const { toast } = useToast();
   const [loading, setLoading] = useState(true);
   const [isAuthorized, setIsAuthorized] = useState(false);
   const [user, setUser] = useState<any>(null);
@@ -246,7 +246,7 @@ export default function AdminDashboard() {
 
         {/* Management Tabs */}
         <Tabs defaultValue="users" className="w-full">
-          <TabsList className="grid w-full grid-cols-2 sm:grid-cols-6 gap-2 h-auto">
+          <TabsList className="grid w-full grid-cols-2 sm:grid-cols-7 gap-2 h-auto">
             <TabsTrigger value="users" className="flex items-center gap-2">
               <Users className="h-4 w-4" />
               <span className="hidden sm:inline">Users & Roles</span>
@@ -266,6 +266,11 @@ export default function AdminDashboard() {
               <BarChart3 className="h-4 w-4" />
               <span className="hidden sm:inline">Audit Log</span>
               <span className="sm:hidden">Audit</span>
+            </TabsTrigger>
+            <TabsTrigger value="moderation" className="flex items-center gap-2">
+              <ClipboardCheck className="h-4 w-4" />
+              <span className="hidden sm:inline">Moderation</span>
+              <span className="sm:hidden">Review</span>
             </TabsTrigger>
             <TabsTrigger value="waitlist" className="flex items-center gap-2">
               <Mail className="h-4 w-4" />
@@ -297,6 +302,10 @@ export default function AdminDashboard() {
           {/* Audit Log Tab */}
           <TabsContent value="audit" className="mt-6">
             <AuditLog />
+          </TabsContent>
+
+          <TabsContent value="moderation" className="mt-6">
+            <ModerationQueueManager />
           </TabsContent>
 
           {/* Waitlist Campaign Tab */}
