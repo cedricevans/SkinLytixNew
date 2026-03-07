@@ -34,6 +34,19 @@ const norm = (v) => String(v || "").trim();
 const CACHE_TTL_MS = 1000 * 60 * 60 * 24 * 7; // 7 days
 const ANALYSES_CACHE_TTL_MS = 1000 * 60 * 60 * 4; // 4 hours (reduced from 2 days)
 
+// ---------- TypeScript types ----------
+interface FindMarketDupesOptions {
+  force?: boolean;
+  productId?: string;
+}
+
+interface SelectProductOptions {
+  skipUrl?: boolean;
+  goToMarket?: boolean;
+  scrollTop?: boolean;
+  autoFindDupes?: boolean;
+}
+
 // ---------- ingredient similarity (My Products Match) ----------
 const normalizeIngredient = (s) =>
   String(s || "")
@@ -413,7 +426,7 @@ export default function Compare() {
   };
 
   // OBF dupes fetch
-  const findMarketDupes = async ({ force = false, productId } = {}) => {
+  const findMarketDupes = async ({ force = false, productId }: FindMarketDupesOptions = {}) => {
     const pid = productId || selectedIdRef.current;
     const product = analyses.find((a) => a.id === pid) || null;
 
@@ -575,7 +588,7 @@ export default function Compare() {
     }
   };
 
-  const selectProduct = async (id, opts = {}) => {
+  const selectProduct = async (id: string, opts: SelectProductOptions = {}) => {
     if (!id) return;
 
     selectedIdRef.current = id;

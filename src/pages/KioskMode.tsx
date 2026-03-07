@@ -69,7 +69,7 @@ const KioskMode = () => {
         user_id: user.id,
         event_name: eventName,
         event_category: "kiosk",
-        event_properties: eventProperties,
+        event_properties: eventProperties as any,
         page_url: typeof window !== "undefined" ? window.location.pathname : null,
         user_agent: typeof navigator !== "undefined" ? navigator.userAgent : null,
       });

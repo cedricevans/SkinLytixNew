@@ -615,8 +615,8 @@ const Analysis = () => {
   });
 
   const showEpiqScoreSublabel =
-    analysis.show_epiq_score_sublabel ??
-    analysis.recommendations_json?.show_epiq_score_sublabel ??
+    (analysis.show_epiq_score_sublabel as boolean | undefined) ??
+    (analysis.recommendations_json as any)?.show_epiq_score_sublabel ??
     !matchView.isMelaninAlert;
 
   const melaninAlertMessage =
@@ -947,7 +947,7 @@ const Analysis = () => {
           {showEpiqScoreSublabel && (
             <p className="mt-2 text-xs text-muted-foreground">EpiQ Score: {analysis.epiq_score}</p>
           )}
-          {analysis.recommendations_json?.scan_mode === "quick" && (
+          {(analysis.recommendations_json as any)?.scan_mode === "quick" && (
             <div className="mt-4 space-y-2">
               <Badge variant="outline" className="text-xs uppercase tracking-[0.2em]">
                 Quick Scan Estimate
