@@ -30,13 +30,5 @@ export default defineConfig(({ mode }) => {
       },
       extensions: [".ts", ".tsx", ".js", ".jsx", ".json"],
     },
-    build: {
-      rollupOptions: {
-        input: {
-          main: path.resolve(__dirname, "index.html"),
-        },
-      },
-      target: "ES2020",
-    },
   };
 });
