@@ -5,6 +5,7 @@ type InvokeResult = any;
 const KIOSK_ALLOWED_FUNCTIONS = new Set([
   'extract-ingredients',
   'analyze-product',
+  'find-dupes',
   'delete-analysis',
   'create-kiosk-transfer',
 ]);
