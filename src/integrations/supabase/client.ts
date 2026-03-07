@@ -2,9 +2,17 @@
 import { createClient } from '@supabase/supabase-js';
 import type { Database } from './types';
 
-const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
+const normalizeEnv = (value: unknown): string | undefined => {
+  if (typeof value !== 'string') return undefined;
+  const trimmed = value.trim();
+  return trimmed.replace(/^['"]+|['"]+$/g, '') || undefined;
+};
+
+const SUPABASE_URL = normalizeEnv(import.meta.env.VITE_SUPABASE_URL);
 // Support both env var names used across the repo: prefer ANON key, fall back to PUBLISHABLE
-const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY ?? import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+const SUPABASE_ANON_KEY = normalizeEnv(
+  import.meta.env.VITE_SUPABASE_ANON_KEY ?? import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+);
 
 // Basic runtime validation to make startup errors clearer when env vars are misconfigured.
 if (!SUPABASE_URL || typeof SUPABASE_URL !== 'string' || !/^https?:\/\//i.test(SUPABASE_URL)) {
