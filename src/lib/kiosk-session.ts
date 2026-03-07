@@ -1,4 +1,4 @@
-import { supabase } from "@/integrations/supabase/client";
+import { supabase } from "@/integrations/supabase";
 import invokeFunction from "@/lib/functions-client";
 
 type KioskPurgeResult = {

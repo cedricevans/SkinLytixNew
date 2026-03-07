@@ -9,7 +9,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
-import { supabase } from '@/integrations/supabase/client';
+import { supabase } from '@/integrations/supabase';
 import { toast } from '@/components/ui/sonner';
 
 interface PaywallModalProps {

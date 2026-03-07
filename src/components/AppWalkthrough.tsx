@@ -11,7 +11,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Camera, CalendarCheck, User, Sparkles, Target, BarChart3, Shield } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
+import { supabase } from "@/integrations/supabase";
 
 interface WalkthroughStep {
   title: string;

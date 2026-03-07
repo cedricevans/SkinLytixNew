@@ -11,7 +11,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { useNavigate } from "react-router-dom";
 import { useReviewerAccess } from "@/hooks/useReviewerAccess";
-import { supabase } from "@/integrations/supabase/client";
+import { supabase } from "@/integrations/supabase";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 

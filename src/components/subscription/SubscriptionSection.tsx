@@ -4,7 +4,7 @@ import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
-import { supabase } from '@/integrations/supabase/client';
+import { supabase } from '@/integrations/supabase';
 import { useSubscription, SubscriptionTier } from '@/hooks/useSubscription';
 import { useUsageLimits } from '@/hooks/useUsageLimits';
 import { PaywallModal } from '@/components/paywall/PaywallModal';

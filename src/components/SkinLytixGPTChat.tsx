@@ -8,7 +8,7 @@ import { useToast } from "@/hooks/use-toast";
 import { trackEvent } from "@/hooks/useTracking";
 import ReactMarkdown from "react-markdown";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { supabase } from "@/integrations/supabase/client";
+import { supabase } from "@/integrations/supabase";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { useSubscription } from "@/hooks/useSubscription";
 import { useUsageLimits } from "@/hooks/useUsageLimits";

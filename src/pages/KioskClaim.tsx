@@ -5,7 +5,7 @@ import AppShell from "@/components/AppShell";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { supabase } from "@/integrations/supabase/client";
+import { supabase } from "@/integrations/supabase";
 import { useToast } from "@/hooks/use-toast";
 import invokeFunction from "@/lib/functions-client";
 import { isKioskEmail } from "@/lib/kiosk";

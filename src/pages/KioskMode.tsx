@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { supabase } from "@/integrations/supabase/client";
+import { supabase } from "@/integrations/supabase";
 import { useToast } from "@/hooks/use-toast";
 import invokeFunction from "@/lib/functions-client";
 import { isKioskEmail, KIOSK_EMAIL } from "@/lib/kiosk";

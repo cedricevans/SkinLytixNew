@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Award, Users, FlaskConical, Shield, TrendingUp } from 'lucide-react';
-import { supabase } from '@/integrations/supabase/client';
+import { supabase } from '@/integrations/supabase';
 
 interface LiveMetrics {
   totalAnalyses: number;

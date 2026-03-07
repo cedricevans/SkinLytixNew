@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import Navigation from "@/components/Navigation";
 import { SkinTypeQuiz } from "@/components/SkinTypeQuiz";
 import { useToast } from "@/hooks/use-toast";
-import { supabase } from "@/integrations/supabase/client";
+import { supabase } from "@/integrations/supabase";
 
 const Quiz = () => {
   const navigate = useNavigate();

@@ -22,7 +22,7 @@ if (!SUPABASE_ANON_KEY || typeof SUPABASE_ANON_KEY !== 'string') {
 }
 
 // Import the supabase client like this:
-// import { supabase } from "@/integrations/supabase/client";
+// import { supabase } from "@/integrations/supabase";
 
 export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_ANON_KEY, {
   auth: {

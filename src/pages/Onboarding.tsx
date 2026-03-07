@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
-import { supabase } from "@/integrations/supabase/client";
+import { supabase } from "@/integrations/supabase";
 import { Droplets, Wind, Flame, Shield, Sparkles, User, Shirt, Scissors, HelpCircle } from "lucide-react";
 import { useTracking, trackEvent } from "@/hooks/useTracking";
 import { SkinTypeQuiz } from "@/components/SkinTypeQuiz";

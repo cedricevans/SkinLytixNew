@@ -6,7 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
-import { supabase } from "@/integrations/supabase/client";
+import { supabase } from "@/integrations/supabase";
 import Navigation from "@/components/Navigation";
 import { Sparkles, ShieldCheck, FlaskConical, TrendingUp } from "lucide-react";
 import { KIOSK_EMAIL, isKioskEmail } from "@/lib/kiosk";

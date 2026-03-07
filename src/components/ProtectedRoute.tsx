@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Navigate } from 'react-router-dom';
-import { supabase } from '@/integrations/supabase/client';
+import { supabase } from '@/integrations/supabase';
 import { Loader2 } from 'lucide-react';
 
 export const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {

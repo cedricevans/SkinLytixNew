@@ -1,6 +1,6 @@
 import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { supabase } from "@/integrations/supabase/client";
+import { supabase } from "@/integrations/supabase";
 import Navigation from "@/components/Navigation";
 import Hero from "@/components/landing/Hero";
 import ProblemSection from "@/components/landing/ProblemSection";

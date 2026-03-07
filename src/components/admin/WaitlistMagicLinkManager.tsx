@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { supabase } from "@/integrations/supabase";
 import invokeFunction from "@/lib/functions-client";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
