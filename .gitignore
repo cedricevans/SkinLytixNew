@@ -1,4 +1,5 @@
 .DS_Store
+.env
 node_modules
 dist
 dist-ssr
@@ -9,5 +10,10 @@ coverage
 .vscode
 .idea
 .vercel
+test-results/
+playwright-report/
+/Update_edge_for_stripe_cedric.png
+/*.pdf
+/*.xlsx
 supabase/user_analyses-export-2026-02-18_12-45-38.csv
 supabase/*.csv
